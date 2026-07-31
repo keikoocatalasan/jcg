@@ -58,3 +58,13 @@ Thumbs.db
 # Large SDKs and archives
 flutter_sdk/
 flutter_windows.zip
+
+# Opencode skills
+.od-skills/
+
+# Flutter debug screenshots and XMLs
+flutter_app/*.png
+flutter_app/*.xml
+
+# Flutter build reports
+flutter_app/android/build/
