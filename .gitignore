@@ -1,0 +1,60 @@
+# Flutter
+flutter_app/.dart_tool/
+flutter_app/.packages
+flutter_app/.pub/
+flutter_app/build/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+flutter_app/ios/Pods/
+flutter_app/ios/.symlinks/
+flutter_app/android/.gradle/
+flutter_app/android/local.properties
+flutter_app/android/key.properties
+flutter_app/*.iml
+flutter_app/.metadata
+flutter_app/coverage/
+
+# Python / FastAPI
+backend/__pycache__/
+backend/*.pyc
+__pycache__/
+*.py[cod]
+backend/.venv/
+backend/venv/
+backend/.env
+*.egg-info/
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# Environment
+.env
+.env.local
+.env.production
+.qa/credentials.local.env
+
+# Secrets & deployment config
+flutter_app/.env
+supabase/.env
+supabase/config.toml
+*.env
+*.env.*
+!backend/.env.example
+!flutter_app/.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Large SDKs and archives
+flutter_sdk/
+flutter_windows.zip
