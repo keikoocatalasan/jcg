@@ -12,8 +12,31 @@ final onboardingCompleteProvider = StateProvider<bool>((ref) {
 
 String onboardingCompleteKey(String userId) => 'onboarding_complete_$userId';
 
+/// Administrators use the moderation and catalog console, so they do not need
+/// to complete the nutrition-specific onboarding flow before accessing it.
+Future<bool> loadAdminAccess(String userId) async {
+  try {
+    final appUser = await Supabase.instance.client
+        .from('app_user')
+        .select('role(role_code)')
+        .eq('auth_user_id', userId)
+        .maybeSingle();
+    return (appUser?['role'] as Map?)?['role_code'] == 'admin';
+  } catch (_) {
+    return false;
+  }
+}
+
 Future<bool> loadOnboardingComplete(String userId) async {
   bool? localCompletion;
+
+  // Admins should be able to enter the admin console even when they do not
+  // have a consumer profile or nutrition onboarding record.
+  if (await loadAdminAccess(userId)) {
+    await saveOnboardingComplete(userId, true);
+    return true;
+  }
+
   try {
     final local =
         await ProfileRepository(DatabaseProvider()).readByUserId(userId);

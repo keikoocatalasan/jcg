@@ -1,15 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
-import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
-import 'package:jcg_fitness/core/database/sync_queue_repository.dart';
-import 'package:jcg_fitness/core/sync/sync_provider.dart';
+import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
-import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
 import 'package:jcg_fitness/features/food_database/food_provider.dart';
 
@@ -37,7 +32,6 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
   final _priceController = TextEditingController();
 
   String? _selectedCategory;
-  bool _isOfficial = true;
   bool _isActive = true;
   bool _isLocalFood = false;
   bool _isLoading = false;
@@ -50,6 +44,8 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
     final food = widget.existingFood;
     if (food != null) {
       _foodNameController.text = food.foodName;
+      _subcategoryController.text = food.subcategory ?? '';
+      _descriptionController.text = food.description ?? '';
       _servingLabelController.text = food.servingLabel ?? '1 serving';
       _servingGramsController.text =
           food.servingGrams?.toStringAsFixed(1) ?? '';
@@ -59,7 +55,6 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
       _fatController.text = food.fatG.toStringAsFixed(1);
       _priceController.text = food.estimatedPricePhp.toStringAsFixed(2);
       _selectedCategory = food.categoryName;
-      _isOfficial = food.isOfficial;
       _isActive = food.isActive;
       _isLocalFood = food.isLocalFood;
     } else {
@@ -113,14 +108,11 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final session = ref.read(authSessionProvider);
-      if (session == null) {
+      final supabase = ref.read(supabaseClientProvider);
+      if (supabase.auth.currentSession == null) {
         throw Exception('Not authenticated');
       }
 
-      final repo = FoodRepository(DatabaseProvider());
-      final syncRepo = SyncQueueRepository(DatabaseProvider());
-      final now = DateTime.now().toUtc().toIso8601String();
       final foodId =
           _isEditing ? widget.existingFood!.foodId : UuidHelper.generateUuid();
       final servingId = _isEditing
@@ -134,51 +126,34 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
       final fat = double.tryParse(_fatController.text) ?? 0;
       final price = double.tryParse(_priceController.text) ?? 0;
 
-      final food = Food(
-        foodId: foodId,
-        categoryName: _selectedCategory!,
-        subcategory: _subcategoryController.text.trim().isEmpty
+      // Admin catalog writes go through the audited, atomic RPC. This keeps
+      // the console usable on web, where the consumer SQLite cache is not
+      // available, and prevents partially-written food records.
+      await supabase.rpc('admin_upsert_food', params: {
+        'p_food_id': foodId,
+        'p_category_name': _selectedCategory!,
+        'p_subcategory': _subcategoryController.text.trim().isEmpty
             ? null
             : _subcategoryController.text.trim(),
-        ownerUserId: session.user.id,
-        foodName: _foodNameController.text.trim(),
-        normalizedName: _foodNameController.text.trim().toLowerCase(),
-        isLocalFood: _isLocalFood,
-        isOfficial: _isOfficial,
-        isActive: _isActive,
-        servingId: servingId,
-        servingLabel: _servingLabelController.text.trim(),
-        servingGrams: servingGrams,
-        calories: calories,
-        proteinG: protein,
-        carbsG: carbs,
-        fatG: fat,
-        estimatedPricePhp: price,
-        syncStatus: 'pending',
-        createdAt: _isEditing ? widget.existingFood!.createdAt : now,
-        updatedAt: now,
-      );
+        'p_description': _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        'p_food_name': _foodNameController.text.trim(),
+        'p_normalized_name': _foodNameController.text.trim().toLowerCase(),
+        'p_is_local_food': _isLocalFood,
+        'p_is_official': true,
+        'p_is_active': _isActive,
+        'p_serving_id': servingId,
+        'p_serving_label': _servingLabelController.text.trim(),
+        'p_serving_grams': servingGrams,
+        'p_calories': calories,
+        'p_protein_g': protein,
+        'p_carbs_g': carbs,
+        'p_fat_g': fat,
+        'p_price_php': price,
+      });
 
-      if (_isEditing) {
-        await repo.update(food);
-      } else {
-        await repo.insert(food);
-      }
-
-      await syncRepo.insert(SyncQueueEntry(
-        syncQueueId: UuidHelper.generateUuid(),
-        userId: session.user.id,
-        operationId: UuidHelper.generateOperationId(),
-        entityTypeCode: 'custom_food',
-        entityId: foodId,
-        operationCode: _isEditing ? 'update' : 'create',
-        payloadJson: jsonEncode(food.toMap()),
-        clientSequence: DateTime.now().millisecondsSinceEpoch,
-        createdAt: now,
-      ));
-
-      ref.invalidate(allOfficialFoodsProvider);
-      await ref.read(syncProvider.notifier).startSync();
+      ref.invalidate(pagedAdminFoodsProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -398,12 +373,11 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
             Card(
               child: Column(
                 children: [
-                  SwitchListTile(
-                    title: const Text('Official Food'),
-                    subtitle:
-                        const Text('Mark as an admin-verified official food'),
-                    value: _isOfficial,
-                    onChanged: (v) => setState(() => _isOfficial = v),
+                  const ListTile(
+                    leading: Icon(Icons.verified_outlined),
+                    title: Text('Official catalog item'),
+                    subtitle: Text(
+                        'Admin entries are published to the official food catalog.'),
                   ),
                   const Divider(height: 1),
                   SwitchListTile(

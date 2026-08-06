@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/models/profile.dart';
+import 'package:jcg_fitness/core/database/weight_log_repository.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
 import 'package:jcg_fitness/core/utils/date_helper.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
@@ -73,6 +74,11 @@ final updateProfileProvider =
 
   final weightChanged = update.currentWeightKg != null &&
       update.currentWeightKg != profile.currentWeightKg;
+  final nutritionInputsChanged = weightChanged ||
+      update.fitnessGoalCode != null ||
+      update.activityLevelCode != null ||
+      update.age != null ||
+      update.heightCm != null;
 
   await db.transaction((txn) async {
     await txn.update(
@@ -97,7 +103,9 @@ final updateProfileProvider =
     });
   });
 
-  if (weightChanged && update.currentWeightKg != null) {
+  if (nutritionInputsChanged &&
+      weightChanged &&
+      update.currentWeightKg != null) {
     final sexCode = profile.sexCode ?? 'male';
     final age = update.age ?? profile.age ?? 25;
     final heightCm = update.heightCm ?? profile.heightCm ?? 170;
@@ -155,5 +163,60 @@ final updateProfileProvider =
             update.dailyBudgetPhp ?? profile.dailyBudgetPhp,
       },
     );
+  } else if (nutritionInputsChanged) {
+    final latestWeight =
+        await WeightLogRepository(DatabaseProvider()).readLatest(user.id);
+    final weightKg = latestWeight?.weightKg ?? profile.currentWeightKg;
+    final sexCode = profile.sexCode ?? 'male';
+    final age = update.age ?? profile.age ?? 25;
+    final heightCm = update.heightCm ?? profile.heightCm ?? 170;
+    final activityLevelCode =
+        update.activityLevelCode ?? profile.activityLevelCode ?? 'moderate';
+    final fitnessGoalCode =
+        update.fitnessGoalCode ?? profile.fitnessGoalCode ?? 'maintenance';
+
+    if (weightKg != null) {
+      final result = NutritionEngine.calculateAll(
+        weightKg: weightKg,
+        heightCm: heightCm,
+        age: age,
+        sexCode: sexCode,
+        activityLevelCode: activityLevelCode,
+        fitnessGoalCode: fitnessGoalCode,
+      );
+      final today = DateHelper.todayDate();
+      final targetId = UuidHelper.generateUuid();
+      final snapshotId = UuidHelper.generateUuid();
+      await LocalTransactionHelper(DatabaseProvider())
+          .recalculateNutritionTarget(
+        userId: user.id,
+        newTargetData: {
+          'target_id': targetId,
+          'formula_version_code': 'mifflin_stjeor',
+          'fitness_goal_code': fitnessGoalCode,
+          'source_weight_log_id': latestWeight?.weightLogId,
+          'bmr': result.bmr,
+          'tdee': result.tdee,
+          'calorie_target': result.calorieTarget.toDouble(),
+          'protein_target_g': result.proteinG,
+          'carbs_target_g': result.carbsG,
+          'fat_target_g': result.fatG,
+          'water_target_ml': result.waterTargetMl.toDouble(),
+          'effective_from': today,
+        },
+        dailySnapshotData: {
+          'snapshot_id': snapshotId,
+          'nutrition_target_id': targetId,
+          'target_date': today,
+          'calorie_target_snapshot': result.calorieTarget.toDouble(),
+          'protein_target_g_snapshot': result.proteinG,
+          'carbs_target_g_snapshot': result.carbsG,
+          'fat_target_g_snapshot': result.fatG,
+          'water_target_ml_snapshot': result.waterTargetMl.toDouble(),
+          'daily_budget_php_snapshot':
+              update.dailyBudgetPhp ?? profile.dailyBudgetPhp,
+        },
+      );
+    }
   }
 });

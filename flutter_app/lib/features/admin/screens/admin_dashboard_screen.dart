@@ -7,6 +7,7 @@ import 'package:jcg_fitness/core/widgets/empty_state_widget.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
+import 'package:jcg_fitness/features/auth/screens/logout_dialog.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -17,7 +18,16 @@ class AdminDashboardScreen extends ConsumerWidget {
     final kpisAsync = ref.watch(dashboardKpisProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Dashboard')),
+      appBar: AppBar(
+        title: const Text('Admin Dashboard'),
+        actions: [
+          IconButton(
+            tooltip: 'Log out',
+            icon: const Icon(Icons.logout),
+            onPressed: () => LogoutDialog.show(context),
+          ),
+        ],
+      ),
       body: GlassBackground(
         child: adminAsync.when(
           data: (isAdmin) {
@@ -154,18 +164,27 @@ class AdminDashboardScreen extends ConsumerWidget {
           'Awaiting action', false),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.4,
-      ),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        return _buildKpiCard(context, entries[index]);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth >= 900
+            ? 4
+            : constraints.maxWidth >= 600
+                ? 3
+                : 2;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: crossAxisCount == 2 ? 1.4 : 1.7,
+          ),
+          itemCount: entries.length,
+          itemBuilder: (context, index) {
+            return _buildKpiCard(context, entries[index]);
+          },
+        );
       },
     );
   }
@@ -203,32 +222,56 @@ class AdminDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildQuickActions(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.restaurant,
-            label: 'Food\nManagement',
-            onTap: () => context.push('/admin/foods'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.flag,
-            label: 'Reports',
-            onTap: () => context.push('/admin/reports'),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ActionButton(
-            icon: Icons.bar_chart,
-            label: 'Statistics',
-            onTap: () => context.push('/admin/analytics'),
-          ),
-        ),
-      ],
+    final actions = [
+      (
+        icon: Icons.restaurant,
+        label: 'Food\nManagement',
+        onTap: () => context.push('/admin/foods'),
+      ),
+      (
+        icon: Icons.flag,
+        label: 'Reports',
+        onTap: () => context.push('/admin/reports'),
+      ),
+      (
+        icon: Icons.bar_chart,
+        label: 'Statistics',
+        onTap: () => context.push('/admin/analytics'),
+      ),
+      (
+        icon: Icons.fact_check_outlined,
+        label: 'Audit Logs',
+        onTap: () => context.push('/admin/audit'),
+      ),
+      (
+        icon: Icons.manage_accounts_outlined,
+        label: 'User Management',
+        onTap: () => context.push('/admin/users'),
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 700 ? 3 : 2;
+        final itemWidth =
+            (constraints.maxWidth - ((columns - 1) * 12)) / columns;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: actions
+              .map(
+                (action) => SizedBox(
+                  width: itemWidth,
+                  child: _ActionButton(
+                    icon: action.icon,
+                    label: action.label,
+                    onTap: action.onTap,
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
   }
 }

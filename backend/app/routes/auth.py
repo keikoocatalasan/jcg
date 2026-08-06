@@ -2,13 +2,15 @@ import hashlib
 import logging
 import secrets
 import time
+import hmac
 
 import jwt
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr, Field
 
 from app.config import settings
 from app.services.email_service import EmailService
+from app.services.rate_limit_service import enforce_auth_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -20,27 +22,36 @@ def _hash_otp(otp: str) -> str:
     return hashlib.sha256(otp.encode()).hexdigest()
 
 
+def _normalise_email(email: str) -> str:
+    return email.strip().lower()
+
+
 def _generate_otp() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
 def _store_otp(email: str, action: str, otp: str) -> None:
-    key = f"{email}:{action}"
+    key = f"{_normalise_email(email)}:{action}"
     _otp_store[key] = {
         "hash": _hash_otp(otp),
         "expires": time.time() + 600,
+        "attempts": 0,
     }
 
 
 def _verify_otp(email: str, action: str, otp: str) -> bool:
-    key = f"{email}:{action}"
+    key = f"{_normalise_email(email)}:{action}"
     entry = _otp_store.get(key)
     if not entry:
         return False
     if time.time() > entry["expires"]:
         del _otp_store[key]
         return False
-    if _hash_otp(otp) != entry["hash"]:
+    entry["attempts"] += 1
+    if entry["attempts"] > 5:
+        del _otp_store[key]
+        return False
+    if not hmac.compare_digest(_hash_otp(otp), entry["hash"]):
         return False
     del _otp_store[key]
     return True
@@ -90,7 +101,7 @@ class VerifyOtpRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     reset_token: str
-    new_password: str
+    new_password: str = Field(min_length=8)
 
 
 class SendConfirmationRequest(BaseModel):
@@ -105,7 +116,10 @@ class ConfirmEmailRequest(BaseModel):
 # ── Forgot Password ──────────────────────────────────────────────────
 
 @router.post("/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest):
+async def forgot_password(
+    req: ForgotPasswordRequest,
+    _: None = Depends(enforce_auth_rate_limit),
+):
     otp = _generate_otp()
     _store_otp(req.email, "reset_password", otp)
 
@@ -125,7 +139,10 @@ async def forgot_password(req: ForgotPasswordRequest):
 
 
 @router.post("/verify-reset-otp")
-async def verify_reset_otp(req: VerifyOtpRequest):
+async def verify_reset_otp(
+    req: VerifyOtpRequest,
+    _: None = Depends(enforce_auth_rate_limit),
+):
     if not _verify_otp(req.email, "reset_password", req.otp):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired code")
 
@@ -134,7 +151,10 @@ async def verify_reset_otp(req: VerifyOtpRequest):
 
 
 @router.post("/reset-password")
-async def reset_password(req: ResetPasswordRequest):
+async def reset_password(
+    req: ResetPasswordRequest,
+    _: None = Depends(enforce_auth_rate_limit),
+):
     email = _decode_token(req.reset_token, "reset_password")
 
     from supabase import create_client
@@ -145,7 +165,7 @@ async def reset_password(req: ResetPasswordRequest):
         users = client.auth.admin.list_users()
         target = None
         for u in users:
-            if u.email == email:
+            if u.email and u.email.lower() == email.lower():
                 target = u
                 break
 
@@ -165,7 +185,10 @@ async def reset_password(req: ResetPasswordRequest):
 # ── Send Confirmation ────────────────────────────────────────────────
 
 @router.post("/send-confirmation")
-async def send_confirmation(req: SendConfirmationRequest):
+async def send_confirmation(
+    req: SendConfirmationRequest,
+    _: None = Depends(enforce_auth_rate_limit),
+):
     otp = _generate_otp()
     _store_otp(req.email, "confirm_email", otp)
 
@@ -185,7 +208,10 @@ async def send_confirmation(req: SendConfirmationRequest):
 
 
 @router.post("/verify-email")
-async def verify_email(req: ConfirmEmailRequest):
+async def verify_email(
+    req: ConfirmEmailRequest,
+    _: None = Depends(enforce_auth_rate_limit),
+):
     if not _verify_otp(req.email, "confirm_email", req.otp):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired code")
 
@@ -197,7 +223,7 @@ async def verify_email(req: ConfirmEmailRequest):
         users = client.auth.admin.list_users()
         target = None
         for u in users:
-            if u.email == req.email:
+            if u.email and u.email.lower() == req.email.lower():
                 target = u
                 break
 

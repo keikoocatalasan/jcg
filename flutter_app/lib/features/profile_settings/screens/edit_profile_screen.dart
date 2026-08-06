@@ -1,8 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/constants.dart';
 import 'package:jcg_fitness/app/theme.dart';
+import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
+import 'package:jcg_fitness/features/nutrition/nutrition_provider.dart';
 import 'package:jcg_fitness/features/profile_settings/profile_provider.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -96,6 +98,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ref.invalidate(updateProfileProvider(update));
       await ref.read(updateProfileProvider(update).future);
       ref.invalidate(profileProvider);
+      ref.invalidate(nutritionTargetProvider);
+      ref.invalidate(dashboardDataProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,7 +139,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 : const Text(
                     'Save',
                     style: TextStyle(
-                        color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.bold),
                   ),
           ),
         ],
@@ -342,14 +347,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   borderRadius: BorderRadius.circular(8),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.primary.withValues(alpha: 0.08)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.border,
+                        color:
+                            isSelected ? AppColors.primary : AppColors.border,
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -357,8 +364,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       o.$2,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -392,14 +402,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   borderRadius: BorderRadius.circular(8),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.primary.withValues(alpha: 0.08)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.border,
+                        color:
+                            isSelected ? AppColors.primary : AppColors.border,
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -407,8 +419,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       o.$2,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected
+                            ? AppColors.primary
+                            : AppColors.textPrimary,
                       ),
                     ),
                   ),

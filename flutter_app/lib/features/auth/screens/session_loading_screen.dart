@@ -97,6 +97,7 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
 
     _setStep(2, _SessionStepStatus.active);
     final onboardingComplete = await loadOnboardingComplete(session.user.id);
+    final adminAccess = await loadAdminAccess(session.user.id);
     if (!mounted) return;
     ref.read(onboardingCompleteProvider.notifier).state = onboardingComplete;
     _setStep(2, _SessionStepStatus.complete);
@@ -109,7 +110,13 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
     await Future<void>.delayed(const Duration(milliseconds: 450));
     if (!mounted) return;
     ref.read(launchSessionCheckedProvider.notifier).state = true;
-    context.go(onboardingComplete ? '/dashboard' : '/onboarding');
+    context.go(
+      adminAccess
+          ? '/admin'
+          : onboardingComplete
+              ? '/dashboard'
+              : '/onboarding',
+    );
   }
 
   Future<void> _ensureSupabaseInitialized() async {

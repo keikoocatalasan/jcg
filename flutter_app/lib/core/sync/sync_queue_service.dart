@@ -765,6 +765,34 @@ class SyncQueueService {
           .eq('food_id', item.entityId);
       return;
     }
+
+    final isOfficial =
+        payload['is_official'] == true || payload['is_official'] == 1;
+    if (isOfficial) {
+      await supabaseClient.rpc('admin_upsert_food', params: {
+        'p_food_id': item.entityId,
+        'p_category_name': payload['category_name'],
+        'p_subcategory': payload['subcategory'],
+        'p_description': payload['description'],
+        'p_food_name': payload['food_name'],
+        'p_normalized_name': payload['normalized_name'],
+        'p_is_local_food':
+            payload['is_local_food'] == true || payload['is_local_food'] == 1,
+        'p_is_official': true,
+        'p_is_active':
+            payload['is_active'] == true || payload['is_active'] == 1,
+        'p_serving_id': payload['serving_id'] ?? item.entityId,
+        'p_serving_label': payload['serving_label'],
+        'p_serving_grams': payload['serving_grams'],
+        'p_calories': payload['calories'],
+        'p_protein_g': payload['protein_g'],
+        'p_carbs_g': payload['carbs_g'],
+        'p_fat_g': payload['fat_g'],
+        'p_price_php': payload['estimated_price_php'],
+      });
+      return;
+    }
+
     final appUserId = await _currentAppUserId();
     final categoryId = await _lookupId(
       'food_category',
@@ -775,17 +803,28 @@ class SyncQueueService {
     await supabaseClient.from('food_item').upsert({
       'food_id': item.entityId,
       'category_id': categoryId,
+      'subcategory': payload['subcategory'],
+      'description': payload['description'],
       'owner_user_id': appUserId,
       'food_name': payload['food_name'],
       'normalized_name': payload['normalized_name'],
       'is_local_food':
           payload['is_local_food'] == true || payload['is_local_food'] == 1,
-      'is_official':
-          payload['is_official'] == true || payload['is_official'] == 1,
+      'is_official': false,
       'is_active': payload['is_active'] == true || payload['is_active'] == 1,
     });
     // Also insert serving and nutrition if present
     if (payload['serving_label'] != null) {
+      final sourceName = payload['source_name'] as String? ??
+          ((payload['is_official'] == true || payload['is_official'] == 1)
+              ? 'FNRI_DOST'
+              : 'Estimated_Common');
+      final sourceId = await _lookupId(
+        'data_source',
+        'source_name',
+        sourceName,
+        'source_id',
+      );
       final servingId = payload['serving_id'] ?? item.entityId;
       await supabaseClient.from('food_serving').upsert({
         'serving_id': servingId,
@@ -800,6 +839,7 @@ class SyncQueueService {
           'nutrition_profile_id': item.entityId,
           'food_id': item.entityId,
           'serving_id': servingId,
+          'source_id': sourceId,
           'calories': payload['calories'],
           'protein_g': payload['protein_g'],
           'carbs_g': payload['carbs_g'],
@@ -812,6 +852,7 @@ class SyncQueueService {
           'price_id': item.entityId,
           'food_id': item.entityId,
           'serving_id': servingId,
+          'source_id': sourceId,
           'estimated_price_php': payload['estimated_price_php'],
           'is_active': true,
         });

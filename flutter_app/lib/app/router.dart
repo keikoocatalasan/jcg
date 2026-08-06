@@ -11,6 +11,8 @@ import 'package:jcg_fitness/features/admin/screens/moderation_detail_screen.dart
 import 'package:jcg_fitness/features/admin/screens/price_history_screen.dart';
 import 'package:jcg_fitness/features/admin/screens/reports_screen.dart';
 import 'package:jcg_fitness/features/admin/screens/admin_analytics_screen.dart';
+import 'package:jcg_fitness/features/admin/screens/admin_audit_screen.dart';
+import 'package:jcg_fitness/features/admin/screens/admin_users_screen.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/ai_scanner_screen.dart';
 import 'package:jcg_fitness/features/analytics/screens/analytics_screen.dart';
 import 'package:jcg_fitness/features/auth/screens/forgot_password_screen.dart';
@@ -333,6 +335,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: 'analytics',
             builder: (_, __) =>
                 const _AdminGuard(child: AdminAnalyticsScreen()),
+          ),
+          GoRoute(
+            path: 'audit',
+            builder: (_, __) => const _AdminGuard(child: AdminAuditScreen()),
+          ),
+          GoRoute(
+            path: 'users',
+            builder: (_, __) => const _AdminGuard(child: AdminUsersScreen()),
           ),
         ],
       ),

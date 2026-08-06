@@ -4,6 +4,7 @@ class Food {
   final String foodId;
   final String categoryName;
   final String? subcategory;
+  final String? description;
   final String? ownerUserId;
   final String foodName;
   final String normalizedName;
@@ -27,6 +28,7 @@ class Food {
     required this.foodId,
     required this.categoryName,
     this.subcategory,
+    this.description,
     this.ownerUserId,
     required this.foodName,
     required this.normalizedName,
@@ -52,6 +54,7 @@ class Food {
       foodId: map['food_id'] as String,
       categoryName: map['category_name'] as String,
       subcategory: map['subcategory'] as String?,
+      description: map['description'] as String?,
       ownerUserId: map['owner_user_id'] as String?,
       foodName: map['food_name'] as String,
       normalizedName: map['normalized_name'] as String,
@@ -78,6 +81,7 @@ class Food {
       'food_id': foodId,
       'category_name': categoryName,
       'subcategory': subcategory,
+      'description': description,
       'owner_user_id': ownerUserId,
       'food_name': foodName,
       'normalized_name': normalizedName,
@@ -121,7 +125,11 @@ class FoodRepository extends BaseRepository<Food> {
     bool? localOnly,
   }) async {
     final db = await database;
-    final conditions = <String>['normalized_name LIKE ?'];
+    final conditions = <String>[
+      'normalized_name LIKE ?',
+      'is_active = 1',
+      'is_deleted = 0',
+    ];
     final args = <String>['%$query%'];
 
     if (category != null) {
@@ -155,7 +163,7 @@ class FoodRepository extends BaseRepository<Food> {
     final db = await database;
     final results = await db.query(
       tableName,
-      where: 'owner_user_id = ?',
+      where: 'owner_user_id = ? AND is_deleted = 0',
       whereArgs: [userId],
     );
     return results.map(fromMap).toList();

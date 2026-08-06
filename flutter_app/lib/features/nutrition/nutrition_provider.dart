@@ -65,6 +65,26 @@ final nutritionTargetProvider =
   final latestWeight = await weightRepo.readLatest(user.id);
   final effectiveWeightKg = latestWeight?.weightKg ?? weightKg;
 
+  final existingTarget = await targetRepo.readActiveByUserId(user.id);
+  if (existingTarget != null &&
+      existingTarget.bmr != null &&
+      existingTarget.tdee != null &&
+      existingTarget.calorieTarget != null &&
+      existingTarget.proteinTargetG != null &&
+      existingTarget.carbsTargetG != null &&
+      existingTarget.fatTargetG != null &&
+      existingTarget.waterTargetMl != null) {
+    return NutritionTargetResult(
+      bmr: existingTarget.bmr!,
+      tdee: existingTarget.tdee!,
+      calorieTarget: existingTarget.calorieTarget!.round(),
+      proteinG: existingTarget.proteinTargetG!,
+      carbsG: existingTarget.carbsTargetG!,
+      fatG: existingTarget.fatTargetG!,
+      waterTargetMl: existingTarget.waterTargetMl!.round(),
+    );
+  }
+
   final result = NutritionEngine.calculateAll(
     weightKg: effectiveWeightKg,
     heightCm: heightCm,

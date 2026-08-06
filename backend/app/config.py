@@ -50,6 +50,7 @@ class Settings(BaseSettings):
             name for name, value in {
                 "SUPABASE_URL": self.supabase_url,
                 "SUPABASE_SERVICE_ROLE_KEY": self.supabase_service_role_key,
+                "SUPABASE_JWT_SECRET": self.supabase_jwt_secret,
                 "ALLOWED_ORIGINS": self.allowed_origins,
             }.items() if not value
         ]

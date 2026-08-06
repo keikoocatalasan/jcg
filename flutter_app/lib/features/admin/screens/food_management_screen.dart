@@ -9,7 +9,7 @@ import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
 
-enum FoodFilter { all, active, inactive, pending }
+enum FoodFilter { all, active, inactive }
 
 class FoodManagementScreen extends ConsumerStatefulWidget {
   const FoodManagementScreen({super.key});
@@ -43,9 +43,6 @@ class _FoodManagementScreenState extends ConsumerState<FoodManagementScreen> {
       case FoodFilter.inactive:
         filtered = filtered.where((f) => !f.isActive).toList();
         break;
-      case FoodFilter.pending:
-        filtered = filtered.where((f) => f.syncStatus == 'pending').toList();
-        break;
       case FoodFilter.all:
         break;
     }
@@ -59,8 +56,9 @@ class _FoodManagementScreenState extends ConsumerState<FoodManagementScreen> {
   }
 
   StatusTag _statusTag(Food food) {
-    if (food.syncStatus == 'pending')
+    if (food.syncStatus == 'pending') {
       return const StatusTag.neutral(label: 'Pending');
+    }
     if (!food.isActive) return const StatusTag.neutral(label: 'Inactive');
     return const StatusTag.ok(label: 'Active');
   }
@@ -91,7 +89,8 @@ class _FoodManagementScreenState extends ConsumerState<FoodManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final foodsAsync = ref.watch(allOfficialFoodsProvider(0));
+    final foodsAsync = ref.watch(pagedAdminFoodsProvider(_loadedPages));
+    final nextFoodsAsync = ref.watch(pagedAdminFoodsProvider(_loadedPages + 1));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Food Management')),
@@ -158,6 +157,11 @@ class _FoodManagementScreenState extends ConsumerState<FoodManagementScreen> {
               child: foodsAsync.when(
                 data: (foods) {
                   final filtered = _filter(foods);
+                  final hasMore = nextFoodsAsync.when(
+                    data: (nextFoods) => nextFoods.length > foods.length,
+                    loading: () => true,
+                    error: (_, __) => false,
+                  );
                   if (filtered.isEmpty) {
                     return const EmptyStateWidget(
                       icon: Icons.restaurant_menu,
@@ -168,44 +172,31 @@ class _FoodManagementScreenState extends ConsumerState<FoodManagementScreen> {
                   return RefreshIndicator(
                     onRefresh: () {
                       _resetPagination();
-                      return ref.refresh(allOfficialFoodsProvider(0).future);
+                      return ref.refresh(pagedAdminFoodsProvider(1).future);
                     },
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(vertical: 4),
-                      itemCount: filtered.length + (_loadedPages > 1 ? 0 : 1),
+                      itemCount: filtered.length + (hasMore ? 1 : 0),
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (_, i) {
-                        if (i == filtered.length && _loadedPages == 1) {
-                          final nextFoods =
-                              ref.watch(allOfficialFoodsProvider(1));
-                          return nextFoods.when(
-                            data: (more) => more.isEmpty
-                                ? const SizedBox.shrink()
-                                : Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton(
-                                        onPressed: () =>
-                                            setState(() => _loadedPages = 2),
-                                        child: Text(
-                                            'Load More (${more.length} more)'),
-                                      ),
-                                    ),
-                                  ),
-                            loading: () => const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Center(child: CircularProgressIndicator()),
+                        if (i == filtered.length && hasMore) {
+                          final loadedNext = nextFoodsAsync.valueOrNull;
+                          final moreCount = loadedNext == null
+                              ? adminFoodPageSize
+                              : loadedNext.length - foods.length;
+                          return Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: () => setState(
+                                    () => _loadedPages = _loadedPages + 1),
+                                child: Text('Load More ($moreCount more)'),
+                              ),
                             ),
-                            error: (_, __) => const SizedBox.shrink(),
                           );
                         }
-                        final food = i < filtered.length
-                            ? filtered[i]
-                            : _filter(ref
-                                    .watch(allOfficialFoodsProvider(1))
-                                    .valueOrNull ??
-                                [])[i - filtered.length];
+                        final food = filtered[i];
                         return GlassCard(
                           margin: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 4),
@@ -264,9 +255,9 @@ class _FoodManagementScreenState extends ConsumerState<FoodManagementScreen> {
                       const Icon(Icons.error_outline,
                           size: 48, color: AppColors.textPrimary),
                       const SizedBox(height: 12),
-                      Text(
+                      const Text(
                         'Failed to load foods',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16, color: AppColors.textSecondary),
                       ),
                       const SizedBox(height: 4),

@@ -81,7 +81,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
         lastResult: result,
         clearSyncing: true,
       );
-      if (result.errors.isEmpty) _refreshDataProviders();
+      if (result.synced > 0) _refreshDataProviders();
     } catch (e) {
       final pending = await _getPendingCount();
       state = state.copyWith(

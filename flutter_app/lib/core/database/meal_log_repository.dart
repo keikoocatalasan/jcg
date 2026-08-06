@@ -110,7 +110,8 @@ class MealLogRepository extends BaseRepository<MealLog> {
     final db = await database;
     final results = await db.query(
       tableName,
-      where: "user_id = ? AND date(logged_at, 'localtime') = ?",
+      where:
+          "user_id = ? AND is_deleted = 0 AND date(logged_at, 'localtime') = ?",
       whereArgs: [userId, date],
     );
     return results.map(fromMap).toList();
@@ -124,7 +125,8 @@ class MealLogRepository extends BaseRepository<MealLog> {
     final db = await database;
     final results = await db.query(
       tableName,
-      where: "user_id = ? AND date(logged_at, 'localtime') BETWEEN ? AND ?",
+      where:
+          "user_id = ? AND is_deleted = 0 AND date(logged_at, 'localtime') BETWEEN ? AND ?",
       whereArgs: [userId, startDate, endDate],
     );
     return results.map(fromMap).toList();
@@ -135,7 +137,7 @@ class MealLogRepository extends BaseRepository<MealLog> {
     final results = await db.query(
       tableName,
       where:
-          "user_id = ? AND date(logged_at, 'localtime') = date('now', 'localtime')",
+          "user_id = ? AND is_deleted = 0 AND date(logged_at, 'localtime') = date('now', 'localtime')",
       whereArgs: [userId],
     );
     return results.map(fromMap).toList();

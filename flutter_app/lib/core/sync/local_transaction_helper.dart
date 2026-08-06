@@ -338,6 +338,76 @@ class LocalTransactionHelper {
     });
   }
 
+  /// Recalculate targets without creating a duplicate weight log. This is
+  /// used when profile inputs such as age, height, activity, or goal change.
+  Future<void> recalculateNutritionTarget({
+    required String userId,
+    required Map<String, dynamic> newTargetData,
+    required Map<String, dynamic> dailySnapshotData,
+  }) async {
+    final db = await _dbProvider.database;
+    final baseSequence = DateTime.now().millisecondsSinceEpoch;
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    await db.transaction((txn) async {
+      await txn.update(
+        'nutrition_targets',
+        {'is_active': 0, 'effective_to': now},
+        where: 'user_id = ? AND is_active = 1',
+        whereArgs: [userId],
+      );
+
+      await txn.insert('nutrition_targets', {
+        'target_id': newTargetData['target_id'],
+        'user_id': userId,
+        ...newTargetData,
+        'is_active': 1,
+        'sync_status': 'pending',
+        'created_at': now,
+      });
+
+      final existingSnapshots = await txn.query(
+        'daily_target_snapshots',
+        columns: ['snapshot_id'],
+        where: 'user_id = ? AND target_date = ?',
+        whereArgs: [userId, dailySnapshotData['target_date']],
+        limit: 1,
+      );
+      await txn.insert(
+        'daily_target_snapshots',
+        {
+          'snapshot_id': dailySnapshotData['snapshot_id'],
+          'user_id': userId,
+          ...dailySnapshotData,
+          'sync_status': 'pending',
+          'created_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      await _enqueueSync(
+        txn,
+        userId,
+        _uuid.v4(),
+        baseSequence,
+        'nutrition_target',
+        newTargetData['target_id'],
+        'create',
+        newTargetData,
+      );
+      await _enqueueSync(
+        txn,
+        userId,
+        _uuid.v4(),
+        baseSequence + 1,
+        'daily_target_snapshot',
+        dailySnapshotData['snapshot_id'],
+        existingSnapshots.isEmpty ? 'create' : 'update',
+        dailySnapshotData,
+      );
+    });
+  }
+
   /// Transaction 7: Delete weight log (hard) + recalculate
   Future<void> deleteWeightLogAndRecalculate({
     required String weightLogId,

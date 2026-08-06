@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
+import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/auth/screens/logout_dialog.dart';
 import 'package:jcg_fitness/features/profile_settings/profile_provider.dart';
 
@@ -11,8 +12,7 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(profileProvider);
-    final isAdmin = ref.watch(isAdminProvider).valueOrNull ?? false;
+    final isAdminAsync = ref.watch(isAdminProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -27,67 +27,154 @@ class ProfileScreen extends ConsumerWidget {
         foregroundColor: AppColors.textPrimary,
         centerTitle: true,
       ),
-      body: profileAsync.when(
+      body: isAdminAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (profile) {
-          if (profile == null) {
-            return const Center(child: Text('Profile not found'));
+        error: (e, _) => Center(child: Text('Unable to load account: $e')),
+        data: (isAdmin) {
+          if (isAdmin) {
+            return _AdminProfileView(
+              email: ref.watch(authSessionProvider)?.user.email,
+            );
           }
 
-          final displayName = profile.nickname ?? 'User';
-          final initial =
-              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+          final profileAsync = ref.watch(profileProvider);
+          return profileAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (profile) {
+              if (profile == null) {
+                return const Center(child: Text('Profile not found'));
+              }
 
-          return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            children: [
-              const SizedBox(height: 12),
-              _ProfileInfoCard(
-                displayName: displayName,
-                handle: profile.fitnessGoalCode ?? '',
-                initial: initial,
-              ),
-              const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.only(left: 8, bottom: 12),
-                child: Text(
-                  'Account Settings',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                    letterSpacing: 0.08,
+              final displayName = profile.nickname ?? 'User';
+              final initial =
+                  displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+
+              return ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  const SizedBox(height: 12),
+                  _ProfileInfoCard(
+                    displayName: displayName,
+                    handle: profile.fitnessGoalCode ?? '',
+                    initial: initial,
                   ),
-                ),
-              ),
-              _GroupedMenuCard(
-                items: [
-                  _MenuData(
-                    icon: Icons.settings_outlined,
-                    label: 'Settings',
-                    onTap: () => context.push('/settings'),
-                  ),
-                  if (isAdmin)
-                    _MenuData(
-                      icon: Icons.admin_panel_settings_outlined,
-                      label: 'Admin Console',
-                      onTap: () => context.push('/admin'),
+                  const SizedBox(height: 24),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8, bottom: 12),
+                    child: Text(
+                      'Account Settings',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 0.08,
+                      ),
                     ),
-                  _MenuData(
-                    icon: Icons.logout,
-                    label: 'Logout',
-                    onTap: () => LogoutDialog.show(context),
-                    iconColor: AppColors.textPrimary,
-                    textColor: AppColors.textPrimary,
                   ),
+                  _GroupedMenuCard(
+                    items: [
+                      _MenuData(
+                        icon: Icons.settings_outlined,
+                        label: 'Settings',
+                        onTap: () => context.push('/settings'),
+                      ),
+                      if (isAdmin)
+                        _MenuData(
+                          icon: Icons.admin_panel_settings_outlined,
+                          label: 'Admin Console',
+                          onTap: () => context.push('/admin'),
+                        ),
+                      _MenuData(
+                        icon: Icons.logout,
+                        label: 'Logout',
+                        onTap: () => LogoutDialog.show(context),
+                        iconColor: AppColors.textPrimary,
+                        textColor: AppColors.textPrimary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 48),
                 ],
-              ),
-              const SizedBox(height: 48),
-            ],
+              );
+            },
           );
         },
       ),
+    );
+  }
+}
+
+class _AdminProfileView extends StatelessWidget {
+  final String? email;
+
+  const _AdminProfileView({this.email});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      children: [
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            children: [
+              const CircleAvatar(
+                radius: 48,
+                backgroundColor: AppColors.textPrimary,
+                child: Icon(
+                  Icons.admin_panel_settings_outlined,
+                  size: 40,
+                  color: AppColors.surface,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Administrator',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                email ?? 'Admin account',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        _GroupedMenuCard(
+          items: [
+            _MenuData(
+              icon: Icons.admin_panel_settings_outlined,
+              label: 'Admin Console',
+              onTap: () => context.go('/admin'),
+            ),
+            _MenuData(
+              icon: Icons.logout,
+              label: 'Logout',
+              onTap: () => LogoutDialog.show(context),
+              iconColor: AppColors.textPrimary,
+              textColor: AppColors.textPrimary,
+            ),
+          ],
+        ),
+        const SizedBox(height: 48),
+      ],
     );
   }
 }

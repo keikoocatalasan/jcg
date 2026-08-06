@@ -3,7 +3,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
+import 'package:jcg_fitness/features/admin/admin_provider.dart';
 import 'package:jcg_fitness/features/admin/screens/reports_screen.dart';
+
+class ModerationComment {
+  final String commentId;
+  final String userId;
+  final String commentText;
+  final bool isHidden;
+  final bool isDeleted;
+  final String? nickname;
+  final DateTime createdAt;
+
+  const ModerationComment({
+    required this.commentId,
+    required this.userId,
+    required this.commentText,
+    required this.isHidden,
+    required this.isDeleted,
+    required this.nickname,
+    required this.createdAt,
+  });
+}
 
 class ModerationDetailScreen extends ConsumerStatefulWidget {
   final PostReport report;
@@ -17,6 +38,70 @@ class ModerationDetailScreen extends ConsumerStatefulWidget {
 class _ModerationDetailScreenState
     extends ConsumerState<ModerationDetailScreen> {
   bool _isLoading = false;
+  bool _commentsLoading = true;
+  String? _commentsError;
+  List<ModerationComment> _comments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    setState(() {
+      _commentsLoading = true;
+      _commentsError = null;
+    });
+
+    try {
+      final supabase = ref.read(supabaseClientProvider);
+      final rows = await supabase
+          .from('community_comment')
+          .select(
+              'comment_id, user_id, comment_text, is_hidden, is_deleted, created_at')
+          .eq('post_id', widget.report.postId)
+          .order('created_at');
+      final userIds = rows.map((row) => row['user_id'] as String).toSet().toList();
+      final profileRows = userIds.isEmpty
+          ? const <dynamic>[]
+          : await supabase
+              .from('user_profile')
+              .select('user_id, nickname')
+              .inFilter('user_id', userIds);
+      final nicknames = <String, String?>{
+        for (final row in profileRows)
+          row['user_id'] as String: row['nickname'] as String?,
+      };
+
+      final comments = rows.map((row) {
+        return ModerationComment(
+          commentId: row['comment_id'] as String,
+          userId: row['user_id'] as String,
+          commentText: row['comment_text'] as String,
+          isHidden: row['is_hidden'] as bool? ?? false,
+          isDeleted: row['is_deleted'] as bool? ?? false,
+          nickname: nicknames[row['user_id'] as String],
+          createdAt: DateTime.tryParse(row['created_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0),
+        );
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          _commentsLoading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _commentsError = '$error';
+          _commentsLoading = false;
+        });
+      }
+    }
+  }
 
   StatusTag _statusTag(String status) {
     switch (status) {
@@ -65,12 +150,13 @@ class _ModerationDetailScreenState
     setState(() => _isLoading = true);
     try {
       final supabase = ref.read(supabaseClientProvider);
-      await supabase
-          .from('community_report')
-          .update({'status_id': 3}).eq('report_id', widget.report.reportId);
-      await _logModerationAction('dismissed', widget.report.reportId,
-          widget.report.postId, 'Report dismissed');
+      await supabase.rpc('admin_resolve_report', params: {
+        'p_report_id': widget.report.reportId,
+        'p_status_code': 'dismissed',
+        'p_details': 'Report dismissed',
+      });
       ref.invalidate(reportsProvider);
+      ref.invalidate(adminAuditLogProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       setState(() => _isLoading = false);
@@ -83,34 +169,20 @@ class _ModerationDetailScreenState
   }
 
   Future<void> _remove() async {
-    setState(() => _isLoading = true);
-    try {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase.rpc('admin_hide_reported_post', params: {
-        'p_report_id': widget.report.reportId,
-      });
-      ref.invalidate(reportsProvider);
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove post: $e')),
-        );
-      }
-    }
+    await _setPostVisibility(true);
   }
 
   Future<void> _reject() async {
     setState(() => _isLoading = true);
     try {
       final supabase = ref.read(supabaseClientProvider);
-      await supabase
-          .from('community_report')
-          .update({'status_id': 2}).eq('report_id', widget.report.reportId);
-      await _logModerationAction('reviewed', widget.report.reportId,
-          widget.report.postId, 'Report marked as reviewed');
+      await supabase.rpc('admin_resolve_report', params: {
+        'p_report_id': widget.report.reportId,
+        'p_status_code': 'reviewed',
+        'p_details': 'Report marked as reviewed',
+      });
       ref.invalidate(reportsProvider);
+      ref.invalidate(adminAuditLogProvider);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       setState(() => _isLoading = false);
@@ -122,42 +194,51 @@ class _ModerationDetailScreenState
     }
   }
 
-  Future<void> _logModerationAction(
-    String actionCode,
-    String reportId,
-    String postId,
-    String details,
+  Future<void> _setPostVisibility(bool hidden) async {
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(supabaseClientProvider).rpc('admin_set_post_visibility',
+          params: {
+        'p_post_id': widget.report.postId,
+        'p_is_hidden': hidden,
+        'p_report_id': widget.report.reportId,
+        'p_details': hidden ? 'Post hidden by administrator' : 'Post restored by administrator',
+      });
+      ref.invalidate(reportsProvider);
+      ref.invalidate(adminAuditLogProvider);
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to change post visibility: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _setCommentVisibility(
+    ModerationComment comment,
+    bool hidden,
   ) async {
     try {
       await ref.read(supabaseClientProvider).rpc(
-        'admin_log_moderation_action',
+        'admin_set_comment_visibility',
         params: {
-          'p_action_code': actionCode,
-          'p_report_id': reportId,
-          'p_post_id': postId,
-          'p_details': details,
+          'p_comment_id': comment.commentId,
+          'p_is_hidden': hidden,
+          'p_details': hidden
+              ? 'Comment hidden during post review'
+              : 'Comment restored during post review',
         },
       );
-    } catch (_) {
-      try {
-        await ref.read(supabaseClientProvider).rpc(
-          'admin_log_moderation_action',
-          params: {
-            'p_action_code': actionCode,
-            'p_report_id': reportId,
-            'p_post_id': postId,
-            'p_details': details,
-          },
+      ref.invalidate(adminAuditLogProvider);
+      await _loadComments();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to change comment visibility: $error')),
         );
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Moderation audit log failed to sync'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
       }
     }
   }
@@ -214,6 +295,18 @@ class _ModerationDetailScreenState
                               ),
                               _statusTag(report.status),
                             ],
+                          ),
+                          if (report.reportDetails != null) ...[
+                            const SizedBox(height: 8),
+                            _InfoRow(
+                              label: 'Details',
+                              value: report.reportDetails!,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          _InfoRow(
+                            label: 'Visibility',
+                            value: report.isHidden ? 'Hidden' : 'Visible',
                           ),
                         ],
                       ),
@@ -285,61 +378,142 @@ class _ModerationDetailScreenState
                       ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _buildComments(),
                   const SizedBox(height: 24),
-                  if (report.status == 'pending') ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _approve,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.textPrimary,
-                              side: const BorderSide(color: AppColors.border),
-                              minimumSize: const Size(0, 48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            child: const Text('Keep Post'),
-                          ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () => _setPostVisibility(!report.isHidden),
+                        icon: Icon(report.isHidden
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined),
+                        label: Text(report.isHidden ? 'Unhide Post' : 'Hide Post'),
+                      ),
+                      if (report.status == 'pending') ...[
+                        OutlinedButton(
+                          onPressed: _approve,
+                          child: const Text('Keep Post'),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _remove,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.textPrimary,
-                              foregroundColor: AppColors.surface,
-                              minimumSize: const Size(0, 48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            child: const Text('Remove Post'),
-                          ),
+                        OutlinedButton(
+                          onPressed: _reject,
+                          child: const Text('Mark Reviewed'),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _reject,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.textPrimary,
-                              side: const BorderSide(
-                                  color: AppColors.borderStrong),
-                              minimumSize: const Size(0, 48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            child: const Text('Mark Reviewed'),
-                          ),
+                        OutlinedButton(
+                          onPressed: _remove,
+                          child: const Text('Remove and Resolve'),
                         ),
                       ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildComments() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Comments',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_commentsLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_commentsError != null)
+              Row(
+                children: [
+                  const Expanded(child: Text('Failed to load comments.')),
+                  IconButton(
+                    tooltip: 'Retry',
+                    onPressed: _loadComments,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              )
+            else if (_comments.isEmpty)
+              const Text(
+                'No comments on this post.',
+                style: TextStyle(color: AppColors.textSecondary),
+              )
+            else
+              ..._comments.map(_buildCommentCard),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommentCard(ModerationComment comment) {
+    final stateLabel = comment.isDeleted
+        ? 'Deleted'
+        : comment.isHidden
+            ? 'Hidden'
+            : 'Visible';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: comment.isHidden ? AppColors.surfaceAlt : AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  comment.nickname ?? 'Unknown user',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                stateLabel,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(comment.commentText),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _formatDateTime(comment.createdAt.toIso8601String()),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              if (!comment.isDeleted)
+                TextButton(
+                  onPressed: () =>
+                      _setCommentVisibility(comment, !comment.isHidden),
+                  child: Text(comment.isHidden ? 'Unhide' : 'Hide'),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

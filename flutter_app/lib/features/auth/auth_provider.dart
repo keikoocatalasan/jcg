@@ -129,7 +129,7 @@ class AuthService {
     try {
       final response = await _supabase
           .from('app_user')
-          .select('account_status_id')
+          .select('account_status(status_code)')
           .eq('auth_user_id', authUserId)
           .maybeSingle();
 
@@ -140,8 +140,9 @@ class AuthService {
         ));
       }
 
-      final statusId = response['account_status_id'] as int?;
-      if (statusId == 2) {
+      final statusCode =
+          (response['account_status'] as Map?)?['status_code'] as String?;
+      if (statusCode == 'disabled') {
         return const Failure(AppError(
           code: 'ACCOUNT_DISABLED',
           message: 'Your account has been disabled. Please contact support.',
@@ -163,8 +164,7 @@ class AuthService {
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        return Failure(
-            AppError.unknown('Google sign-in was cancelled.'));
+        return Failure(AppError.unknown('Google sign-in was cancelled.'));
       }
 
       final googleAuth = await googleUser.authentication;
@@ -172,8 +172,8 @@ class AuthService {
       final accessToken = googleAuth.accessToken;
 
       if (idToken == null) {
-        return Failure(
-            AppError.unknown('Unable to get Google credentials. Please try again.'));
+        return Failure(AppError.unknown(
+            'Unable to get Google credentials. Please try again.'));
       }
 
       final response = await _supabase.auth.signInWithIdToken(
@@ -187,14 +187,19 @@ class AuthService {
         return Failure(
             AppError.unknown('Google sign-in failed. Please try again.'));
       }
-      return Success(user);
+      final statusResult = await checkAccountStatus(user.id);
+      switch (statusResult) {
+        case Success(data: final _):
+          return Success(user);
+        case Failure(:final error):
+          await _supabase.auth.signOut();
+          return Failure<User>(error);
+      }
     } on PlatformException catch (e) {
       if (e.code == 'sign_in_canceled' || e.code == 'CANCELED') {
-        return Failure(
-            AppError.unknown('Google sign-in was cancelled.'));
+        return Failure(AppError.unknown('Google sign-in was cancelled.'));
       }
-      return Failure(
-          AppError.unknown('Google sign-in failed: ${e.message}'));
+      return Failure(AppError.unknown('Google sign-in failed: ${e.message}'));
     } on AuthException catch (e) {
       final msg = e.message.toLowerCase();
       if (msg.contains('already registered') ||
@@ -203,7 +208,8 @@ class AuthService {
           msg.contains('user already exists')) {
         return Failure(AppError(
           code: 'ACCOUNT_EXISTS',
-          message: 'An account with this email already exists. Please log in with your password, then link Google from your profile settings.',
+          message:
+              'An account with this email already exists. Please log in with your password, then link Google from your profile settings.',
         ));
       }
       return Failure(AppError(code: 'AUTH_ERROR', message: e.message));
@@ -236,14 +242,17 @@ class AuthService {
     }
   }
 
-  Future<Result<Map<String, dynamic>>> requestPasswordReset(String email) async {
+  Future<Result<Map<String, dynamic>>> requestPasswordReset(
+      String email) async {
     try {
       final uri = Uri.parse('${AppConfig.fastApiBaseUrl}/auth/forgot-password');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}),
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -255,40 +264,51 @@ class AuthService {
     }
   }
 
-  Future<Result<Map<String, dynamic>>> verifyResetOtp(String email, String otp) async {
+  Future<Result<Map<String, dynamic>>> verifyResetOtp(
+      String email, String otp) async {
     try {
-      final uri = Uri.parse('${AppConfig.fastApiBaseUrl}/auth/verify-reset-otp');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'otp': otp}),
-      ).timeout(const Duration(seconds: 15));
+      final uri =
+          Uri.parse('${AppConfig.fastApiBaseUrl}/auth/verify-reset-otp');
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email, 'otp': otp}),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
         return Success(body);
       }
-      return Failure(AppError(code: 'INVALID_OTP', message: 'Invalid or expired code.'));
+      return Failure(
+          AppError(code: 'INVALID_OTP', message: 'Invalid or expired code.'));
     } catch (e) {
       return Failure(AppError.unknown('Connection error. Please try again.'));
     }
   }
 
-  Future<Result<Map<String, dynamic>>> resetPassword(String resetToken, String newPassword) async {
+  Future<Result<Map<String, dynamic>>> resetPassword(
+      String resetToken, String newPassword) async {
     try {
       final uri = Uri.parse('${AppConfig.fastApiBaseUrl}/auth/reset-password');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'reset_token': resetToken, 'new_password': newPassword}),
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(
+                {'reset_token': resetToken, 'new_password': newPassword}),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
         return Success(body);
       }
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final msg = body['detail'] ?? body['error']?['message'] ?? 'Password reset failed.';
+      final msg = body['detail'] ??
+          body['error']?['message'] ??
+          'Password reset failed.';
       return Failure(AppError.unknown(msg.toString()));
     } catch (e) {
       return Failure(AppError.unknown('Connection error. Please try again.'));

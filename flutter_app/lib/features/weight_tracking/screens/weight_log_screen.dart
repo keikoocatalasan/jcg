@@ -14,6 +14,7 @@ import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
 import 'package:jcg_fitness/features/meal_logging/recent_logs_provider.dart';
 import 'package:jcg_fitness/features/nutrition/nutrition_engine.dart';
+import 'package:jcg_fitness/features/nutrition/nutrition_provider.dart';
 import 'package:jcg_fitness/features/weight_tracking/weight_provider.dart';
 
 class WeightLogScreen extends ConsumerStatefulWidget {
@@ -186,6 +187,7 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
 
       ref.invalidate(latestWeightProvider);
       ref.invalidate(weightHistoryProvider);
+      ref.invalidate(nutritionTargetProvider);
       ref.invalidate(dashboardDataProvider);
       ref.invalidate(recentLogsProvider);
       ref.read(syncProvider.notifier).startSync();
@@ -332,6 +334,7 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
 
       ref.invalidate(latestWeightProvider);
       ref.invalidate(weightHistoryProvider);
+      ref.invalidate(nutritionTargetProvider);
       ref.invalidate(dashboardDataProvider);
       ref.invalidate(recentLogsProvider);
 

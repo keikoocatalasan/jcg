@@ -215,7 +215,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                 getTitlesWidget: (value, meta) {
                   final i = value.toInt();
                   if (i < 0 || i >= data.length) return const SizedBox.shrink();
-                  return Text(data[i].date.substring(5),
+                  return Text(_shortDate(data[i].date),
                       style: const TextStyle(
                           fontSize: 9, color: AppColors.textSecondary));
                 },
@@ -286,11 +286,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                 getTitlesWidget: (value, meta) {
                   final i = value.toInt();
                   if (i < 0 || i >= data.length) return const SizedBox.shrink();
-                  final parts = data[i].date.split('-');
-                  return Text(
-                      parts.length >= 3
-                          ? '${parts[1]}/${parts[2]}'
-                          : data[i].date,
+                  return Text(_shortDate(data[i].date),
                       style: const TextStyle(
                           fontSize: 8, color: AppColors.textSecondary));
                 },
@@ -363,15 +359,15 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                     color: AppColors.divider.withAlpha(51), strokeWidth: 1),
               ),
               borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
+              titlesData: const FlTitlesData(
                 bottomTitles:
-                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: const AxisTitles(
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: AxisTitles(
                     sideTitles: SideTitles(showTitles: true, reservedSize: 30)),
                 topTitles:
-                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 rightTitles:
-                    const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    AxisTitles(sideTitles: SideTitles(showTitles: false)),
               ),
             ),
           ),
@@ -414,6 +410,15 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
             style: TextStyle(color: AppColors.textSecondary)),
       ),
     );
+  }
+
+  String _shortDate(String rawDate) {
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed != null) return '${parsed.month}/${parsed.day}';
+
+    final dateOnly = rawDate.split(' ').first;
+    final parts = dateOnly.split('-');
+    return parts.length >= 3 ? '${parts[1]}/${parts[2]}' : dateOnly;
   }
 
   Widget _buildDbHealthCard(ThemeData theme) {

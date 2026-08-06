@@ -5,7 +5,9 @@
 **Food CRUD** uses the offline-first pattern:
 - `admin_food_form_screen.dart` writes to local SQLite via `FoodRepository`
 - A `SyncQueueEntry` is enqueued with the full JSON payload
-- The `SyncQueueService` worker processes the queue when online, pushing to Supabase
+- The `SyncQueueService` worker routes official-food writes through
+  `admin_upsert_food()` so nutrition/price history and `food_change_log` remain
+  immutable; non-official custom-food sync keeps the normal upsert path
 - This ensures food management works during connectivity gaps
 
 **Why offline-first for food CRUD:**

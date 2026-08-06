@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'migration_v1.dart';
 import 'migration_v2.dart';
+import 'migration_v3.dart';
 
 class DatabaseProvider {
   static final DatabaseProvider _instance = DatabaseProvider._internal();
@@ -22,23 +23,21 @@ class DatabaseProvider {
 
     return openDatabase(
       path,
-      version: MigrationV2.version,
+      version: MigrationV3.version,
       onCreate: (db, version) async {
         final batch = db.batch();
         await MigrationV1.run(batch);
         await batch.commit(noResult: true);
         await MigrationV2.run(db);
-        try {
-          await db.execute('ALTER TABLE foods ADD COLUMN subcategory TEXT');
-        } catch (_) {}
+        await MigrationV3.run(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < MigrationV2.version) {
           await MigrationV2.run(db);
         }
-        try {
-          await db.execute('ALTER TABLE foods ADD COLUMN subcategory TEXT');
-        } catch (_) {}
+        if (oldVersion < MigrationV3.version) {
+          await MigrationV3.run(db);
+        }
       },
       onConfigure: (db) async {
         await db.rawQuery('PRAGMA foreign_keys = ON');

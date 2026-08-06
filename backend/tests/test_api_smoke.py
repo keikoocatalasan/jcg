@@ -6,6 +6,7 @@ from PIL import Image
 
 from app.config import settings
 from app.main import app
+from app.routes.auth import _otp_store, _store_otp, _verify_otp
 from app.routes.chat import chatbot_service
 from app.routes.scan_food import scanner_service
 
@@ -208,3 +209,25 @@ def test_explain_recommendation_route_returns_explanation() -> None:
 
     assert response.status_code == 200
     assert "White Rice" in response.json()["data"]["explanation"]
+
+
+def test_otp_verification_is_case_insensitive_and_limited() -> None:
+    _otp_store.clear()
+    _store_otp("User@Example.com", "reset_password", "123456")
+
+    assert _verify_otp("user@example.com", "reset_password", "000000") is False
+    assert _verify_otp("user@example.com", "reset_password", "123456") is True
+
+    _store_otp("locked@example.com", "reset_password", "654321")
+    for _ in range(5):
+        assert _verify_otp("locked@example.com", "reset_password", "000000") is False
+    assert _verify_otp("locked@example.com", "reset_password", "654321") is False
+
+
+def test_reset_password_rejects_short_password() -> None:
+    response = client.post(
+        "/auth/reset-password",
+        json={"reset_token": "not-used", "new_password": "short"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"

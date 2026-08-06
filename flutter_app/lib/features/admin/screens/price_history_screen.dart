@@ -153,19 +153,37 @@ class _PriceHistoryScreenState extends ConsumerState<PriceHistoryScreen> {
     );
 
     if (result != null && mounted) {
-      final supabase = ref.read(supabaseClientProvider);
-      await supabase.rpc('admin_set_food_price', params: {
-        'p_food_id': widget.foodId,
-        'p_price_php': result,
-        'p_source_id': 2,
-      });
-      await _loadHistory();
+      try {
+        final supabase = ref.read(supabaseClientProvider);
+        final source = await supabase
+            .from('data_source')
+            .select('source_id')
+            .eq('source_name', 'Estimated_Common')
+            .maybeSingle();
+        final sourceId = source?['source_id'];
+        if (sourceId == null) {
+          throw Exception('Estimated price source is not configured');
+        }
+        await supabase.rpc('admin_set_food_price', params: {
+          'p_food_id': widget.foodId,
+          'p_price_php': result,
+          'p_source_id': sourceId,
+        });
+        await _loadHistory();
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('New price ${Formatters.formatPhp(result)} added')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content:
+                    Text('New price ${Formatters.formatPhp(result)} added')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to add price: $e')),
+          );
+        }
       }
     }
   }
@@ -192,9 +210,9 @@ class _PriceHistoryScreenState extends ConsumerState<PriceHistoryScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Per 100 grams',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
             ),

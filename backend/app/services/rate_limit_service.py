@@ -32,3 +32,8 @@ limiter = InMemoryRateLimiter()
 async def enforce_ai_rate_limit(request: Request) -> None:
     client = request.client.host if request.client else "unknown"
     limiter.check(client)
+
+
+async def enforce_auth_rate_limit(request: Request) -> None:
+    client = request.client.host if request.client else "unknown"
+    limiter.check(f"auth:{client}")

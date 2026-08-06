@@ -13,6 +13,8 @@ class PostReport {
   final String reportedByUserId;
   final String reason;
   final String status;
+  final bool isHidden;
+  final String? reportDetails;
   final String? authorNickname;
   final String? postBody;
   final String createdAt;
@@ -23,6 +25,8 @@ class PostReport {
     required this.reportedByUserId,
     required this.reason,
     required this.status,
+    required this.isHidden,
+    this.reportDetails,
     this.authorNickname,
     this.postBody,
     required this.createdAt,
@@ -35,6 +39,8 @@ class PostReport {
       reportedByUserId: map['reporter_user_id'] as String,
       reason: map['reason'] as String,
       status: map['status'] as String? ?? 'pending',
+      isHidden: map['is_hidden'] as bool? ?? false,
+      reportDetails: map['report_details'] as String?,
       authorNickname: map['author_nickname'] as String?,
       postBody: map['post_body'] as String?,
       createdAt: map['created_at'] as String,
@@ -44,9 +50,15 @@ class PostReport {
 
 final reportsProvider = FutureProvider<List<PostReport>>((ref) async {
   final supabase = ref.read(supabaseClientProvider);
+  final since = DateTime.now()
+      .toUtc()
+      .subtract(const Duration(days: 30))
+      .toIso8601String();
   final response = await supabase
       .from('community_report')
       .select()
+      .gte('created_at', since)
+      .limit(100)
       .order('created_at', ascending: false);
   if (response.isEmpty) return [];
 
@@ -57,7 +69,7 @@ final reportsProvider = FutureProvider<List<PostReport>>((ref) async {
   final postIds = response.map((row) => row['post_id'] as String).toList();
   final posts = await supabase
       .from('community_post')
-      .select('post_id, user_id, body_text')
+      .select('post_id, user_id, body_text, is_hidden, is_deleted')
       .inFilter('post_id', postIds);
   final authorIds =
       posts.map((row) => row['user_id'] as String).toSet().toList();
@@ -84,6 +96,8 @@ final reportsProvider = FutureProvider<List<PostReport>>((ref) async {
       ...m,
       'reason': reasons[m['reason_id']] ?? 'other',
       'status': statuses[m['status_id']] ?? 'pending',
+      'is_hidden': post?['is_hidden'] as bool? ?? false,
+      'report_details': m['details'] as String?,
       if (post != null) 'author_nickname': nicknames[post['user_id']],
       if (post != null) 'post_body': post['body_text'],
     });
@@ -172,7 +186,7 @@ class ReportsScreen extends ConsumerWidget {
                   ),
                 ),
                 if (sortedReasons.isNotEmpty) ...[
-                  _SectionHeader(title: 'Report Reasons'),
+                  const _SectionHeader(title: 'Report Reasons'),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Card(
@@ -399,9 +413,9 @@ class _ReportCard extends ConsumerWidget {
     return GlassCard(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
-        leading: CircleAvatar(
+        leading: const CircleAvatar(
           backgroundColor: AppColors.surfaceAlt,
-          child: const Icon(
+          child: Icon(
             Icons.flag,
             color: AppColors.textPrimary,
             size: 20,

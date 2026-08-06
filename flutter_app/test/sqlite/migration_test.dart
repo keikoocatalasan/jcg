@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:jcg_fitness/core/database/migration_v1.dart';
 import 'package:jcg_fitness/core/database/migration_v2.dart';
+import 'package:jcg_fitness/core/database/migration_v3.dart';
 
 void main() {
   late Database db;
@@ -101,6 +102,40 @@ void main() {
             'feedback_text',
             'created_at',
           }));
+    });
+  });
+
+  group('Migration V3', () {
+    test('adds food descriptions and is idempotent', () async {
+      await MigrationV3.run(db);
+      await MigrationV3.run(db);
+
+      final columns = await db.rawQuery('PRAGMA table_info(foods)');
+      final names = columns.map((row) => row['name']).toSet();
+      expect(names, contains('description'));
+
+      await db.insert('foods', {
+        'food_id': 'food-description',
+        'category_name': 'Other',
+        'subcategory': 'Prepared',
+        'description': 'A test food description',
+        'food_name': 'Test Food',
+        'normalized_name': 'test food',
+        'calories': 100.0,
+        'protein_g': 5.0,
+        'carbs_g': 10.0,
+        'fat_g': 2.0,
+        'estimated_price_php': 20.0,
+      });
+
+      final row = await db.query(
+        'foods',
+        columns: ['subcategory', 'description'],
+        where: 'food_id = ?',
+        whereArgs: ['food-description'],
+      );
+      expect(row.single['subcategory'], 'Prepared');
+      expect(row.single['description'], 'A test food description');
     });
   });
 

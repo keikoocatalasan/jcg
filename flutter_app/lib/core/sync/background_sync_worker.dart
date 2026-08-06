@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import 'package:flutter/foundation.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/sync/sync_queue_service.dart';
@@ -39,20 +40,31 @@ void backgroundSyncCallbackDispatcher() {
         '${result.skipped} skipped',
         name: 'BackgroundSync',
       );
-      return Future.value(true);
+      return Future.value(result.errors.isEmpty && result.failed == 0);
     } catch (e, st) {
-      log('Background sync error: $e', name: 'BackgroundSync', error: e, stackTrace: st);
+      log('Background sync error: $e',
+          name: 'BackgroundSync', error: e, stackTrace: st);
       return Future.value(false);
     }
   });
 }
 
 class BackgroundSyncScheduler {
+  static bool get _isSupportedPlatform {
+    if (kIsWeb) return false;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android || TargetPlatform.iOS => true,
+      _ => false,
+    };
+  }
+
   static Future<void> initialize() async {
+    if (!_isSupportedPlatform) return;
     await Workmanager().initialize(backgroundSyncCallbackDispatcher);
   }
 
   static Future<void> schedulePeriodicSync() async {
+    if (!_isSupportedPlatform) return;
     await Workmanager().registerPeriodicTask(
       backgroundSyncTaskName,
       backgroundSyncTaskName,
@@ -66,6 +78,7 @@ class BackgroundSyncScheduler {
   }
 
   static Future<void> cancel() async {
+    if (!_isSupportedPlatform) return;
     await Workmanager().cancelByUniqueName(backgroundSyncTaskName);
   }
 }

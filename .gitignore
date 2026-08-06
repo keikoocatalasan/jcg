@@ -1,70 +1,94 @@
-# Flutter
+# Environment files and secrets (commit only sanitized *.env.example templates)
+.env
+.env.*
+*.env
+*.env.*
+!*.env.example
+!.env.example
+!backend/.env.example
+!flutter_app/.env.example
+
+# Credentials, signing material, and provider configuration
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+**/key.properties
+**/google-services.json
+**/GoogleService-Info.plist
+**/service-account*.json
+**/*service_account*.json
+**/credentials*.json
+.qa/credentials.local.env
+
+# Local databases, exports, and backups
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlitedb
+*.dump
+*.bak
+
+# Python and FastAPI
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+backend/.venv/
+backend/venv/
+backend/.envrc
+
+# Flutter and Dart
 flutter_app/.dart_tool/
 flutter_app/.packages
 flutter_app/.pub/
 flutter_app/build/
+flutter_app/coverage/
 flutter_app/.flutter-plugins
 flutter_app/.flutter-plugins-dependencies
+flutter_app/.metadata
+flutter_app/android/.gradle/
+flutter_app/android/.cxx/
+flutter_app/android/build/
+flutter_app/android/local.properties
 flutter_app/ios/Pods/
 flutter_app/ios/.symlinks/
-flutter_app/android/.gradle/
-flutter_app/android/local.properties
-flutter_app/android/key.properties
+flutter_app/ios/Flutter/ephemeral/
 flutter_app/*.iml
-flutter_app/.metadata
-flutter_app/coverage/
 
-# Python / FastAPI
-backend/__pycache__/
-backend/*.pyc
-__pycache__/
-*.py[cod]
-backend/.venv/
-backend/venv/
-backend/.env
-*.egg-info/
-
-# Supabase
-supabase/.branches
-supabase/.temp
-
-# Environment
-.env
-.env.local
-.env.production
-.qa/credentials.local.env
-
-# Secrets & deployment config
-flutter_app/.env
+# Supabase local state and machine-specific configuration
+supabase/.branches/
+supabase/.temp/
 supabase/.env
+supabase/.env.example
 supabase/config.toml
-*.env
-*.env.*
-!backend/.env.example
-!flutter_app/.env.example
 
-# IDE
+# Editor, OS, logs, and temporary artifacts
 .idea/
 .vscode/
+*.code-workspace
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
+Desktop.ini
 *.log
+*.tmp
+*.temp
 
-# Large SDKs and archives
+# Large local SDKs and tool caches
 flutter_sdk/
 flutter_windows.zip
-
-# Opencode skills
 .od-skills/
-
-# Flutter debug screenshots and XMLs
-flutter_app/*.png
-flutter_app/*.xml
-
-# Flutter build reports
-flutter_app/android/build/
