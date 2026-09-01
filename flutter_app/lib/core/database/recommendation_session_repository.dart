@@ -8,6 +8,10 @@ class RecommendationSession {
   final double remainingProteinG;
   final double remainingCarbsG;
   final double remainingFatG;
+  final String? mealTypeCode;
+  final String? fitnessGoalCode;
+  final double? minimumPricePhp;
+  final double? maximumPricePhp;
   final String syncStatus;
   final String? generatedAt;
 
@@ -19,6 +23,10 @@ class RecommendationSession {
     required this.remainingProteinG,
     required this.remainingCarbsG,
     required this.remainingFatG,
+    this.mealTypeCode,
+    this.fitnessGoalCode,
+    this.minimumPricePhp,
+    this.maximumPricePhp,
     required this.syncStatus,
     this.generatedAt,
   });
@@ -44,6 +52,10 @@ class RecommendationSessionRepository
       remainingProteinG: (map['remaining_protein_g'] as num).toDouble(),
       remainingCarbsG: (map['remaining_carbs_g'] as num).toDouble(),
       remainingFatG: (map['remaining_fat_g'] as num).toDouble(),
+      mealTypeCode: map['meal_type_code'] as String?,
+      fitnessGoalCode: map['fitness_goal_code'] as String?,
+      minimumPricePhp: (map['minimum_price_php'] as num?)?.toDouble(),
+      maximumPricePhp: (map['maximum_price_php'] as num?)?.toDouble(),
       syncStatus: map['sync_status'] as String,
       generatedAt: map['generated_at'] as String?,
     );
@@ -59,6 +71,10 @@ class RecommendationSessionRepository
       'remaining_protein_g': entity.remainingProteinG,
       'remaining_carbs_g': entity.remainingCarbsG,
       'remaining_fat_g': entity.remainingFatG,
+      'meal_type_code': entity.mealTypeCode,
+      'fitness_goal_code': entity.fitnessGoalCode,
+      'minimum_price_php': entity.minimumPricePhp,
+      'maximum_price_php': entity.maximumPricePhp,
       'sync_status': entity.syncStatus,
       'generated_at': entity.generatedAt,
     };

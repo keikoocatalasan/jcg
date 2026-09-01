@@ -53,6 +53,30 @@ class ScanPrediction {
       estimatedCostPhp: (json['estimated_cost_php'] as num?)?.toDouble(),
     );
   }
+
+  ScanPrediction copyWith({
+    String? foodId,
+    String? foodName,
+    double? confidence,
+    int? rankNumber,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+    double? estimatedCostPhp,
+  }) {
+    return ScanPrediction(
+      foodId: foodId ?? this.foodId,
+      foodName: foodName ?? this.foodName,
+      confidence: confidence ?? this.confidence,
+      rankNumber: rankNumber ?? this.rankNumber,
+      calories: calories ?? this.calories,
+      proteinG: proteinG ?? this.proteinG,
+      carbsG: carbsG ?? this.carbsG,
+      fatG: fatG ?? this.fatG,
+      estimatedCostPhp: estimatedCostPhp ?? this.estimatedCostPhp,
+    );
+  }
 }
 
 class ScanResult {
@@ -77,6 +101,14 @@ class ScanResult {
       predictions: rawPredictions
           .map((e) => ScanPrediction.fromJson(e as Map<String, dynamic>))
           .toList(),
+    );
+  }
+
+  ScanResult copyWith({List<ScanPrediction>? predictions}) {
+    return ScanResult(
+      scanId: scanId,
+      clientScanId: clientScanId,
+      predictions: predictions ?? this.predictions,
     );
   }
 }

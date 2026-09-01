@@ -3,6 +3,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:jcg_fitness/core/database/migration_v1.dart';
 import 'package:jcg_fitness/core/database/migration_v2.dart';
 import 'package:jcg_fitness/core/database/migration_v3.dart';
+import 'package:jcg_fitness/core/database/migration_v4.dart';
 
 void main() {
   late Database db;
@@ -136,6 +137,31 @@ void main() {
       );
       expect(row.single['subcategory'], 'Prepared');
       expect(row.single['description'], 'A test food description');
+    });
+  });
+
+  group('Migration V4', () {
+    test('adds meal tags and recommendation filter context idempotently',
+        () async {
+      await MigrationV4.run(db);
+      await MigrationV4.run(db);
+
+      final foodColumns = await db.rawQuery('PRAGMA table_info(foods)');
+      final foodNames = foodColumns.map((row) => row['name']).toSet();
+      expect(foodNames, contains('meal_type_codes'));
+
+      final sessionColumns =
+          await db.rawQuery('PRAGMA table_info(recommendation_sessions)');
+      final sessionNames = sessionColumns.map((row) => row['name']).toSet();
+      expect(
+        sessionNames,
+        containsAll(<String>{
+          'meal_type_code',
+          'fitness_goal_code',
+          'minimum_price_php',
+          'maximum_price_php',
+        }),
+      );
     });
   });
 

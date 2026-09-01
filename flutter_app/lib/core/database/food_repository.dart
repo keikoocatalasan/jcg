@@ -1,4 +1,5 @@
 import 'base_repository.dart';
+import '../constants/food_taxonomy.dart';
 
 class Food {
   final String foodId;
@@ -19,6 +20,7 @@ class Food {
   final double carbsG;
   final double fatG;
   final double estimatedPricePhp;
+  final List<String> mealTypeCodes;
   final bool isDeleted;
   final String syncStatus;
   final String createdAt;
@@ -43,6 +45,7 @@ class Food {
     required this.carbsG,
     required this.fatG,
     required this.estimatedPricePhp,
+    this.mealTypeCodes = const [],
     this.isDeleted = false,
     this.syncStatus = 'pending',
     required this.createdAt,
@@ -69,6 +72,7 @@ class Food {
       carbsG: (map['carbs_g'] as num).toDouble(),
       fatG: (map['fat_g'] as num).toDouble(),
       estimatedPricePhp: (map['estimated_price_php'] as num).toDouble(),
+      mealTypeCodes: FoodTaxonomy.parseMealTypeCodes(map['meal_type_codes']),
       isDeleted: (map['is_deleted'] as int) == 1,
       syncStatus: map['sync_status'] as String? ?? 'synced',
       createdAt: map['created_at'] as String,
@@ -96,6 +100,7 @@ class Food {
       'carbs_g': carbsG,
       'fat_g': fatG,
       'estimated_price_php': estimatedPricePhp,
+      'meal_type_codes': mealTypeCodes.join(','),
       'is_deleted': isDeleted ? 1 : 0,
       'sync_status': syncStatus,
       'created_at': createdAt,

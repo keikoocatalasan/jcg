@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routes import health, version, scan_food, scan_feedback, chat, explain_recommendation, auth
+from app.routes import health, version, scan_food, scan_feedback, chat, explain_recommendation, auth, nutrition_estimate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -64,4 +64,5 @@ app.include_router(scan_food.router)
 app.include_router(scan_feedback.router)
 app.include_router(chat.router)
 app.include_router(explain_recommendation.router)
+app.include_router(nutrition_estimate.router)
 app.include_router(auth.router)

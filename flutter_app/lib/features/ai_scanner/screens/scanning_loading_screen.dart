@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -142,7 +143,7 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
-        final scanResult = ScanResult.fromJson(body);
+        final scanResult = await _matchCatalogFoods(ScanResult.fromJson(body));
 
         final db = await DatabaseProvider().database;
         final user = Supabase.instance.client.auth.currentUser;
@@ -376,6 +377,50 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
     }
     return error;
   }
+
+  Future<ScanResult> _matchCatalogFoods(ScanResult result) async {
+    final foods = await FoodRepository(DatabaseProvider()).readActiveOfficial();
+    if (foods.isEmpty) return result;
+    final matched = result.predictions.map((prediction) {
+      final predictionTokens = _foodTokens(prediction.foodName);
+      Food? best;
+      var bestScore = 0.0;
+      for (final food in foods) {
+        final foodTokens = _foodTokens(food.normalizedName);
+        final union = predictionTokens.union(foodTokens);
+        if (union.isEmpty) continue;
+        final score =
+            predictionTokens.intersection(foodTokens).length / union.length;
+        final contains = food.normalizedName.contains(
+              prediction.foodName.toLowerCase(),
+            ) ||
+            prediction.foodName.toLowerCase().contains(food.normalizedName);
+        final effectiveScore = contains ? 1.0 : score;
+        if (effectiveScore > bestScore) {
+          best = food;
+          bestScore = effectiveScore;
+        }
+      }
+      if (best == null || bestScore < 0.5) return prediction;
+      return prediction.copyWith(
+        foodId: best.foodId,
+        foodName: best.foodName,
+        calories: best.calories,
+        proteinG: best.proteinG,
+        carbsG: best.carbsG,
+        fatG: best.fatG,
+        estimatedCostPhp: best.estimatedPricePhp,
+      );
+    }).toList();
+    return result.copyWith(predictions: matched);
+  }
+
+  Set<String> _foodTokens(String value) => value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+      .split(RegExp(r'\s+'))
+      .where((token) => token.length > 2 && token != 'cooked')
+      .toSet();
 
   Widget _buildStepIndicator(int index) {
     final isCompleted = index < _currentStep;

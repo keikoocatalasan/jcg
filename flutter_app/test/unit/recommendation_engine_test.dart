@@ -4,7 +4,7 @@ import 'package:jcg_fitness/features/recommendations/recommendation_engine.dart'
 
 Food _food({
   String foodId = 'f1',
-  String categoryName = 'Meat',
+  String categoryName = 'Meat and Poultry',
   String foodName = 'Chicken Breast',
   double calories = 284,
   double proteinG = 53,
@@ -172,7 +172,7 @@ void main() {
         calories: 500,
         carbsG: 60,
         fatG: 20,
-        categoryName: 'Meat',
+        categoryName: 'Meat and Poultry',
       );
       final results = RecommendationEngine.generate(
         remainingBudget: 100,
@@ -202,7 +202,7 @@ void main() {
       // maintenance: protein/calories is not relevant. The logic: max-min <= 50
       // protein=50, carbs=60, fat=20 => max=60, min=20, diff=40 <= 50 => true
       expect(r.goalMatchScore, closeTo(1.0, 0.001));
-      // mealType: lunch includes 'Meat' => true
+      // mealType: lunch includes 'Meat and Poultry' => true
       expect(r.mealTypeScore, closeTo(1.0, 0.001));
       // overBudgetPenalty: 50 <= 100 => 0
       expect(r.overBudgetPenalty, closeTo(0.0, 0.001));
@@ -285,15 +285,15 @@ void main() {
   });
 
   group('allergy filtering', () {
-    test('dairy allergy excludes Dairy category foods', () {
+    test('milk allergy excludes foods with milk in the name', () {
       final milk = _food(
         foodId: 'milk',
-        categoryName: 'Dairy',
+        categoryName: 'Dairy and Eggs',
         foodName: 'Fresh Milk',
       );
       final chicken = _food(
         foodId: 'chicken',
-        categoryName: 'Meat',
+        categoryName: 'Meat and Poultry',
         foodName: 'Chicken Breast',
       );
       final results = RecommendationEngine.generate(
@@ -304,7 +304,7 @@ void main() {
         remainingFat: 20,
         fitnessGoalCode: 'maintenance',
         mealTypeCode: null,
-        allergies: ['dairy'],
+        allergies: ['milk'],
         dietaryRestrictions: [],
         availableFoods: [milk, chicken],
       );
@@ -316,7 +316,7 @@ void main() {
       final peanutButter = _food(
         foodId: 'pb',
         foodName: 'Peanut Butter',
-        categoryName: 'Snacks',
+        categoryName: 'Snacks and Desserts',
       );
       final apple = _food(
         foodId: 'apple',
@@ -342,7 +342,7 @@ void main() {
     test('no allergies returns all foods', () {
       final milk = _food(
         foodId: 'milk',
-        categoryName: 'Dairy',
+        categoryName: 'Dairy and Eggs',
         foodName: 'Fresh Milk',
       );
       final results = RecommendationEngine.generate(
@@ -443,7 +443,7 @@ void main() {
     test('vegetarian excludes Meat and Seafood categories', () {
       final chicken = _food(
         foodId: 'chicken',
-        categoryName: 'Meat',
+        categoryName: 'Meat and Poultry',
         foodName: 'Chicken Breast',
       );
       final tofu = _food(
@@ -471,12 +471,12 @@ void main() {
       final bacon = _food(
         foodId: 'bacon',
         foodName: 'Bacon Strips',
-        categoryName: 'Meat',
+        categoryName: 'Meat and Poultry',
       );
       final beef = _food(
         foodId: 'beef',
         foodName: 'Beef Tapa',
-        categoryName: 'Meat',
+        categoryName: 'Meat and Poultry',
       );
       final results = RecommendationEngine.generate(
         remainingBudget: 100,
@@ -494,10 +494,10 @@ void main() {
       expect(results.any((r) => r.food.foodId == 'beef'), true);
     });
 
-    test('vegan excludes Meat, Seafood, Dairy, Egg categories', () {
+    test('vegan excludes Meat, Seafood, and Dairy and Eggs categories', () {
       final egg = _food(
         foodId: 'egg',
-        categoryName: 'Egg',
+        categoryName: 'Dairy and Eggs',
         foodName: 'Egg',
       );
       final fruit = _food(
@@ -544,10 +544,10 @@ void main() {
       expect(results.first.mealTypeScore, closeTo(1.0, 0.001));
     });
 
-    test('non-breakfast food scores 0.5 for breakfast meal type', () {
+    test('non-breakfast food is excluded by breakfast filter', () {
       final meat = _food(
         foodId: 'meat',
-        categoryName: 'Meat',
+        categoryName: 'Meat and Poultry',
         foodName: 'Beef',
       );
       final results = RecommendationEngine.generate(
@@ -562,7 +562,95 @@ void main() {
         dietaryRestrictions: [],
         availableFoods: [meat],
       );
-      expect(results.first.mealTypeScore, closeTo(0.5, 0.001));
+      expect(results, isEmpty);
+    });
+
+    test('explicit meal tags override category fallback', () {
+      final breakfastMeat = _food(
+        foodId: 'tocino',
+        categoryName: 'Meat and Poultry',
+        foodName: 'Pork Tocino',
+      );
+      final tagged = Food(
+        foodId: breakfastMeat.foodId,
+        categoryName: breakfastMeat.categoryName,
+        foodName: breakfastMeat.foodName,
+        normalizedName: breakfastMeat.normalizedName,
+        calories: breakfastMeat.calories,
+        proteinG: breakfastMeat.proteinG,
+        carbsG: breakfastMeat.carbsG,
+        fatG: breakfastMeat.fatG,
+        estimatedPricePhp: breakfastMeat.estimatedPricePhp,
+        mealTypeCodes: const ['breakfast'],
+        createdAt: breakfastMeat.createdAt,
+        updatedAt: breakfastMeat.updatedAt,
+      );
+      final results = RecommendationEngine.generate(
+        remainingBudget: 100,
+        remainingCalories: 500,
+        remainingProtein: 50,
+        remainingCarbs: 60,
+        remainingFat: 20,
+        fitnessGoalCode: 'maintenance',
+        mealTypeCode: 'breakfast',
+        allergies: [],
+        dietaryRestrictions: [],
+        availableFoods: [tagged],
+      );
+      expect(results.single.mealTypeScore, 1);
+    });
+  });
+
+  group('hard recommendation filters', () {
+    test('budget range is applied before the top-ten result cap', () {
+      final expensive = List.generate(
+        10,
+        (index) => _food(
+          foodId: 'expensive-$index',
+          foodName: 'Expensive $index',
+          estimatedPricePhp: 80,
+          proteinG: 50,
+          calories: 500,
+        ),
+      );
+      final affordable = _food(
+        foodId: 'affordable',
+        foodName: 'Affordable Meal',
+        estimatedPricePhp: 25,
+        proteinG: 5,
+        calories: 100,
+      );
+      final results = RecommendationEngine.generate(
+        remainingBudget: 100,
+        remainingCalories: 500,
+        remainingProtein: 50,
+        remainingCarbs: 60,
+        remainingFat: 20,
+        fitnessGoalCode: 'maintenance',
+        mealTypeCode: null,
+        allergies: [],
+        dietaryRestrictions: [],
+        maximumPricePhp: 30,
+        availableFoods: [...expensive, affordable],
+      );
+      expect(results.map((item) => item.food.foodId), ['affordable']);
+    });
+
+    test('display-name restrictions are normalized to canonical codes', () {
+      final meat = _food(foodName: 'Chicken Adobo');
+      final results = RecommendationEngine.generate(
+        remainingBudget: 100,
+        remainingCalories: 500,
+        remainingProtein: 50,
+        remainingCarbs: 60,
+        remainingFat: 20,
+        fitnessGoalCode: 'maintenance',
+        mealTypeCode: null,
+        allergies: [],
+        dietaryRestrictions: ['Vegetarian'],
+        availableFoods: [meat],
+      );
+      expect(results, isEmpty);
     });
   });
 

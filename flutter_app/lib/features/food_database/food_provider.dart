@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/constants/food_taxonomy.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/core/database/sync_queue_repository.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
@@ -55,20 +56,7 @@ final foodSearchProvider =
 );
 
 final categoriesProvider = Provider<List<String>>((ref) {
-  return [
-    'Rice and Grains',
-    'Meat and Poultry',
-    'Seafood',
-    'Vegetables',
-    'Fruits',
-    'Dairy and Eggs',
-    'Bread and Pastry',
-    'Soups and Porridge',
-    'Beverages',
-    'Snacks and Desserts',
-    'Legumes and Tofu',
-    'Condiments and Spreads',
-  ];
+  return FoodTaxonomy.categories;
 });
 
 class FoodFormData {

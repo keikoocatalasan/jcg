@@ -356,22 +356,36 @@ final pagedOfficialFoodsProvider =
 /// web build where sqflite has no default database factory.
 final pagedAdminFoodsProvider =
     FutureProvider.family<List<Food>, int>((ref, pages) async {
-  final rows = await ref
-      .read(supabaseClientProvider)
-      .from('food_item')
-      .select(
-        'food_id, owner_user_id, food_name, normalized_name, is_local_food, '
-        'is_official, is_active, created_at, updated_at, '
-        'food_category(category_name), '
-        'food_serving(serving_id, serving_label, serving_grams, is_default, is_active), '
-        'food_nutrition_profile(serving_id, calories, protein_g, carbs_g, fat_g, is_active, effective_from), '
-        'food_price(serving_id, estimated_price_php, is_active, effective_from)',
-      )
-      .eq('is_official', true)
-      .order('food_name')
-      .range(0, (pages * adminFoodPageSize) - 1);
+  final supabase = ref.read(supabaseClientProvider);
+  const baseSelection =
+      'food_id, owner_user_id, food_name, normalized_name, is_local_food, '
+      'is_official, is_active, created_at, updated_at, '
+      'food_category(category_name), '
+      'food_serving(serving_id, serving_label, serving_grams, is_default, is_active), '
+      'food_nutrition_profile(serving_id, calories, protein_g, carbs_g, fat_g, is_active, effective_from), '
+      'food_price(serving_id, estimated_price_php, is_active, effective_from)';
+  List<dynamic> rows;
+  try {
+    rows = await supabase
+        .from('food_item')
+        .select('$baseSelection, food_meal_type(meal_type(meal_type_code))')
+        .eq('is_official', true)
+        .order('food_name')
+        .range(0, (pages * adminFoodPageSize) - 1);
+  } catch (_) {
+    rows = await supabase
+        .from('food_item')
+        .select(baseSelection)
+        .eq('is_official', true)
+        .order('food_name')
+        .range(0, (pages * adminFoodPageSize) - 1);
+  }
 
-  return rows.map((row) => Food.fromMap(_adminFoodRowToLocalMap(row))).toList();
+  return rows
+      .map((row) => Food.fromMap(
+            _adminFoodRowToLocalMap(Map<String, dynamic>.from(row as Map)),
+          ))
+      .toList();
 });
 
 Map<String, dynamic> _adminFoodRowToLocalMap(Map<String, dynamic> row) {
@@ -409,6 +423,10 @@ Map<String, dynamic> _adminFoodRowToLocalMap(Map<String, dynamic> row) {
   final nutritionRow =
       nutrition.isEmpty ? const <String, dynamic>{} : nutrition.first;
   final priceRow = price.isEmpty ? const <String, dynamic>{} : price.first;
+  final mealTypeCodes = asMaps(row['food_meal_type'])
+      .map((item) => asMap(item['meal_type'])?['meal_type_code'])
+      .whereType<String>()
+      .toList();
   final now = DateTime.now().toUtc().toIso8601String();
 
   return {
@@ -430,6 +448,7 @@ Map<String, dynamic> _adminFoodRowToLocalMap(Map<String, dynamic> row) {
     'carbs_g': nutritionRow['carbs_g'] ?? 0,
     'fat_g': nutritionRow['fat_g'] ?? 0,
     'estimated_price_php': priceRow['estimated_price_php'] ?? 0,
+    'meal_type_codes': mealTypeCodes.join(','),
     'is_deleted': 0,
     'sync_status': 'synced',
     'created_at': row['created_at']?.toString() ?? now,

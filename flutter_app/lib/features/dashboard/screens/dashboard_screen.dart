@@ -766,7 +766,9 @@ class _AiRecommendationCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recommendationsAsync = ref.watch(recommendationProvider);
+    final recommendationsAsync = ref.watch(
+      recommendationProvider(const RecommendationRequest()),
+    );
 
     return recommendationsAsync.when(
       data: (items) {

@@ -214,6 +214,12 @@ class SyncQueueService {
       case 'meal_plan':
         await _syncMealPlan(item, payload);
         return;
+      case 'recommendation_session':
+        await _syncRecommendationSession(item, payload);
+        return;
+      case 'recommendation_item':
+        await _syncRecommendationItem(item, payload);
+        return;
       case 'custom_food':
         await _syncCustomFood(item, payload);
         return;
@@ -751,6 +757,70 @@ class SyncQueueService {
       'fat_g_snapshot': data['fat_g_snapshot'],
       'cost_php_snapshot': data['cost_php_snapshot'],
       'planned_date': data['planned_date'],
+    });
+  }
+
+  Future<void> _syncRecommendationSession(
+    SyncQueueEntry item,
+    Map<String, dynamic> payload,
+  ) async {
+    final appUserId = await _currentAppUserId();
+    final mealTypeCode = payload['meal_type_code'] as String?;
+    final goalCode = payload['fitness_goal_code'] as String?;
+    final remote = <String, dynamic>{
+      'session_id': item.entityId,
+      'user_id': appUserId,
+      'remaining_budget_php': payload['remaining_budget_php'],
+      'remaining_calories': payload['remaining_calories'],
+      'remaining_protein_g': payload['remaining_protein_g'],
+      'remaining_carbs_g': payload['remaining_carbs_g'],
+      'remaining_fat_g': payload['remaining_fat_g'],
+      'minimum_price_php': payload['minimum_price_php'],
+      'maximum_price_php': payload['maximum_price_php'],
+      'generated_at': payload['generated_at'],
+    };
+    if (mealTypeCode != null && mealTypeCode.isNotEmpty) {
+      remote['meal_type_id'] = await _lookupId(
+        'meal_type',
+        'meal_type_code',
+        mealTypeCode,
+        'meal_type_id',
+      );
+    }
+    if (goalCode != null && goalCode.isNotEmpty) {
+      remote['fitness_goal_id'] = await _lookupId(
+        'fitness_goal',
+        'goal_code',
+        goalCode,
+        'fitness_goal_id',
+      );
+    }
+    await supabaseClient.from('recommendation_session').upsert(remote);
+  }
+
+  Future<void> _syncRecommendationItem(
+    SyncQueueEntry item,
+    Map<String, dynamic> payload,
+  ) async {
+    await supabaseClient.from('recommendation_item').upsert({
+      'recommendation_item_id': item.entityId,
+      'session_id': payload['session_id'],
+      'food_id': payload['food_id'],
+      'linked_meal_log_id': payload['linked_meal_log_id'],
+      'linked_meal_plan_id': payload['linked_meal_plan_id'],
+      'rank_number': payload['rank_number'],
+      'final_score': payload['final_score'],
+      'affordability_score': payload['affordability_score'],
+      'protein_fit_score': payload['protein_fit_score'],
+      'calorie_fit_score': payload['calorie_fit_score'],
+      'macro_balance_score': payload['macro_balance_score'],
+      'goal_match_score': payload['goal_match_score'],
+      'meal_type_score': payload['meal_type_score'],
+      'over_budget_penalty': payload['over_budget_penalty'],
+      'reason_text': payload['reason_text'],
+      'was_accepted':
+          payload['was_accepted'] == true || payload['was_accepted'] == 1,
+      'accepted_at': payload['accepted_at'],
     });
   }
 

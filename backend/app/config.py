@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ai_model_name: str = "gpt-5-mini"
     openai_base_url: str = "https://api.openai.com/v1"
     ai_request_timeout_seconds: float = 45.0
+    ai_web_search_enabled: bool = False
+    ai_allowed_domains: str = ""
     max_image_upload_mb: int = 5
     allowed_origins: str = ""
     environment: str = "development"
@@ -35,6 +37,14 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
 
+    @property
+    def ai_allowed_domains_list(self) -> list[str]:
+        return [
+            domain.strip().removeprefix("https://").removeprefix("http://")
+            for domain in self.ai_allowed_domains.split(",")
+            if domain.strip()
+        ]
+
     def validate_runtime(self) -> None:
         if self.ai_model_provider.lower() not in {"deterministic", "openai"}:
             raise ValueError("AI_MODEL_PROVIDER must be 'deterministic' or 'openai'")
@@ -44,6 +54,10 @@ class Settings(BaseSettings):
             raise ValueError("Rate limit settings must be greater than zero")
         if self.ai_request_timeout_seconds <= 0:
             raise ValueError("AI_REQUEST_TIMEOUT_SECONDS must be greater than zero")
+        if self.ai_web_search_enabled and not self.ai_allowed_domains_list:
+            raise ValueError(
+                "AI_ALLOWED_DOMAINS is required when AI_WEB_SEARCH_ENABLED=true"
+            )
         if not self.is_production:
             return
         missing = [

@@ -1,4 +1,5 @@
 import 'package:jcg_fitness/core/database/food_repository.dart';
+import 'package:jcg_fitness/core/constants/food_taxonomy.dart';
 
 class ScoredFood {
   final Food food;
@@ -32,12 +33,12 @@ class RecommendationEngine {
   static const int _maxResults = 10;
 
   static const Map<String, List<String>> _allergenCategoryMap = {
-    'dairy': ['Dairy'],
+    'milk': [],
     'egg': [],
-    'gluten': ['Bread and Pastry', 'Rice and Grains'],
+    'gluten': ['Bread and Pastry'],
     'peanut': [],
     'tree_nut': [],
-    'soy': [],
+    'soy': ['Legumes and Tofu'],
     'fish': ['Seafood'],
     'shellfish': ['Seafood'],
     'wheat': ['Bread and Pastry'],
@@ -45,7 +46,7 @@ class RecommendationEngine {
   };
 
   static const Map<String, List<String>> _allergenNameKeywords = {
-    'dairy': ['milk', 'cheese', 'cream', 'butter', 'yogurt', 'dairy'],
+    'milk': ['milk', 'cheese', 'cream', 'butter', 'yogurt', 'dairy'],
     'egg': ['egg', 'eggs'],
     'gluten': [
       'gluten',
@@ -91,26 +92,40 @@ class RecommendationEngine {
   };
 
   static const Map<String, List<String>> _restrictionExcludeCategories = {
-    'vegetarian': ['Meat', 'Seafood'],
-    'vegan': ['Meat', 'Seafood', 'Dairy', 'Egg'],
-    'low_carb': ['Rice and Grains', 'Bread and Pastry', 'Snacks'],
+    'vegetarian': ['Meat and Poultry', 'Seafood'],
+    'vegan': ['Meat and Poultry', 'Seafood', 'Dairy and Eggs'],
+    'low_carb': [
+      'Rice and Grains',
+      'Bread and Pastry',
+      'Snacks and Desserts',
+    ],
     'low_fat': [],
   };
 
   static const Map<String, List<String>> _restrictionNameKeywords = {
     'halal': ['pork', 'bacon', 'ham', 'lechon'],
+    'no_pork': ['pork', 'bacon', 'ham', 'lechon', 'liempo'],
+    'no_beef': ['beef', 'baka', 'corned beef'],
+    'lactose_intolerant': [
+      'milk',
+      'cheese',
+      'cream',
+      'butter',
+      'yogurt',
+    ],
+    'gluten_free': [
+      'gluten',
+      'wheat',
+      'flour',
+      'bread',
+      'pasta',
+      'noodle',
+    ],
     'vegetarian': [],
     'vegan': [],
     'keto': [],
     'low_carb': [],
     'low_fat': [],
-  };
-
-  static const Map<String, List<String>> _mealTypeCategories = {
-    'breakfast': ['Dairy', 'Bread and Pastry', 'Fruits', 'Beverages'],
-    'lunch': ['Rice and Grains', 'Meat', 'Seafood', 'Vegetables'],
-    'dinner': ['Rice and Grains', 'Meat', 'Seafood', 'Vegetables'],
-    'snack': ['Snacks', 'Fruits', 'Bread and Pastry', 'Beverages'],
   };
 
   static List<ScoredFood> generate({
@@ -124,6 +139,10 @@ class RecommendationEngine {
     required List<String> allergies,
     required List<String> dietaryRestrictions,
     required List<Food> availableFoods,
+    double? minimumPricePhp,
+    double? maximumPricePhp,
+    bool highProteinOnly = false,
+    bool lowCostOnly = false,
   }) {
     final safeBudget = remainingBudget.clamp(0.0, double.infinity);
     final safeCalories = remainingCalories.clamp(0, 2147483647);
@@ -131,9 +150,18 @@ class RecommendationEngine {
     final safeCarbs = remainingCarbs.clamp(0.0, double.infinity);
     final safeFat = remainingFat.clamp(0.0, double.infinity);
 
+    final safeMinimumPrice = minimumPricePhp?.clamp(0.0, double.infinity);
+    final safeMaximumPrice = maximumPricePhp?.clamp(0.0, double.infinity);
+
     final filtered = availableFoods.where((food) {
       return !_conflictsWithAllergies(food, allergies) &&
-          !_conflictsWithRestrictions(food, dietaryRestrictions);
+          !_conflictsWithRestrictions(food, dietaryRestrictions) &&
+          _calcMealTypeSuitable(food, mealTypeCode) &&
+          (safeMinimumPrice == null ||
+              food.estimatedPricePhp >= safeMinimumPrice) &&
+          (safeMaximumPrice == null ||
+              food.estimatedPricePhp <= safeMaximumPrice) &&
+          (!highProteinOnly || food.proteinG >= 15);
     }).toList();
 
     final scored = filtered.map((food) {
@@ -149,6 +177,10 @@ class RecommendationEngine {
       );
     }).toList();
 
+    if (lowCostOnly) {
+      scored.removeWhere((item) => item.affordabilityScore < 0.7);
+    }
+
     scored.sort((a, b) => b.finalScore.compareTo(a.finalScore));
 
     return scored.take(_maxResults).toList();
@@ -160,7 +192,7 @@ class RecommendationEngine {
     final category = food.categoryName;
 
     for (final allergy in allergies) {
-      final trimmedAllergy = allergy.trim().toLowerCase();
+      final trimmedAllergy = FoodTaxonomy.normalizeAllergyCode(allergy);
       if (trimmedAllergy.isEmpty) continue;
 
       final categories = _allergenCategoryMap[trimmedAllergy] ?? [];
@@ -181,13 +213,16 @@ class RecommendationEngine {
     final category = food.categoryName;
 
     for (final restriction in restrictions) {
-      final trimmed = restriction.trim().toLowerCase();
+      final trimmed = FoodTaxonomy.normalizeRestrictionCode(restriction);
       if (trimmed.isEmpty) continue;
 
       final excludeCategories = _restrictionExcludeCategories[trimmed] ?? [];
       if (excludeCategories.contains(category)) return true;
 
-      if (trimmed == 'halal' && _isPorkRelated(name)) return true;
+      if ((trimmed == 'halal' || trimmed == 'no_pork') &&
+          _isPorkRelated(name)) {
+        return true;
+      }
 
       if (trimmed == 'low_fat' && food.fatG > 10) return true;
 
@@ -306,8 +341,10 @@ class RecommendationEngine {
 
   static bool _calcMealTypeSuitable(Food food, String? mealTypeCode) {
     if (mealTypeCode == null || mealTypeCode.isEmpty) return true;
-    final categories = _mealTypeCategories[mealTypeCode] ?? [];
-    return categories.contains(food.categoryName);
+    return FoodTaxonomy.suitableMealTypes(
+      categoryName: food.categoryName,
+      explicitCodes: food.mealTypeCodes,
+    ).contains(mealTypeCode);
   }
 
   static String _generateReason({

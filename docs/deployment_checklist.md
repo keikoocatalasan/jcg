@@ -36,6 +36,8 @@
 - [ ] `AI_MODEL_PROVIDER` — `deterministic` or `openai`
 - [ ] `AI_MODEL_API_KEY` — required when `AI_MODEL_PROVIDER=openai`
 - [ ] `AI_MODEL_NAME`
+- [ ] `AI_WEB_SEARCH_ENABLED` — enable only after the configured model passes a web-search smoke test
+- [ ] `AI_ALLOWED_DOMAINS` — comma-separated approved nutrition-source domains
 - [ ] `ALLOWED_ORIGINS` — comma-separated list of allowed origins
 - [ ] `MAX_IMAGE_UPLOAD_MB`
 - [ ] `RATE_LIMIT_REQUESTS` and `RATE_LIMIT_WINDOW_SECONDS`
@@ -47,6 +49,8 @@
 - [ ] Configure CORS middleware to restrict origins
 - [ ] Rate limiting enabled on `/ai/` endpoints
 - [ ] Validate JWT on every authenticated route
+- [ ] Verify `/ai/admin/estimate-nutrition` rejects non-admin users
+- [ ] Keep AI nutrition output in review state until the audited admin RPC succeeds
 - [ ] Request size limits configured (especially for image uploads)
 
 ## Flutter App

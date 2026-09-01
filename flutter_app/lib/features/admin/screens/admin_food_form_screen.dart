@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:jcg_fitness/app/theme.dart';
+import 'package:jcg_fitness/core/constants/food_taxonomy.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
+import 'package:jcg_fitness/core/errors/result.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
+import 'package:jcg_fitness/features/admin/admin_nutrition_estimate.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
 import 'package:jcg_fitness/features/food_database/food_provider.dart';
 
@@ -32,9 +37,13 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
   final _priceController = TextEditingController();
 
   String? _selectedCategory;
+  final Set<String> _selectedMealTypes = {};
+  final _nutritionEstimateService = AdminNutritionEstimateService();
+  AdminNutritionEstimate? _nutritionEstimate;
   bool _isActive = true;
   bool _isLocalFood = false;
   bool _isLoading = false;
+  bool _isEstimating = false;
 
   bool get _isEditing => widget.existingFood != null;
 
@@ -57,6 +66,7 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
       _selectedCategory = food.categoryName;
       _isActive = food.isActive;
       _isLocalFood = food.isLocalFood;
+      _selectedMealTypes.addAll(food.mealTypeCodes);
     } else {
       _servingLabelController.text = '1 serving';
     }
@@ -96,6 +106,57 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
     return null;
   }
 
+  Future<void> _estimateNutrition() async {
+    final foodName = _foodNameController.text.trim();
+    final servingLabel = _servingLabelController.text.trim();
+    final servingGrams = double.tryParse(_servingGramsController.text);
+    if (foodName.isEmpty ||
+        _selectedCategory == null ||
+        servingLabel.isEmpty ||
+        servingGrams == null ||
+        servingGrams <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enter food name, category, serving unit, and serving grams first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isEstimating = true);
+    final result = await _nutritionEstimateService.estimate(
+      foodName: foodName,
+      categoryName: _selectedCategory!,
+      servingLabel: servingLabel,
+      servingGrams: servingGrams,
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+    );
+    if (!mounted) return;
+    switch (result) {
+      case Success(data: final estimate):
+        setState(() {
+          _nutritionEstimate = estimate;
+          _caloriesController.text = estimate.calories.toStringAsFixed(1);
+          _proteinController.text = estimate.proteinG.toStringAsFixed(1);
+          _carbsController.text = estimate.carbsG.toStringAsFixed(1);
+          _fatController.text = estimate.fatG.toStringAsFixed(1);
+          _selectedMealTypes
+            ..clear()
+            ..addAll(estimate.suggestedMealTypes);
+          _isEstimating = false;
+        });
+      case Failure(error: final error):
+        setState(() => _isEstimating = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+    }
+  }
+
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) {
@@ -126,10 +187,7 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
       final fat = double.tryParse(_fatController.text) ?? 0;
       final price = double.tryParse(_priceController.text) ?? 0;
 
-      // Admin catalog writes go through the audited, atomic RPC. This keeps
-      // the console usable on web, where the consumer SQLite cache is not
-      // available, and prevents partially-written food records.
-      await supabase.rpc('admin_upsert_food', params: {
+      final legacyParams = <String, dynamic>{
         'p_food_id': foodId,
         'p_category_name': _selectedCategory!,
         'p_subcategory': _subcategoryController.text.trim().isEmpty
@@ -151,7 +209,32 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
         'p_carbs_g': carbs,
         'p_fat_g': fat,
         'p_price_php': price,
-      });
+      };
+      try {
+        await supabase.rpc('admin_upsert_food_with_evidence', params: {
+          ...legacyParams,
+          'p_meal_type_codes': _selectedMealTypes.toList()..sort(),
+          'p_estimate_id': _nutritionEstimate?.estimateId,
+          'p_estimate_provider': _nutritionEstimate?.provider,
+          'p_evidence': [
+            for (var index = 0;
+                index < (_nutritionEstimate?.sources.length ?? 0);
+                index++)
+              {
+                'title': _nutritionEstimate!.sources[index].title,
+                'url': _nutritionEstimate!.sources[index].url,
+                'is_primary': index == 0,
+                'provider': _nutritionEstimate!.provider,
+                'model': _nutritionEstimate!.model,
+              },
+          ],
+        });
+      } on PostgrestException catch (error) {
+        final missingRpc = error.code == 'PGRST202' ||
+            error.message.contains('admin_upsert_food_with_evidence');
+        if (!missingRpc || _nutritionEstimate != null) rethrow;
+        await supabase.rpc('admin_upsert_food', params: legacyParams);
+      }
 
       ref.invalidate(pagedAdminFoodsProvider);
 
@@ -188,6 +271,74 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAiReviewCard(AdminNutritionEstimate estimate) {
+    final confidence = (estimate.confidence * 100).round();
+    return Card(
+      color: AppColors.primary.withValues(alpha: 0.05),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.fact_check_outlined, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'AI draft — administrator review required',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${estimate.provider} / ${estimate.model} • $confidence% confidence',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            for (final warning in estimate.warnings)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '• $warning',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.warning,
+                      ),
+                ),
+              ),
+            if (estimate.sources.isNotEmpty) ...[
+              const Divider(height: 24),
+              Text(
+                'Sources',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              for (final source in estimate.sources)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: source.url.isEmpty
+                        ? null
+                        : () => launchUrl(
+                              Uri.parse(source.url),
+                              mode: LaunchMode.externalApplication,
+                            ),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: Text(
+                      source.title,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -302,6 +453,28 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 12),
+            _buildSectionHeader('Suitable Meal Types', Icons.schedule),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: FoodTaxonomy.mealTypeCodes.map((code) {
+                final selected = _selectedMealTypes.contains(code);
+                return FilterChip(
+                  label: Text(
+                    code[0].toUpperCase() + code.substring(1),
+                  ),
+                  selected: selected,
+                  onSelected: (value) => setState(() {
+                    if (value) {
+                      _selectedMealTypes.add(code);
+                    } else {
+                      _selectedMealTypes.remove(code);
+                    }
+                  }),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Active'),
@@ -311,6 +484,29 @@ class _AdminFoodFormScreenState extends ConsumerState<AdminFoodFormScreen> {
             ),
             const Divider(height: 32),
             _buildSectionHeader('Nutrition', Icons.local_fire_department),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isEstimating ? null : _estimateNutrition,
+                icon: _isEstimating
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome),
+                label: Text(
+                  _isEstimating
+                      ? 'Estimating nutrition…'
+                      : 'Generate Nutrition with AI',
+                ),
+              ),
+            ),
+            if (_nutritionEstimate != null) ...[
+              const SizedBox(height: 12),
+              _buildAiReviewCard(_nutritionEstimate!),
+            ],
+            const SizedBox(height: 12),
             TextFormField(
               controller: _caloriesController,
               decoration: const InputDecoration(

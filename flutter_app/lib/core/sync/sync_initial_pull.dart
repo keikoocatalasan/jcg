@@ -1,7 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_provider.dart';
-import '../database/food_repository.dart';
+import '../constants/food_taxonomy.dart';
 
 class SyncInitialPull {
   /// Pull official foods and lookup data from Supabase to SQLite.
@@ -27,19 +27,14 @@ class SyncInitialPull {
       if (foods.isEmpty) return;
 
       final database = await db.database;
-      final repo = FoodRepository(db);
-
-      final existingFoods = await repo.readActiveOfficial();
-      final existingIds = existingFoods.map((f) => f.foodId).toSet();
-
       for (final food in foods) {
-        final foodId = food['food_id'] as String;
-        if (existingIds.contains(foodId)) continue;
-
         final record = Map<String, dynamic>.from(food)
           ..['is_local_food'] = food['is_local_food'] == true ? 1 : 0
           ..['is_official'] = food['is_official'] == true ? 1 : 0
           ..['is_active'] = food['is_active'] == true ? 1 : 0
+          ..['meal_type_codes'] = FoodTaxonomy.parseMealTypeCodes(
+            food['meal_type_codes'],
+          ).join(',')
           ..['is_deleted'] = 0;
         await database.insert('foods', record,
             conflictAlgorithm: ConflictAlgorithm.replace);
@@ -87,14 +82,30 @@ class SyncInitialPull {
           .maybeSingle();
 
       if (profile != null) {
-        final allergyRows = await supabase
-            .from('user_allergy')
-            .select('allergy(allergy_name)')
-            .eq('user_id', appUserId);
-        final restrictionRows = await supabase
-            .from('user_dietary_restriction')
-            .select('dietary_restriction(restriction_name)')
-            .eq('user_id', appUserId);
+        List<dynamic> allergyRows;
+        List<dynamic> restrictionRows;
+        try {
+          allergyRows = await supabase
+              .from('user_allergy')
+              .select('allergy(allergy_code, allergy_name)')
+              .eq('user_id', appUserId);
+        } catch (_) {
+          allergyRows = await supabase
+              .from('user_allergy')
+              .select('allergy(allergy_name)')
+              .eq('user_id', appUserId);
+        }
+        try {
+          restrictionRows = await supabase
+              .from('user_dietary_restriction')
+              .select('dietary_restriction(restriction_code, restriction_name)')
+              .eq('user_id', appUserId);
+        } catch (_) {
+          restrictionRows = await supabase
+              .from('user_dietary_restriction')
+              .select('dietary_restriction(restriction_name)')
+              .eq('user_id', appUserId);
+        }
         final disclaimer = await supabase
             .from('medical_disclaimer_acceptance')
             .select('disclaimer_version')
@@ -120,12 +131,25 @@ class SyncInitialPull {
           ..['fitness_goal_code'] =
               (profile['fitness_goal'] as Map?)?['goal_code']
           ..['allergies'] = allergyRows
-              .map((row) => (row['allergy'] as Map?)?['allergy_name'])
+              .map((row) {
+                final allergy = row['allergy'] as Map?;
+                final value =
+                    allergy?['allergy_code'] ?? allergy?['allergy_name'];
+                return value == null
+                    ? null
+                    : FoodTaxonomy.normalizeAllergyCode(value.toString());
+              })
               .whereType<String>()
               .join(',')
           ..['dietary_restrictions'] = restrictionRows
-              .map((row) =>
-                  (row['dietary_restriction'] as Map?)?['restriction_name'])
+              .map((row) {
+                final restriction = row['dietary_restriction'] as Map?;
+                final value = restriction?['restriction_code'] ??
+                    restriction?['restriction_name'];
+                return value == null
+                    ? null
+                    : FoodTaxonomy.normalizeRestrictionCode(value.toString());
+              })
               .whereType<String>()
               .join(',')
           ..['disclaimer_accepted'] = disclaimer == null ? 0 : 1

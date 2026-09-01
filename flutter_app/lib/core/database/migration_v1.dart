@@ -100,6 +100,7 @@ class MigrationV1 {
         carbs_g REAL NOT NULL,
         fat_g REAL NOT NULL,
         estimated_price_php REAL NOT NULL,
+        meal_type_codes TEXT NOT NULL DEFAULT '',
         is_deleted INTEGER NOT NULL DEFAULT 0,
         sync_status TEXT DEFAULT 'synced',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -226,6 +227,10 @@ class MigrationV1 {
         remaining_protein_g REAL NOT NULL,
         remaining_carbs_g REAL NOT NULL,
         remaining_fat_g REAL NOT NULL,
+        meal_type_code TEXT,
+        fitness_goal_code TEXT,
+        minimum_price_php REAL,
+        maximum_price_php REAL,
         generated_at TEXT NOT NULL DEFAULT (datetime('now')),
         sync_status TEXT NOT NULL DEFAULT 'pending',
         FOREIGN KEY (user_id) REFERENCES profiles(user_id)

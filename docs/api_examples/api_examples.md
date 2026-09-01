@@ -98,6 +98,27 @@ curl -X POST http://localhost:8000/ai/explain-recommendation \
   }'
 ```
 
+## Generate an admin nutrition draft
+
+This route requires an authenticated administrator. The result is a review
+draft and does not write to the food catalog.
+
+```powershell
+curl -X POST http://localhost:8000/ai/admin/estimate-nutrition `
+  -H "Authorization: Bearer <supabase-access-token>" `
+  -H "Content-Type: application/json" `
+  -d '{
+    "food_name": "Chicken Adobo",
+    "category_name": "Meat and Poultry",
+    "serving_label": "1 cup",
+    "serving_grams": 200,
+    "description": "Filipino chicken adobo"
+  }'
+```
+
+The response includes calories, macros, suggested meal types, confidence,
+warnings, provider/model metadata, and source URLs when web search is enabled.
+
 ## Account email flows
 
 The backend implements these unauthenticated JSON routes:

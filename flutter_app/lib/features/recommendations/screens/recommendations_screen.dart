@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,8 +24,11 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
   String? _selectedGoal;
   String? _selectedMealType;
   String? _selectedBudget;
+  double? _minimumPricePhp;
+  double? _maximumPricePhp;
   bool _highProteinOnly = false;
   bool _lowCostOnly = false;
+  Timer? _recordDebounce;
 
   static const _goalOptions = <String, String>{
     'cutting': 'Cutting',
@@ -44,61 +49,162 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
     'under_50': 'Under ₱50',
     'under_100': 'Under ₱100',
     'under_150': 'Under ₱150',
+    'custom': 'Custom Range',
     'any': 'Any Budget',
   };
 
-  List<ScoredFood> _applyFilters(List<ScoredFood> items) {
-    var result = List<ScoredFood>.from(items);
+  RecommendationRequest get _request => RecommendationRequest(
+        goalCode: _selectedGoal,
+        mealTypeCode: _selectedMealType,
+        minimumPricePhp: _minimumPricePhp,
+        maximumPricePhp: _maximumPricePhp,
+        highProteinOnly: _highProteinOnly,
+        lowCostOnly: _lowCostOnly,
+      );
 
-    if (_selectedGoal != null) {
-      result = result.where((s) {
-        switch (_selectedGoal) {
-          case 'cutting':
-            return s.goalMatchScore >= 0.75;
-          case 'bulking':
-            return s.goalMatchScore >= 0.75;
-          case 'maintenance':
-            return s.goalMatchScore >= 0.75;
-          case 'lean':
-            return s.goalMatchScore >= 0.75;
-          case 'gain_weight':
-            return s.goalMatchScore >= 0.75;
-          default:
-            return true;
-        }
-      }).toList();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recordCurrent());
+  }
+
+  Future<void> _recordCurrent({bool refresh = false}) async {
+    final request = _request;
+    final future = refresh
+        ? ref.refresh(recommendationProvider(request).future)
+        : ref.read(recommendationProvider(request).future);
+    try {
+      final results = await future;
+      await ref.read(recommendationRecorderProvider).record(request, results);
+    } catch (_) {
+      // The screen already renders provider errors and remains retryable.
     }
+  }
 
-    if (_selectedMealType != null) {
-      result = result.where((s) => s.mealTypeScore >= 0.75).toList();
+  void _changeFilter(VoidCallback update) {
+    setState(update);
+    _recordDebounce?.cancel();
+    _recordDebounce = Timer(
+      const Duration(milliseconds: 350),
+      _recordCurrent,
+    );
+  }
+
+  @override
+  void dispose() {
+    _recordDebounce?.cancel();
+    super.dispose();
+  }
+
+  void _setBudgetPreset(String? value) {
+    if (value == 'custom') {
+      Future<void>.microtask(_showBudgetRangeSheet);
+      return;
     }
-
-    if (_selectedBudget != null && _selectedBudget != 'any') {
-      final maxPrice = switch (_selectedBudget) {
-        'under_50' => 50.0,
-        'under_100' => 100.0,
-        'under_150' => 150.0,
-        _ => double.infinity,
+    _changeFilter(() {
+      _selectedBudget = value;
+      _minimumPricePhp = null;
+      _maximumPricePhp = switch (value) {
+        'under_50' => 50,
+        'under_100' => 100,
+        'under_150' => 150,
+        _ => null,
       };
-      result =
-          result.where((s) => s.food.estimatedPricePhp <= maxPrice).toList();
-    }
+    });
+  }
 
-    if (_highProteinOnly) {
-      result = result.where((s) => s.proteinFitScore >= 0.7).toList();
-    }
-
-    if (_lowCostOnly) {
-      result = result.where((s) => s.affordabilityScore >= 0.7).toList();
-    }
-
-    return result;
+  Future<void> _showBudgetRangeSheet() async {
+    final minimumController = TextEditingController(
+      text: _minimumPricePhp?.toStringAsFixed(0) ?? '',
+    );
+    final maximumController = TextEditingController(
+      text: _maximumPricePhp?.toStringAsFixed(0) ?? '',
+    );
+    final range = await showModalBottomSheet<(double?, double?)>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          20,
+          16,
+          MediaQuery.viewInsetsOf(context).bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Custom budget range',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: minimumController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Minimum PHP',
+                      prefixText: '₱',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: maximumController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Maximum PHP',
+                      prefixText: '₱',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  final minimum = double.tryParse(minimumController.text);
+                  final maximum = double.tryParse(maximumController.text);
+                  if ((minimum != null && minimum < 0) ||
+                      (maximum != null && maximum < 0) ||
+                      (minimum != null &&
+                          maximum != null &&
+                          minimum > maximum)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Enter a valid minimum and maximum.'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, (minimum, maximum));
+                },
+                child: const Text('Apply range'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    minimumController.dispose();
+    maximumController.dispose();
+    if (range == null || !mounted) return;
+    _changeFilter(() {
+      _selectedBudget = 'custom';
+      _minimumPricePhp = range.$1;
+      _maximumPricePhp = range.$2;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final recsAsync = ref.watch(recommendationProvider);
+    final request = _request;
+    final recsAsync = ref.watch(recommendationProvider(request));
     final dashAsync = ref.watch(dashboardDataProvider);
     final isOnline = ref.watch(isOnlineProvider);
 
@@ -108,7 +214,7 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(recommendationProvider),
+            onPressed: () => _recordCurrent(refresh: true),
           ),
         ],
       ),
@@ -117,7 +223,7 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
           const OfflineBanner(),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => ref.refresh(recommendationProvider.future),
+              onRefresh: () => _recordCurrent(refresh: true),
               child: CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
@@ -146,12 +252,11 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
                     ),
                     error: (e, _) => SliverFillRemaining(
                       child: _ErrorState(
-                        onRetry: () => ref.invalidate(recommendationProvider),
+                        onRetry: () => _recordCurrent(refresh: true),
                       ),
                     ),
                     data: (results) {
-                      final filtered = _applyFilters(results);
-                      if (filtered.isEmpty) {
+                      if (results.isEmpty) {
                         return const SliverFillRemaining(
                           child: _EmptyState(),
                         );
@@ -164,12 +269,12 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
                           bottom: 88,
                         ),
                         sliver: SliverList.separated(
-                          itemCount: filtered.length,
+                          itemCount: results.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 8),
                           itemBuilder: (_, i) => _FoodCard(
                             index: i,
-                            scored: filtered[i],
+                            scored: results[i],
                           ),
                         ),
                       );
@@ -207,27 +312,27 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
             label: 'Goal',
             value: _selectedGoal,
             options: _goalOptions,
-            onChanged: (v) => setState(() => _selectedGoal = v),
+            onChanged: (v) => _changeFilter(() => _selectedGoal = v),
           ),
           const SizedBox(width: 8),
           _FilterDropdown(
             label: 'Meal Type',
             value: _selectedMealType,
             options: _mealTypeOptions,
-            onChanged: (v) => setState(() => _selectedMealType = v),
+            onChanged: (v) => _changeFilter(() => _selectedMealType = v),
           ),
           const SizedBox(width: 8),
           _FilterDropdown(
             label: 'Budget',
             value: _selectedBudget,
             options: _budgetOptions,
-            onChanged: (v) => setState(() => _selectedBudget = v),
+            onChanged: _setBudgetPreset,
           ),
           const SizedBox(width: 8),
           FilterChip(
             label: const Text('High Protein'),
             selected: _highProteinOnly,
-            onSelected: (v) => setState(() => _highProteinOnly = v),
+            onSelected: (v) => _changeFilter(() => _highProteinOnly = v),
             selectedColor: AppColors.primary.withValues(alpha: 0.1),
             checkmarkColor: AppColors.primary,
             labelStyle: TextStyle(
@@ -244,7 +349,7 @@ class _RecommendationsScreenState extends ConsumerState<RecommendationsScreen> {
           FilterChip(
             label: const Text('Low Cost'),
             selected: _lowCostOnly,
-            onSelected: (v) => setState(() => _lowCostOnly = v),
+            onSelected: (v) => _changeFilter(() => _lowCostOnly = v),
             selectedColor: AppColors.primary.withValues(alpha: 0.1),
             checkmarkColor: AppColors.primary,
             labelStyle: TextStyle(
