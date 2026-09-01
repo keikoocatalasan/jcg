@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: jcg-fitness-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: AI_MODEL_PROVIDER
+        value: deterministic
+      - key: AI_MODEL_API_KEY
+        sync: false
+      - key: AI_MODEL_NAME
+        value: gpt-5-mini
+      - key: AI_REQUEST_TIMEOUT_SECONDS
+        value: 45
+      - key: MAX_IMAGE_UPLOAD_MB
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: RATE_LIMIT_REQUESTS
+        value: 30
+      - key: RATE_LIMIT_WINDOW_SECONDS
+        value: 60
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        value: keikoocatalasan@gmail.com

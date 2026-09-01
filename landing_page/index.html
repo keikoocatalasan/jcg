@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JCG Fitness - Budget-Aware Nutrition & Fitness Companion</title>
+    <meta name="description" content="Download JCG Fitness, a budget-aware nutrition tracking app. Scan local food, chat with our AI coach, and plan meals that match your budget and fitness goals.">
+    <!-- Google Fonts — Monospace -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Header Navigation -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="logo" id="nav-logo">
+                <span class="logo-icon"><i data-lucide="utensils"></i></span>
+                <span class="logo-text">JCG <span class="accent-text">Fitness</span></span>
+            </div>
+            <nav class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#install">How to Install</a>
+                <a href="https://github.com/keikoocatalasan/jcg" target="_blank" rel="noopener noreferrer" class="github-link">
+                    <svg viewBox="0 0 24 24" class="svg-icon"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    GitHub
+                </a>
+            </nav>
+            <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/app-release.apk" id="cta-nav-download" class="btn btn-primary btn-sm">Download APK</a>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-container">
+            <div class="hero-content">
+                <div class="badge" id="hero-badge"><i data-lucide="graduation-cap"></i> Thesis Project Defense</div>
+                <h1 class="hero-title" id="main-title">
+                    Eat Smart.<br>Stay Fit.<br><span class="gradient-text">Save Money.</span>
+                </h1>
+                <p class="hero-description">
+                    JCG Fitness is a budget-aware nutrition assistant app built to bridge health goals with economic reality. Scan local foods, manage your daily budget, and consult our AI coach offline or online.
+                </p>
+                <div class="hero-actions">
+                    <!-- Link points directly to your Supabase storage public bucket for fast downloading -->
+                    <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/app-release.apk" id="cta-hero-download" class="btn btn-primary btn-lg">
+                        <span class="btn-icon"><i data-lucide="bot"></i></span>
+                        Download App (APK)
+                    </a>
+                    <a href="#features" class="btn btn-secondary btn-lg">Learn Features</a>
+                </div>
+                <div class="hero-meta">
+                    <span><i data-lucide="check" class="check-icon"></i> Built for Android</span>
+                    <span><i data-lucide="check" class="check-icon"></i> 100% Free</span>
+                    <span><i data-lucide="check" class="check-icon"></i> Local Database</span>
+                </div>
+            </div>
+            
+            <div class="hero-visual">
+                <div class="phone-frame-wrapper">
+                    <!-- Glassmorphic shadows under phone -->
+                    <div class="phone-glow"></div>
+                    <div class="phone-frame">
+                        <img src="assets/jcg_session_visible.png" alt="JCG Fitness Dashboard" class="phone-screen" id="img-hero-screen">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <div class="section-header">
+            <h2 class="section-title">01 — features</h2>
+            <p class="section-subtitle">A premium dashboard designed to provide granular tracking with AI-guided assistance.</p>
+        </div>
+        <div class="features-grid">
+            <!-- Feature Card 1 -->
+            <div class="glass-card feature-card" id="card-scanner">
+                <div class="feature-icon-wrapper color-primary">
+                    <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M4 4h3V2H4c-1.1 0-2 .9-2 2v3h2V4zm16-2h-3v2h3v3h2V4c0-1.1-.9-2-2-2zm0 18h-3v2h3c1.1 0 2-.9 2-2v-3h-2v3zM4 17H2v3c0 1.1.9 2 2 2h3v-2H4v-3zm8-9c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                </div>
+                <h3 class="feature-title">AI Food Scanner</h3>
+                <p class="feature-text">Snap a photo of your meal. The on-device camera feeds our backend AI to instantly detect dishes and output precise calorie, macro, and price estimations tailored to local Filipino foods.</p>
+            </div>
+
+            <!-- Feature Card 2 -->
+            <div class="glass-card feature-card" id="card-budget">
+                <div class="feature-icon-wrapper color-secondary">
+                    <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                </div>
+                <h3 class="feature-title">Budget-Aware Planning</h3>
+                <p class="feature-text">Achieve your fitness goals without overspending. The recommendation engine scores meals deterministically based on their nutritional density relative to their cost in the local market.</p>
+            </div>
+
+            <!-- Feature Card 3 -->
+            <div class="glass-card feature-card" id="card-chatbot">
+                <div class="feature-icon-wrapper color-tertiary">
+                    <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
+                </div>
+                <h3 class="feature-title">AI Nutrition Coach</h3>
+                <p class="feature-text">Need advice on budget meal-prep? Talk with the embedded chatbot. It parses your profile history and gives personalized, safe advice while adhering strictly to safety guardrails.</p>
+            </div>
+
+            <!-- Feature Card 4 -->
+            <div class="glass-card feature-card" id="card-offline">
+                <div class="feature-icon-wrapper color-info">
+                    <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>
+                </div>
+                <h3 class="feature-title">Offline-First Design</h3>
+                <p class="feature-text">No internet connection? No problem. Track your meals, hydration, and logs locally using our SQLite database. Changes are queued and sync securely with Supabase once you're online.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Screenshot Showcase -->
+    <section class="gallery-section">
+        <div class="section-header">
+            <h2 class="section-title">02 — interface</h2>
+            <p class="section-subtitle">Sleek dark mode styling centered on biometric and budgetary visibility.</p>
+        </div>
+        <div class="gallery-slider">
+            <div class="gallery-slide">
+                <img src="assets/jcg_start_100.png" alt="Onboarding flow screen" class="gallery-img" id="img-onboarding">
+                <span class="gallery-label">Step Onboarding</span>
+            </div>
+            <div class="gallery-slide">
+                <img src="assets/jcg_session_visible.png" alt="Authenticated dashboard screen" class="gallery-img" id="img-dashboard">
+                <span class="gallery-label">Main Dashboard</span>
+            </div>
+            <div class="gallery-slide">
+                <img src="assets/jcg_session_loading.png" alt="Loading state visual screen" class="gallery-img" id="img-loading">
+                <span class="gallery-label">Session Initialization</span>
+            </div>
+            <div class="gallery-slide">
+                <img src="assets/jcg_session_final.png" alt="Final summary screen" class="gallery-img" id="img-summary">
+                <span class="gallery-label">Daily Tracker Summary</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Steps -->
+    <section id="install" class="install-section">
+        <div class="section-header">
+            <h2 class="section-title">03 — installation</h2>
+            <p class="section-subtitle">How to install JCG Fitness on your Android device in less than a minute.</p>
+        </div>
+        <div class="install-steps">
+            <!-- Step 1 -->
+            <div class="glass-card install-step-card" id="step-1">
+                <div class="step-num">01</div>
+                <h4 class="step-title">Download APK</h4>
+                <p class="step-desc">Tap the download button to grab the latest `app-release.apk` directly onto your Android device.</p>
+            </div>
+            <!-- Step 2 -->
+            <div class="glass-card install-step-card" id="step-2">
+                <div class="step-num">02</div>
+                <h4 class="step-title">Allow Unknown Sources</h4>
+                <p class="step-desc">If a prompt blocks the install, go to your phone settings or tap **"Install anyway"** to trust this local build.</p>
+            </div>
+            <!-- Step 3 -->
+            <div class="glass-card install-step-card" id="step-3">
+                <div class="step-num">03</div>
+                <h4 class="step-title">Launch & Demo</h4>
+                <p class="step-desc">Open the application, sign up, set your nutritional and budget goals, and start scanning your food!</p>
+            </div>
+        </div>
+        <div class="cta-bottom">
+            <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/app-release.apk" id="cta-bottom-download" class="btn btn-primary btn-lg">Download for Android Now</a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <p>© 2026 JCG Fitness. All Rights Reserved. Built for Thesis Defense.</p>
+            <p class="footer-credit">Developed with <i data-lucide="heart" class="footer-heart"></i> by keikoocatalasan</p>
+        </div>
+    </footer>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

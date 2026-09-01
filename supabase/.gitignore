@@ -1,0 +1,6 @@
+.branches
+.temp
+.env
+.env.local
+supabase/
+  config.toml
