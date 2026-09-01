@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Production backend: require HTTPS -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">nutrismart-ai-backend.onrender.com</domain>
+        <domain includeSubdomains="true">vjdvrdpvjjclbibrjoqf.supabase.co</domain>
+    </domain-config>
+
+    <!-- Emulator local dev loopback: allow HTTP for FastAPI local testing -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>
