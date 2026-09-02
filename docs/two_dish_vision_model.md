@@ -16,6 +16,13 @@ size, or nutrition. The UI keeps confidence visible and retains manual
 correction. Authenticated, online users can still use the server-side OpenAI
 vision path when the local model is uncertain.
 
+Because the prototype has no unknown-food class, local auto-accept currently
+requires a conservative 95% top score plus a margin over the runner-up. Lower
+scores remain reviewable instead of being treated as confirmed food. The
+100-class expansion pipeline, including the required
+`unknown_or_unsupported` class, is documented in
+[`tools/dataset/README.md`](../tools/dataset/README.md).
+
 ## Bundled sample-image attribution
 
 - **Chicken Adobo** — “Chicken adobo.jpg” by dbgg1979, licensed under
