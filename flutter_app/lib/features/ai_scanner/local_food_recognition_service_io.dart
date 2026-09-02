@@ -41,7 +41,11 @@ class LocalFoodRecognitionService {
   static const modelPath = 'assets/models/two_dish_classifier.tflite';
   static const labelsPath = 'assets/models/two_dish_labels.txt';
   static const inputSize = 224;
-  static const confidentThreshold = 0.68;
+  static const modelName = 'jcg_two_dish_classifier';
+  // The two-class prototype has no unknown-food class, so use a conservative
+  // auto-accept gate until the expanded model is trained with negatives.
+  static const confidentThreshold = 0.95;
+  static const confidentMarginThreshold = 0.20;
 
   static const _dishProfiles = <String, LocalDishRecognition>{
     'chicken_adobo': LocalDishRecognition(
@@ -68,6 +72,14 @@ class LocalFoodRecognitionService {
 
   Interpreter? _interpreter;
   List<String>? _labels;
+
+  static bool isConfident(List<LocalDishRecognition> results) {
+    if (results.isEmpty || results.first.confidence < confidentThreshold) {
+      return false;
+    }
+    final runnerUp = results.length > 1 ? results[1].confidence : 0.0;
+    return results.first.confidence - runnerUp >= confidentMarginThreshold;
+  }
 
   Future<List<LocalDishRecognition>> recognizeFile(String imagePath) async {
     await _ensureInitialized();

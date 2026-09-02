@@ -35,7 +35,7 @@ class PredictionResultScreen extends StatelessWidget {
 
     final topConfidence = predictions.first.confidence;
 
-    if (topConfidence >= 0.80) {
+    if (topConfidence >= 0.95) {
       return _buildHighConfidence(context, predictions);
     } else if (topConfidence >= 0.60) {
       return _buildMediumConfidence(context, predictions);
@@ -137,7 +137,7 @@ class PredictionResultScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            prediction.confidence >= 0.80
+            prediction.confidence >= 0.95
                 ? StatusTag.ok(
                     label:
                         '${(prediction.confidence * 100).toStringAsFixed(0)}% match')
@@ -580,7 +580,7 @@ class _CandidateSelectionScreenState extends State<_CandidateSelectionScreen> {
                               color: AppColors.textSecondary,
                             ),
                           ),
-                        prediction.confidence >= 0.80
+                        prediction.confidence >= 0.95
                             ? StatusTag.ok(
                                 label:
                                     '${(prediction.confidence * 100).toStringAsFixed(0)}% match')

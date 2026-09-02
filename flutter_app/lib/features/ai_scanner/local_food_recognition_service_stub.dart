@@ -21,7 +21,17 @@ class LocalDishRecognition {
 }
 
 class LocalFoodRecognitionService {
-  static const confidentThreshold = 0.68;
+  static const modelName = 'jcg_two_dish_classifier';
+  static const confidentThreshold = 0.95;
+  static const confidentMarginThreshold = 0.20;
+
+  static bool isConfident(List<LocalDishRecognition> results) {
+    if (results.isEmpty || results.first.confidence < confidentThreshold) {
+      return false;
+    }
+    final runnerUp = results.length > 1 ? results[1].confidence : 0.0;
+    return results.first.confidence - runnerUp >= confidentMarginThreshold;
+  }
 
   Future<List<LocalDishRecognition>> recognizeFile(String imagePath) {
     throw UnsupportedError('On-device vision is available on Android and iOS.');

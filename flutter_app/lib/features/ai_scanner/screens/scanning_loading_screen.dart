@@ -108,7 +108,14 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
       final topConfidence = localResult.predictions.isEmpty
           ? 0.0
           : localResult.predictions.first.confidence;
-      if (topConfidence >= LocalFoodRecognitionService.confidentThreshold) {
+      final runnerUpConfidence = localResult.predictions.length > 1
+          ? localResult.predictions[1].confidence
+          : 0.0;
+      final localIsConfident =
+          topConfidence >= LocalFoodRecognitionService.confidentThreshold &&
+              topConfidence - runnerUpConfidence >=
+                  LocalFoodRecognitionService.confidentMarginThreshold;
+      if (localIsConfident) {
         await _completeScan(
           localResult,
           rawResponse: _localResponseJson(localResult),
@@ -234,7 +241,7 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
 
   String _localResponseJson(ScanResult result) => jsonEncode({
         'provider': 'tflite_on_device',
-        'model': 'jcg_two_dish_classifier',
+        'model': LocalFoodRecognitionService.modelName,
         'supported_foods': ['Chicken Adobo', 'Sinigang na Baboy'],
         'client_scan_id': result.clientScanId,
         'predictions': [
@@ -300,7 +307,9 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
           'scan_id': result.scanId,
           'user_id': userId,
           'scan_status_code':
-              topConfidence >= 0.60 ? 'completed' : 'low_confidence',
+              topConfidence >= LocalFoodRecognitionService.confidentThreshold
+                  ? 'completed'
+                  : 'low_confidence',
           'client_scan_id': result.clientScanId,
           'image_path': widget.imagePath,
           'raw_response_json': rawResponse,
