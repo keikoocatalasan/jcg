@@ -63,3 +63,9 @@
 # Prevent stripping of platform channel message classes
 -keep class * extends io.flutter.plugin.common.StandardMessageCodec { *; }
 -keep class * extends io.flutter.plugin.common.JSONMessageCodec { *; }
+
+# Flutter includes an optional Play Store deferred-components integration in
+# the Android embedding. JCG ships a single APK and does not use deferred
+# components, so the Play Core types are intentionally absent. Suppress only
+# these optional references so release R8 can optimize the rest of the app.
+-dontwarn com.google.android.play.core.**
