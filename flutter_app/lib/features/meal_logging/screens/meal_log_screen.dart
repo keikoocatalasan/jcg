@@ -5,6 +5,7 @@ import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
@@ -183,6 +184,10 @@ class _MealLogScreenState extends ConsumerState<MealLogScreen> {
         }
         return;
       }
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
 
       final helper = LocalTransactionHelper(DatabaseProvider());
 
@@ -190,7 +195,7 @@ class _MealLogScreenState extends ConsumerState<MealLogScreen> {
         final mealLogId = UuidHelper.generateUuid();
         final mealLogData = <String, dynamic>{
           'meal_log_id': mealLogId,
-          'user_id': user.id,
+          'user_id': localUserId,
           'food_id': item.food.foodId,
           'meal_type_code': _mealType,
           'log_source_code': 'manual',

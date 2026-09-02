@@ -4,6 +4,7 @@ import 'package:jcg_fitness/core/database/migration_v1.dart';
 import 'package:jcg_fitness/core/database/migration_v2.dart';
 import 'package:jcg_fitness/core/database/migration_v3.dart';
 import 'package:jcg_fitness/core/database/migration_v4.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 
 void main() {
   late Database db;
@@ -166,6 +167,36 @@ void main() {
   });
 
   group('Profile CRUD', () {
+    test('resolves auth identity to the stable local application user ID',
+        () async {
+      await db.insert('profiles', {
+        'user_id': 'app-user-1',
+        'auth_user_id': 'auth-user-1',
+        'sex_code': 'male',
+        'age': 25,
+        'height_cm': 175.0,
+        'current_weight_kg': 70.0,
+        'target_weight_kg': 65.0,
+        'activity_level_code': 'moderate',
+        'fitness_goal_code': 'maintenance',
+        'daily_budget_php': 300.0,
+        'nickname': 'Identity Test',
+        'onboarding_completed': 1,
+        'sync_status': 'synced',
+        'created_at': '2026-09-02T00:00:00Z',
+        'updated_at': '2026-09-02T00:00:00Z',
+      });
+
+      expect(
+        await LocalUserIdentity.resolveInDatabase(db, 'auth-user-1'),
+        'app-user-1',
+      );
+      expect(
+        await LocalUserIdentity.resolveInDatabase(db, 'new-auth-user'),
+        'new-auth-user',
+      );
+    });
+
     test('insert and read profile', () async {
       await db.insert('profiles', {
         'user_id': 'u1',

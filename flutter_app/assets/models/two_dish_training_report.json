@@ -1,0 +1,13 @@
+{
+  "labels": [
+    "chicken_adobo",
+    "sinigang"
+  ],
+  "image_size": 224,
+  "training_images": 34,
+  "validation_loss": 0.20538419485092163,
+  "validation_accuracy": 1.0,
+  "model_bytes": 2536888,
+  "initial_epochs": 8,
+  "fine_tune_epochs": 5
+}

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/daily_target_snapshot_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/nutrition_target_repository.dart';
 import 'package:jcg_fitness/core/database/profile_repository.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
@@ -37,6 +38,7 @@ final nutritionTargetProvider =
     FutureProvider<NutritionTargetResult?>((ref) async {
   final user = ref.watch(authStateProvider).valueOrNull;
   if (user == null) return null;
+  final localUserId = await ref.watch(localUserIdProvider.future) ?? user.id;
 
   final profileRepo = ref.watch(profileRepositoryProvider);
   final weightRepo = ref.watch(weightLogRepositoryProvider);
@@ -62,10 +64,10 @@ final nutritionTargetProvider =
     return null;
   }
 
-  final latestWeight = await weightRepo.readLatest(user.id);
+  final latestWeight = await weightRepo.readLatest(localUserId);
   final effectiveWeightKg = latestWeight?.weightKg ?? weightKg;
 
-  final existingTarget = await targetRepo.readActiveByUserId(user.id);
+  final existingTarget = await targetRepo.readActiveByUserId(localUserId);
   if (existingTarget != null &&
       existingTarget.bmr != null &&
       existingTarget.tdee != null &&
@@ -98,11 +100,11 @@ final nutritionTargetProvider =
   final targetId = UuidHelper.generateUuid();
   final weightLogId = latestWeight?.weightLogId;
 
-  await targetRepo.deactivateOldTargets(user.id);
+  await targetRepo.deactivateOldTargets(localUserId);
 
   await targetRepo.insert(NutritionTarget(
     targetId: targetId,
-    userId: user.id,
+    userId: localUserId,
     formulaVersionCode: 'mifflin_stjeor',
     fitnessGoalCode: fitnessGoalCode,
     sourceWeightLogId: weightLogId,
@@ -121,7 +123,7 @@ final nutritionTargetProvider =
 
   await snapshotRepo.upsert(DailyTargetSnapshot(
     snapshotId: UuidHelper.generateUuid(),
-    userId: user.id,
+    userId: localUserId,
     nutritionTargetId: targetId,
     targetDate: DateHelper.todayDate(),
     calorieTargetSnapshot: result.calorieTarget.toDouble(),

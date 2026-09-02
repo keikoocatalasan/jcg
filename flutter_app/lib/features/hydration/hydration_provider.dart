@@ -1,36 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/nutrition_target_repository.dart';
 import 'package:jcg_fitness/core/database/water_log_repository.dart';
-import 'package:jcg_fitness/features/auth/auth_provider.dart';
 
 final todayWaterProvider = FutureProvider<int>((ref) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return 0;
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return 0;
   final repo = WaterLogRepository(DatabaseProvider());
-  final logs = await repo.queryTodayByUser(user.id);
+  final logs = await repo.queryTodayByUser(userId);
   return logs.fold<int>(0, (sum, log) => sum + log.amountMl);
 });
 
 final waterTargetProvider = FutureProvider<int>((ref) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return 2500;
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return 2500;
   final repo = NutritionTargetRepository(DatabaseProvider());
-  final target = await repo.readActiveByUserId(user.id);
+  final target = await repo.readActiveByUserId(userId);
   return target?.waterTargetMl?.toInt() ?? 2500;
 });
 
 final todayWaterLogsProvider = FutureProvider<List<WaterLog>>((ref) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = WaterLogRepository(DatabaseProvider());
-  return repo.queryTodayByUser(user.id);
+  return repo.queryTodayByUser(userId);
 });
 
 final pastWeekWaterProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = WaterLogRepository(DatabaseProvider());
   final now = DateTime.now();
   final sevenDaysAgo = now.subtract(const Duration(days: 6));
@@ -38,7 +38,7 @@ final pastWeekWaterProvider =
       '${sevenDaysAgo.year}-${sevenDaysAgo.month.toString().padLeft(2, '0')}-${sevenDaysAgo.day.toString().padLeft(2, '0')}';
   final endDate =
       '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  final logs = await repo.queryByUserAndDateRange(user.id, startDate, endDate);
+  final logs = await repo.queryByUserAndDateRange(userId, startDate, endDate);
 
   final Map<String, int> dailyTotals = {};
   for (int i = 0; i < 7; i++) {
@@ -63,8 +63,8 @@ final pastWeekWaterProvider =
 
 final hydrationHistoryProvider = FutureProvider.autoDispose
     .family<List<Map<String, dynamic>>, int>((ref, days) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = WaterLogRepository(DatabaseProvider());
   final now = DateTime.now();
   final startDate = now.subtract(Duration(days: days - 1));
@@ -72,7 +72,7 @@ final hydrationHistoryProvider = FutureProvider.autoDispose
       '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
   final endStr =
       '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  final logs = await repo.queryByUserAndDateRange(user.id, startStr, endStr);
+  final logs = await repo.queryByUserAndDateRange(userId, startStr, endStr);
 
   final Map<String, int> dailyTotals = {};
   for (int i = 0; i < days; i++) {
@@ -97,8 +97,8 @@ final hydrationHistoryProvider = FutureProvider.autoDispose
 
 final hydrationHistoryLogsProvider =
     FutureProvider.autoDispose.family<List<WaterLog>, int>((ref, days) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = WaterLogRepository(DatabaseProvider());
   final now = DateTime.now();
   final startDate = now.subtract(Duration(days: days - 1));
@@ -106,7 +106,7 @@ final hydrationHistoryLogsProvider =
       '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
   final endStr =
       '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  return repo.queryByUserAndDateRange(user.id, startStr, endStr);
+  return repo.queryByUserAndDateRange(userId, startStr, endStr);
 });
 
 Future<void> updateWaterTarget({
@@ -115,8 +115,9 @@ Future<void> updateWaterTarget({
 }) async {
   final dbProvider = DatabaseProvider();
   final targetRepo = NutritionTargetRepository(dbProvider);
+  final localUserId = await LocalUserIdentity.resolve(dbProvider, userId);
 
-  final current = await targetRepo.readActiveByUserId(userId);
+  final current = await targetRepo.readActiveByUserId(localUserId);
   if (current == null) return;
 
   final updated = current.copyWith(

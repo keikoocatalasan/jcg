@@ -46,6 +46,8 @@ dependencies:
   # Camera / image (AI scanner)
   camera: ^0.10.5
   image_picker: ^1.0.7
+  image: ^4.9.2
+  tflite_flutter: ^0.12.1
 
   # Secure storage for tokens
   flutter_secure_storage: ^9.0.0
@@ -75,4 +77,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/images/dishes/
     - assets/icons/
+    - assets/models/

@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/meal_log_repository.dart';
-import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/nutrition/nutrition_provider.dart';
 
 final mealLogRepositoryProvider = Provider<MealLogRepository>((ref) {
@@ -9,17 +9,17 @@ final mealLogRepositoryProvider = Provider<MealLogRepository>((ref) {
 
 final mealLogsForDateProvider =
     FutureProvider.family<List<MealLog>, String>((ref, date) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = ref.watch(mealLogRepositoryProvider);
-  return repo.queryByUserAndDate(user.id, date);
+  return repo.queryByUserAndDate(userId, date);
 });
 
 final todayMealLogsProvider = FutureProvider<List<MealLog>>((ref) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = ref.watch(mealLogRepositoryProvider);
-  return repo.queryTodayByUser(user.id);
+  return repo.queryTodayByUser(userId);
 });
 
 final todayCaloriesProvider = FutureProvider<int>((ref) async {

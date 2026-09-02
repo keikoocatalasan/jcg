@@ -5,6 +5,7 @@ import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/chat_message_repository.dart' as db;
 import 'package:jcg_fitness/core/database/chat_session_repository.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/utils/date_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/chatbot/chatbot_provider.dart';
@@ -17,8 +18,9 @@ final _sessionsWithPreviewProvider =
   final dbProvider = DatabaseProvider();
   final sessionRepo = ChatSessionRepository(dbProvider);
   final msgRepo = db.ChatMessageRepository(dbProvider);
+  final localUserId = await LocalUserIdentity.resolve(dbProvider, user.id);
 
-  final sessions = await sessionRepo.queryByUser(user.id);
+  final sessions = await sessionRepo.queryByUser(localUserId);
   final result = <_SessionWithPreview>[];
 
   for (final session in sessions) {
@@ -148,7 +150,9 @@ class _ChatHistoryScreenState extends ConsumerState<ChatHistoryScreen> {
               final dbProvider = DatabaseProvider();
               final sessionRepo = ChatSessionRepository(dbProvider);
               final msgRepo = db.ChatMessageRepository(dbProvider);
-              final sessions = await sessionRepo.queryByUser(user.id);
+              final localUserId =
+                  await LocalUserIdentity.resolve(dbProvider, user.id);
+              final sessions = await sessionRepo.queryByUser(localUserId);
               for (final session in sessions) {
                 final msgs =
                     await msgRepo.queryBySession(session.chatSessionId);

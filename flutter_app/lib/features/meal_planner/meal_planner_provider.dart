@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/meal_plan_repository.dart';
-import 'package:jcg_fitness/features/auth/auth_provider.dart';
 
 final mealPlanRepositoryProvider = Provider<MealPlanRepository>((ref) {
   return MealPlanRepository(DatabaseProvider());
@@ -9,16 +9,16 @@ final mealPlanRepositoryProvider = Provider<MealPlanRepository>((ref) {
 
 final weeklyPlansProvider =
     FutureProvider.family<List<MealPlan>, String>((ref, weekStart) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = ref.watch(mealPlanRepositoryProvider);
-  return repo.queryByUserAndWeek(user.id, weekStart);
+  return repo.queryByUserAndWeek(userId, weekStart);
 });
 
 final plansForDateProvider =
     FutureProvider.family<List<MealPlan>, String>((ref, date) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return [];
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return [];
   final repo = ref.watch(mealPlanRepositoryProvider);
-  return repo.queryByUserAndDate(user.id, date);
+  return repo.queryByUserAndDate(userId, date);
 });

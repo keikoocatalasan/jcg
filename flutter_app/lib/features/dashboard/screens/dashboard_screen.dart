@@ -10,7 +10,9 @@ import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
 import 'package:jcg_fitness/features/profile_settings/profile_provider.dart';
+import 'package:jcg_fitness/features/auth/welcome_message_provider.dart';
 import 'package:jcg_fitness/features/recommendations/recommendation_provider.dart';
+import 'package:jcg_fitness/features/recommendations/situational_insight_provider.dart';
 
 String _greetingForTimeOfDay() {
   final hour = DateTime.now().hour;
@@ -39,6 +41,7 @@ class DashboardScreen extends ConsumerWidget {
                 const _DateRow(),
                 _TodayProgressCard(data: data),
                 _BudgetCard(data: data),
+                const _SituationalInsightCard(),
                 const _AiRecommendationCard(),
                 _RecentLogsCard(data: data),
                 const _QuickActionsRow(),
@@ -79,6 +82,7 @@ class _Header extends ConsumerWidget {
     final profileAsync = ref.watch(profileProvider);
     final nickname = profileAsync.valueOrNull?.nickname ?? 'User';
     final greeting = _greetingForTimeOfDay();
+    final welcome = ref.watch(welcomeMessageProvider).valueOrNull;
 
     return InkWell(
       onTap: () => context.push('/profile'),
@@ -99,7 +103,7 @@ class _Header extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '$greeting, $nickname!',
+                    welcome?.text ?? '$greeting, $nickname!',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -757,6 +761,67 @@ class _BudgetCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SituationalInsightCard extends ConsumerWidget {
+  const _SituationalInsightCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final insightAsync = ref.watch(situationalInsightProvider);
+    return insightAsync.when(
+      loading: () => const SizedBox(height: 8),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (insight) {
+        if (insight == null) return const SizedBox.shrink();
+        return Card(
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+          color: AppColors.surface,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.insights_outlined,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        insight.title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        insight.body,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        insight.action,
+                        style:
+                            Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

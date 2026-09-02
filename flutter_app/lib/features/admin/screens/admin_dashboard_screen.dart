@@ -248,6 +248,11 @@ class AdminDashboardScreen extends ConsumerWidget {
         label: 'User Management',
         onTap: () => context.push('/admin/users'),
       ),
+      (
+        icon: Icons.shield_outlined,
+        label: 'Content Rules',
+        onTap: () => context.push('/admin/content-rules'),
+      ),
     ];
 
     return LayoutBuilder(

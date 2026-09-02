@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/meal_plan_repository.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
@@ -108,8 +109,12 @@ class _DaySummaryScreenState extends ConsumerState<DaySummaryScreen> {
     if (user == null) return;
 
     try {
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final helper = LocalTransactionHelper(DatabaseProvider());
-      await helper.deletePlannedMeal(plan.mealPlanId, user.id);
+      await helper.deletePlannedMeal(plan.mealPlanId, localUserId);
       if (mounted) {
         ref.invalidate(plansForDateProvider(_dateStr!));
         ref.invalidate(weeklyPlansProvider);

@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/daily_target_snapshot_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/meal_log_repository.dart';
 import 'package:jcg_fitness/core/database/water_log_repository.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
 import 'package:jcg_fitness/core/models/daily_target_snapshot.dart';
-import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/nutrition/nutrition_provider.dart';
 
 class DateRange {
@@ -109,8 +109,8 @@ final analyticsSnapshotRepositoryProvider =
 
 final analyticsDataProvider =
     FutureProvider.family<AnalyticsData, DateRange>((ref, range) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) {
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) {
     return const AnalyticsData(
       dailyData: [],
       totalSpending: 0,
@@ -138,11 +138,11 @@ final analyticsDataProvider =
       '${range.end.year}-${range.end.month.toString().padLeft(2, '0')}-${range.end.day.toString().padLeft(2, '0')}';
 
   final meals =
-      await mealRepo.queryByUserAndDateRange(user.id, startStr, endStr);
+      await mealRepo.queryByUserAndDateRange(userId, startStr, endStr);
   final waterLogs =
-      await waterRepo.queryByUserAndDateRange(user.id, startStr, endStr);
+      await waterRepo.queryByUserAndDateRange(userId, startStr, endStr);
   final weightLogs =
-      await weightRepo.queryByUserAndDateRange(user.id, startStr, endStr);
+      await weightRepo.queryByUserAndDateRange(userId, startStr, endStr);
 
   final dates = <String>[];
   var current = DateTime(range.start.year, range.start.month, range.start.day);
@@ -179,7 +179,7 @@ final analyticsDataProvider =
 
   final snapshotsByDate = <String, DailyTargetSnapshot>{};
   for (final date in dates) {
-    final snap = await snapshotRepo.readByUserAndDate(user.id, date);
+    final snap = await snapshotRepo.readByUserAndDate(userId, date);
     if (snap != null) {
       snapshotsByDate[date] = snap;
     }

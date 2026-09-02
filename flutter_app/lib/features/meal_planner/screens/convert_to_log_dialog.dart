@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/meal_plan_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
@@ -71,6 +72,10 @@ class _ConvertToLogDialogState extends ConsumerState<ConvertToLogDialog> {
         if (mounted) Navigator.of(context).pop(false);
         return;
       }
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
 
       final helper = LocalTransactionHelper(DatabaseProvider());
       final selectedDate = DateTime.tryParse(widget.dateStr);
@@ -91,7 +96,7 @@ class _ConvertToLogDialogState extends ConsumerState<ConvertToLogDialog> {
         final mealLogId = UuidHelper.generateUuid();
         final mealLogData = <String, dynamic>{
           'meal_log_id': mealLogId,
-          'user_id': user.id,
+          'user_id': localUserId,
           'food_id': plan.foodId,
           'meal_type_code': plan.mealTypeCode,
           'food_name_snapshot': plan.foodNameSnapshot,
@@ -109,7 +114,7 @@ class _ConvertToLogDialogState extends ConsumerState<ConvertToLogDialog> {
         await helper.convertPlanToLog(
           mealLogData: mealLogData,
           mealPlanId: plan.mealPlanId,
-          userId: user.id,
+          userId: localUserId,
           markPlanCompleted: _markCompleted,
         );
       }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/widgets/internet_required_widget.dart';
 import 'package:jcg_fitness/features/community/community_provider.dart';
+import 'package:jcg_fitness/features/community/community_content_filter.dart';
 
 class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key});
@@ -59,6 +60,13 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Future<void> _submit() async {
     if (!_isValid || _isSubmitting) return;
+
+    final contentCheck = CommunityContentFilter.check(_controller.text);
+    if (!contentCheck.allowed) {
+      setState(() => _error =
+          'Please remove disrespectful or unsafe language before posting.');
+      return;
+    }
 
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {

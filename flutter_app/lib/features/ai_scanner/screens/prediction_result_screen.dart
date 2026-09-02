@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
@@ -170,7 +170,7 @@ class PredictionResultScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'We found multiple items in your photo',
+                    'Other possible matches are available',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -194,7 +194,7 @@ class PredictionResultScreen extends StatelessWidget {
                 );
               },
               child: Text(
-                'View all items ($count)',
+                'View all matches ($count)',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                 ),

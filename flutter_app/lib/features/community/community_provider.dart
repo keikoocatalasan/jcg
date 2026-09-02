@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/community_cache_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
+import 'package:jcg_fitness/features/community/community_content_filter.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
@@ -10,6 +12,28 @@ const _communityPostTable = 'community_post';
 const _communityLikeTable = 'community_like';
 const _communityCommentTable = 'community_comment';
 const _communityReportTable = 'community_report';
+
+Future<String> _resolveCommunityUserId(
+  Ref ref,
+  SupabaseClient supabase,
+  String authUserId,
+) async {
+  try {
+    final appUser = await supabase
+        .from('app_user')
+        .select('user_id')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+    final remoteId = appUser?['user_id'] as String?;
+    if (remoteId != null && remoteId.isNotEmpty) return remoteId;
+  } catch (_) {
+    // A fresh offline profile may not have an app_user row yet.
+  }
+  return LocalUserIdentity.resolve(
+    ref.read(databaseProvider),
+    authUserId,
+  );
+}
 
 class CommunityPost {
   final String postId;
@@ -133,13 +157,20 @@ Future<Map<String, String>> _loadNicknames(
   Iterable<String> userIds,
 ) async {
   final nicknames = <String, String>{};
-  for (final userId in userIds.toSet()) {
-    final profile = await supabase
-        .from('user_profile')
-        .select('nickname')
-        .eq('user_id', userId)
-        .maybeSingle();
-    nicknames[userId] = profile?['nickname'] as String? ?? 'Unknown';
+  final ids = userIds.toSet().toList(growable: false);
+  if (ids.isEmpty) return nicknames;
+  final profiles = await supabase
+      .from('user_profile')
+      .select('user_id, nickname')
+      .inFilter('user_id', ids);
+  for (final profile in profiles) {
+    final userId = profile['user_id'] as String?;
+    if (userId != null) {
+      nicknames[userId] = profile['nickname'] as String? ?? 'Unknown';
+    }
+  }
+  for (final userId in ids) {
+    nicknames.putIfAbsent(userId, () => 'Unknown');
   }
   return nicknames;
 }
@@ -155,20 +186,6 @@ Future<String?> _loadLocalNickname(Ref ref, String userId) async {
   );
   if (rows.isEmpty) return null;
   return rows.first['nickname'] as String?;
-}
-
-Future<int> _countRows(
-  SupabaseClient supabase,
-  String table,
-  String postId, {
-  bool visibleOnly = false,
-}) async {
-  var query = supabase.from(table).select('post_id').eq('post_id', postId);
-  if (visibleOnly) {
-    query = query.eq('is_hidden', false).eq('is_deleted', false);
-  }
-  final rows = await query;
-  return rows.length;
 }
 
 String _reportReasonCode(String reason) {
@@ -215,32 +232,56 @@ final communityFeedProvider = FutureProvider<List<CommunityPost>>((ref) async {
         response.map<String>((row) => row['user_id'] as String),
       );
       final user = ref.read(authStateProvider).valueOrNull;
-      if (user != null &&
-          (nicknames[user.id] == null || nicknames[user.id] == 'Unknown')) {
-        nicknames[user.id] =
-            await _loadLocalNickname(ref, user.id) ?? 'Unknown';
+      final currentAppUserId = user == null
+          ? null
+          : await _resolveCommunityUserId(ref, supabase, user.id);
+      if (currentAppUserId != null &&
+          (nicknames[currentAppUserId] == null ||
+              nicknames[currentAppUserId] == 'Unknown')) {
+        nicknames[currentAppUserId] =
+            await _loadLocalNickname(ref, currentAppUserId) ?? 'Unknown';
+      }
+
+      final postIds = response
+          .map<String>((row) => row['post_id'] as String)
+          .toList(growable: false);
+      final likeRows = postIds.isEmpty
+          ? const <Map<String, dynamic>>[]
+          : await supabase
+              .from(_communityLikeTable)
+              .select('post_id')
+              .inFilter('post_id', postIds);
+      final commentRows = postIds.isEmpty
+          ? const <Map<String, dynamic>>[]
+          : await supabase
+              .from(_communityCommentTable)
+              .select('post_id')
+              .inFilter('post_id', postIds)
+              .eq('is_hidden', false)
+              .eq('is_deleted', false);
+      final likeCounts = <String, int>{};
+      for (final row in likeRows) {
+        final postId = row['post_id'] as String;
+        likeCounts[postId] = (likeCounts[postId] ?? 0) + 1;
+      }
+      final commentCounts = <String, int>{};
+      for (final row in commentRows) {
+        final postId = row['post_id'] as String;
+        commentCounts[postId] = (commentCounts[postId] ?? 0) + 1;
       }
 
       final entries = <CommunityCacheEntry>[];
       for (final row in response) {
         final postId = row['post_id'] as String;
         final userId = row['user_id'] as String;
-        final likeCount =
-            await _countRows(supabase, _communityLikeTable, postId);
-        final commentCount = await _countRows(
-          supabase,
-          _communityCommentTable,
-          postId,
-          visibleOnly: true,
-        );
         entries.add(
           CommunityCacheEntry(
             postId: postId,
             userId: userId,
             authorNickname: nicknames[userId] ?? 'Unknown',
             bodyText: row['body_text'] as String,
-            likeCount: likeCount,
-            commentCount: commentCount,
+            likeCount: likeCounts[postId] ?? 0,
+            commentCount: commentCounts[postId] ?? 0,
             createdAt: row['created_at'] as String,
             updatedAt: row['updated_at'] as String,
             cachedAt: now,
@@ -254,11 +295,11 @@ final communityFeedProvider = FutureProvider<List<CommunityPost>>((ref) async {
       }
 
       final likedPostIds = <String>{};
-      if (user != null) {
+      if (currentAppUserId != null) {
         final likes = await supabase
             .from(_communityLikeTable)
             .select('post_id')
-            .eq('user_id', user.id);
+            .eq('user_id', currentAppUserId);
         for (final like in likes) {
           likedPostIds.add(like['post_id'] as String);
         }
@@ -281,6 +322,47 @@ final communityFeedProvider = FutureProvider<List<CommunityPost>>((ref) async {
   return cached.map(CommunityPost.fromCache).toList();
 });
 
+final communityRealtimeProvider = Provider.autoDispose<void>((ref) {
+  final supabase = ref.read(supabaseClientProvider);
+  final channel = supabase.channel('community-feed-live');
+
+  void refresh(PostgresChangePayload payload) {
+    ref.invalidate(communityFeedProvider);
+    if (payload.table == _communityCommentTable) {
+      final postId =
+          payload.newRecord['post_id'] ?? payload.oldRecord['post_id'];
+      if (postId is String) {
+        ref.invalidate(postCommentsProvider(postId));
+      }
+    }
+  }
+
+  channel
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: _communityPostTable,
+        callback: refresh,
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: _communityCommentTable,
+        callback: refresh,
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: _communityLikeTable,
+        callback: refresh,
+      )
+      .subscribe();
+
+  ref.onDispose(() {
+    supabase.removeChannel(channel);
+  });
+});
+
 final likePostProvider =
     Provider.family<Future<bool> Function(), String>((ref, postId) {
   return () async {
@@ -295,12 +377,13 @@ final likePostProvider =
     }
 
     final supabase = ref.read(supabaseClientProvider);
+    final appUserId = await _resolveCommunityUserId(ref, supabase, user.id);
 
     final existing = await supabase
         .from(_communityLikeTable)
         .select('post_id')
         .eq('post_id', postId)
-        .eq('user_id', user.id)
+        .eq('user_id', appUserId)
         .maybeSingle();
 
     if (existing != null) {
@@ -308,11 +391,11 @@ final likePostProvider =
           .from(_communityLikeTable)
           .delete()
           .eq('post_id', postId)
-          .eq('user_id', user.id);
+          .eq('user_id', appUserId);
     } else {
       await supabase.from(_communityLikeTable).insert({
         'post_id': postId,
-        'user_id': user.id,
+        'user_id': appUserId,
       });
     }
     return true;
@@ -322,6 +405,9 @@ final likePostProvider =
 final createCommentProvider =
     Provider.family<Future<bool> Function(), CreateCommentInput>((ref, input) {
   return () async {
+    if (!CommunityContentFilter.check(input.bodyText).allowed) {
+      throw Exception('Community content was blocked by the safety filter.');
+    }
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
       throw Exception('Adding comments requires an internet connection.');
@@ -333,10 +419,11 @@ final createCommentProvider =
     }
 
     final supabase = ref.read(supabaseClientProvider);
+    final appUserId = await _resolveCommunityUserId(ref, supabase, user.id);
 
     await supabase.from(_communityCommentTable).insert({
       'post_id': input.postId,
-      'user_id': user.id,
+      'user_id': appUserId,
       'comment_text': input.bodyText,
     });
 
@@ -347,6 +434,9 @@ final createCommentProvider =
 final createPostProvider =
     Provider.family<Future<bool> Function(), String>((ref, bodyText) {
   return () async {
+    if (!CommunityContentFilter.check(bodyText).allowed) {
+      throw Exception('Community content was blocked by the safety filter.');
+    }
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
       throw Exception('Creating posts requires an internet connection.');
@@ -358,9 +448,10 @@ final createPostProvider =
     }
 
     final supabase = ref.read(supabaseClientProvider);
+    final appUserId = await _resolveCommunityUserId(ref, supabase, user.id);
 
     await supabase.from(_communityPostTable).insert({
-      'user_id': user.id,
+      'user_id': appUserId,
       'body_text': bodyText,
     });
     return true;
@@ -398,6 +489,7 @@ final reportPostProvider =
     }
 
     final supabase = ref.read(supabaseClientProvider);
+    final appUserId = await _resolveCommunityUserId(ref, supabase, user.id);
     final reason = await supabase
         .from('report_reason')
         .select('reason_id')
@@ -406,7 +498,7 @@ final reportPostProvider =
 
     await supabase.from(_communityReportTable).insert({
       'post_id': input.postId,
-      'reporter_user_id': user.id,
+      'reporter_user_id': appUserId,
       'reason_id': reason?['reason_id'] as int? ?? 5,
       'details': input.details,
     });

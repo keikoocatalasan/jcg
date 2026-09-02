@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/constants.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/water_log_repository.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
@@ -41,10 +42,14 @@ class _WaterLogScreenState extends ConsumerState<WaterLogScreen> {
 
     try {
       final now = DateHelper.nowUtc();
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final helper = LocalTransactionHelper(DatabaseProvider());
       await helper.createWaterLog({
         'water_log_id': UuidHelper.generateUuid(),
-        'user_id': user.id,
+        'user_id': localUserId,
         'amount_ml': amountMl,
         'logged_at': now,
       });
@@ -89,8 +94,12 @@ class _WaterLogScreenState extends ConsumerState<WaterLogScreen> {
     if (user == null) return;
 
     try {
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final helper = LocalTransactionHelper(DatabaseProvider());
-      await helper.deleteWaterLog(log.waterLogId, user.id);
+      await helper.deleteWaterLog(log.waterLogId, localUserId);
 
       ref.invalidate(todayWaterProvider);
       ref.invalidate(todayWaterLogsProvider);

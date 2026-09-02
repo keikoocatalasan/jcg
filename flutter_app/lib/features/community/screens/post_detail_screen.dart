@@ -6,7 +6,9 @@ import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/utils/date_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/community/community_provider.dart';
+import 'package:jcg_fitness/features/community/community_content_filter.dart';
 import 'package:jcg_fitness/features/community/screens/report_post_dialog.dart';
+import 'package:jcg_fitness/features/profile_settings/profile_provider.dart';
 
 class PostDetailScreen extends ConsumerStatefulWidget {
   const PostDetailScreen({super.key});
@@ -45,6 +47,12 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   Future<void> _submitComment(CommunityPost post) async {
     final text = _commentController.text.trim();
     if (text.isEmpty || _isSubmittingComment) return;
+
+    if (!CommunityContentFilter.check(text).allowed) {
+      _showError(
+          'Please remove disrespectful or unsafe language before commenting.');
+      return;
+    }
 
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
@@ -135,7 +143,10 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     }
 
     final currentUser = ref.watch(authStateProvider).valueOrNull;
-    final isOwnPost = currentUser?.id == post.userId;
+    ref.watch(communityRealtimeProvider);
+    final currentProfile = ref.watch(profileProvider).valueOrNull;
+    final isOwnPost =
+        currentProfile?.userId == post.userId || currentUser?.id == post.userId;
     final commentsAsync = ref.watch(postCommentsProvider(post.postId));
     final isOnline = ref.watch(isOnlineProvider);
 
@@ -435,6 +446,7 @@ class _CommentInput extends StatelessWidget {
               textCapitalization: TextCapitalization.sentences,
               maxLines: 3,
               minLines: 1,
+              maxLength: 500,
               textInputAction: TextInputAction.send,
               onSubmitted: (_) => onSubmit(),
               enabled: !isSubmitting,

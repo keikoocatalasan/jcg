@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
@@ -57,8 +58,12 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
           '${_startDate.year}-${_startDate.month.toString().padLeft(2, '0')}-${_startDate.day.toString().padLeft(2, '0')}';
       final endDate =
           '${_endDate.year}-${_endDate.month.toString().padLeft(2, '0')}-${_endDate.day.toString().padLeft(2, '0')}';
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final logs =
-          await repo.queryByUserAndDateRange(user.id, startDate, endDate);
+          await repo.queryByUserAndDateRange(localUserId, startDate, endDate);
       logs.sort((a, b) => a.loggedAt.compareTo(b.loggedAt));
 
       if (mounted) {

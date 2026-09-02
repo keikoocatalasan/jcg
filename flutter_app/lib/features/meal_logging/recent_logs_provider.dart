@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/meal_log_repository.dart';
 import 'package:jcg_fitness/core/database/water_log_repository.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
-import 'package:jcg_fitness/features/auth/auth_provider.dart';
 
 enum LogEntryType { meal, water, weight }
 
@@ -44,8 +44,8 @@ class DaySummary {
 }
 
 final recentLogsProvider = FutureProvider<Map<String, DaySummary>>((ref) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) return {};
+  final userId = await ref.watch(localUserIdProvider.future);
+  if (userId == null) return {};
 
   final mealRepo = MealLogRepository(DatabaseProvider());
   final waterRepo = WaterLogRepository(DatabaseProvider());
@@ -58,15 +58,15 @@ final recentLogsProvider = FutureProvider<Map<String, DaySummary>>((ref) async {
   final yesterdayStr =
       '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
 
-  final todayMeals = await mealRepo.queryByUserAndDate(user.id, today);
+  final todayMeals = await mealRepo.queryByUserAndDate(userId, today);
   final yesterdayMeals =
-      await mealRepo.queryByUserAndDate(user.id, yesterdayStr);
-  final todayWater = await waterRepo.queryByUserAndDate(user.id, today);
+      await mealRepo.queryByUserAndDate(userId, yesterdayStr);
+  final todayWater = await waterRepo.queryByUserAndDate(userId, today);
   final yesterdayWater =
-      await waterRepo.queryByUserAndDate(user.id, yesterdayStr);
-  final todayWeight = await weightRepo.queryByUserAndDate(user.id, today);
+      await waterRepo.queryByUserAndDate(userId, yesterdayStr);
+  final todayWeight = await weightRepo.queryByUserAndDate(userId, today);
   final yesterdayWeight =
-      await weightRepo.queryByUserAndDate(user.id, yesterdayStr);
+      await weightRepo.queryByUserAndDate(userId, yesterdayStr);
 
   final result = <String, DaySummary>{};
 

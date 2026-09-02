@@ -23,16 +23,23 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging && mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(communityRealtimeProvider);
     final feedAsync = ref.watch(communityFeedProvider);
     final isOnline = ref.watch(isOnlineProvider);
 
@@ -60,10 +67,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           indicatorSize: TabBarIndicatorSize.label,
           labelColor: AppColors.accentPrimary,
           unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+          labelStyle:
+              const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          unselectedLabelStyle:
+              const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
           tabs: const [
-            Tab(text: 'Following'),
+            Tab(text: 'All'),
             Tab(text: 'Trending'),
             Tab(text: 'Latest'),
           ],
@@ -75,7 +84,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppColors.textPrimary),
+              const Icon(Icons.error_outline,
+                  size: 48, color: AppColors.textPrimary),
               const SizedBox(height: 16),
               Text('Failed to load feed',
                   style: Theme.of(context).textTheme.titleMedium),
@@ -88,13 +98,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           ),
         ),
         data: (posts) {
-          if (!isOnline && posts.isEmpty) {
+          final orderedPosts = _orderedPosts(posts);
+          if (!isOnline && orderedPosts.isEmpty) {
             return const InternetRequiredWidget(
               featureName: 'Community',
             );
           }
 
-          if (posts.isEmpty) {
+          if (orderedPosts.isEmpty) {
             return Center(
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -152,9 +163,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
             },
             child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 88),
-              itemCount: posts.length,
+              itemCount: orderedPosts.length,
               itemBuilder: (context, index) {
-                final post = posts[index];
+                final post = orderedPosts[index];
                 return _PostCard(
                   post: post,
                   isOnline: isOnline,
@@ -178,6 +189,20 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         },
       ),
     );
+  }
+
+  List<CommunityPost> _orderedPosts(List<CommunityPost> posts) {
+    final ordered = List<CommunityPost>.from(posts);
+    if (_tabController.index == 1) {
+      ordered.sort((a, b) {
+        final scoreA = a.likeCount + a.commentCount * 2;
+        final scoreB = b.likeCount + b.commentCount * 2;
+        return scoreB.compareTo(scoreA);
+      });
+    } else {
+      ordered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    return ordered;
   }
 
   void _showOfflineSnackbar(BuildContext context) {
@@ -281,9 +306,10 @@ class _PostCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Text(
                           '${post.likeCount}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                         ),
                       ],
                     ),
@@ -301,9 +327,10 @@ class _PostCard extends ConsumerWidget {
                         const SizedBox(width: 4),
                         Text(
                           '${post.commentCount}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
                         ),
                       ],
                     ),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/core/database/meal_log_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/water_log_repository.dart';
 import 'package:jcg_fitness/core/utils/date_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
@@ -52,8 +53,8 @@ class DashboardData {
 }
 
 final dashboardDataProvider = FutureProvider<DashboardData>((ref) async {
-  final user = ref.watch(authStateProvider).valueOrNull;
-  if (user == null) {
+  final authUser = ref.watch(authStateProvider).valueOrNull;
+  if (authUser == null) {
     return const DashboardData(
       consumedCalories: 0,
       targetCalories: 0,
@@ -73,6 +74,7 @@ final dashboardDataProvider = FutureProvider<DashboardData>((ref) async {
       hasTarget: false,
     );
   }
+  final userId = await ref.watch(localUserIdProvider.future) ?? authUser.id;
 
   final mealRepo = ref.watch(mealLogRepositoryProvider);
   final waterRepo = ref.watch(waterLogRepositoryProvider);
@@ -82,11 +84,11 @@ final dashboardDataProvider = FutureProvider<DashboardData>((ref) async {
 
   final today = DateHelper.todayDate();
 
-  final meals = await mealRepo.queryByUserAndDate(user.id, today);
-  final waterLogs = await waterRepo.queryByUserAndDate(user.id, today);
-  final latestWeight = await weightRepo.readLatest(user.id);
-  final target = await targetRepo.readActiveByUserId(user.id);
-  final profile = await profileRepo.readByUserId(user.id);
+  final meals = await mealRepo.queryByUserAndDate(userId, today);
+  final waterLogs = await waterRepo.queryByUserAndDate(userId, today);
+  final latestWeight = await weightRepo.readLatest(userId);
+  final target = await targetRepo.readActiveByUserId(userId);
+  final profile = await profileRepo.readByUserId(authUser.id);
 
   final consumedCalories =
       meals.fold<int>(0, (sum, m) => sum + m.caloriesSnapshot.round());

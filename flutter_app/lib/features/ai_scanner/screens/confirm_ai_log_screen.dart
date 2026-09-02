@@ -7,6 +7,7 @@ import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/database/ai_scan_feedback_repository.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/errors/result.dart';
 import 'package:jcg_fitness/core/network/api_client.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
@@ -78,13 +79,17 @@ class _ConfirmAiLogScreenState extends ConsumerState<ConfirmAiLogScreen> {
         }
         return;
       }
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
 
       final mealLogId = UuidHelper.generateUuid();
       final now = DateTime.now().toUtc().toIso8601String();
 
       final mealLogData = <String, dynamic>{
         'meal_log_id': mealLogId,
-        'user_id': user.id,
+        'user_id': localUserId,
         'food_id': widget.foodId,
         'meal_type_code': widget.mealType,
         'log_source_code': 'ai_scanner',

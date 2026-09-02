@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
@@ -226,6 +227,10 @@ class _AddPlannedMealScreenState extends ConsumerState<AddPlannedMealScreen> {
         }
         return;
       }
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
 
       final food = _selectedFood!;
       final mealPlanId = UuidHelper.generateUuid();
@@ -236,7 +241,7 @@ class _AddPlannedMealScreenState extends ConsumerState<AddPlannedMealScreen> {
       await db.transaction((txn) async {
         await txn.insert('meal_plans', {
           'meal_plan_id': mealPlanId,
-          'user_id': user.id,
+          'user_id': localUserId,
           'food_id': food.foodId,
           'meal_type_code': _mealType,
           'status_code': 'planned',
@@ -258,14 +263,14 @@ class _AddPlannedMealScreenState extends ConsumerState<AddPlannedMealScreen> {
         final operationId = const Uuid().v4();
         await txn.insert('sync_queue', {
           'sync_queue_id': const Uuid().v4(),
-          'user_id': user.id,
+          'user_id': localUserId,
           'operation_id': operationId,
           'entity_type_code': 'meal_plan',
           'entity_id': mealPlanId,
           'operation_code': 'create',
           'payload_json': jsonEncode({
             'meal_plan_id': mealPlanId,
-            'user_id': user.id,
+            'user_id': localUserId,
             'food_id': food.foodId,
             'meal_type_code': _mealType,
             'status_code': 'planned',

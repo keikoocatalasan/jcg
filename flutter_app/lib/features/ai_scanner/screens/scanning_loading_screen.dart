@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
+import 'package:jcg_fitness/features/ai_scanner/local_food_recognition_service.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/prediction_result_screen.dart';
 import 'package:jcg_fitness/app/theme.dart';
 
@@ -82,137 +83,264 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
   }
 
   Future<void> _performScan() async {
+    if (!mounted) return;
     setState(() {
+      _isCancelled = false;
       _isScanning = true;
       _error = null;
+      _currentStep = 0;
     });
-
-    final online = ref.read(isOnlineProvider);
-    if (!online) {
-      setState(() {
-        _error = 'Internet connection required to scan food';
-        _isScanning = false;
-      });
-      return;
-    }
 
     final file = File(widget.imagePath);
     if (!file.existsSync()) {
-      setState(() {
-        _error = 'Image file not found';
-        _isScanning = false;
-      });
+      _showError('Image file not found');
       return;
     }
 
     final clientScanId = UuidHelper.generateUuid();
+    ScanResult? localResult;
+    Object? localFailure;
 
     try {
-      final session = Supabase.instance.client.auth.currentSession;
-      final token = session?.accessToken;
-
-      const baseUrl = AppConfig.fastApiBaseUrl;
-      final uri = Uri.parse('$baseUrl/ai/scan-food');
-      final request = http.MultipartRequest('POST', uri);
-
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
-      request.headers['Accept'] = 'application/json';
-
-      request.fields['client_scan_id'] = clientScanId;
-      request.fields['meal_type'] = widget.mealType;
-      final ext = widget.imagePath.split('.').last.toLowerCase();
-      final mimeType = ext == 'png'
-          ? MediaType('image', 'png')
-          : ext == 'webp'
-              ? MediaType('image', 'webp')
-              : MediaType('image', 'jpeg');
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'file',
-          widget.imagePath,
-          contentType: mimeType,
-        ),
-      );
-
-      final streamedResponse = await request.send().timeout(
-            const Duration(seconds: 60),
-          );
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
-        final scanResult = await _matchCatalogFoods(ScanResult.fromJson(body));
-
-        final db = await DatabaseProvider().database;
-        final user = Supabase.instance.client.auth.currentUser;
-        if (user != null) {
-          final profiles = await db.query(
-            'profiles',
-            where: 'auth_user_id = ?',
-            whereArgs: [user.id],
-          );
-          if (profiles.isNotEmpty) {
-            final userId = profiles.first['user_id'] as String;
-            await db.insert(
-              'ai_scans',
-              {
-                'scan_id': scanResult.scanId,
-                'user_id': userId,
-                'scan_status_code': 'completed',
-                'client_scan_id': scanResult.clientScanId,
-                'image_path': widget.imagePath,
-                'raw_response_json': response.body,
-                'sync_status': 'synced',
-                'created_at': DateTime.now().toUtc().toIso8601String(),
-                'completed_at': DateTime.now().toUtc().toIso8601String(),
-              },
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-          }
-        }
-
-        ref.read(scanResultProvider.notifier).setResult(scanResult);
-
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PredictionResultScreen(
-                scanResult: scanResult,
-                mealType: widget.mealType,
-                clientScanId: scanResult.clientScanId,
-              ),
-            ),
-          );
-        }
-      } else {
-        final body = response.body.isNotEmpty
-            ? jsonDecode(response.body) as Map<String, dynamic>
-            : <String, dynamic>{};
-        final detail = body['detail'];
-        final rootError = body['error'] as Map<String, dynamic>?;
-        final nestedError = detail is Map<String, dynamic>
-            ? detail['error'] as Map<String, dynamic>?
-            : null;
-        final message = rootError?['message'] as String? ??
-            (detail is String
-                ? detail
-                : nestedError?['message'] as String? ??
-                    body['message'] as String? ??
-                    'Scan failed with status ${response.statusCode}');
-        setState(() {
-          _error = message;
-          _isScanning = false;
-        });
+      if (mounted) setState(() => _currentStep = 1);
+      localResult = await _recognizeLocally(clientScanId);
+      if (_isCancelled) return;
+      final topConfidence = localResult.predictions.isEmpty
+          ? 0.0
+          : localResult.predictions.first.confidence;
+      if (topConfidence >= LocalFoodRecognitionService.confidentThreshold) {
+        await _completeScan(
+          localResult,
+          rawResponse: _localResponseJson(localResult),
+          syncStatus: 'pending',
+        );
+        return;
       }
     } catch (e) {
-      setState(() {
-        _error = 'Connection error: ${e.toString()}';
-        _isScanning = false;
-      });
+      localFailure = e;
     }
+
+    final online = ref.read(isOnlineProvider);
+    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (online && token != null && !_isCancelled) {
+      try {
+        if (mounted) setState(() => _currentStep = 2);
+        final cloud = await _requestCloudScan(token, clientScanId);
+        await _completeScan(
+          cloud.$1,
+          rawResponse: cloud.$2,
+          syncStatus: 'synced',
+        );
+        return;
+      } catch (cloudError) {
+        if (localResult == null) {
+          _showError('Cloud scan failed: $cloudError');
+          return;
+        }
+      }
+    }
+
+    if (localResult != null && !_isCancelled) {
+      await _completeScan(
+        localResult,
+        rawResponse: _localResponseJson(localResult),
+        syncStatus: 'pending',
+      );
+      return;
+    }
+
+    final reason = localFailure == null
+        ? 'The on-device model could not analyze this image.'
+        : 'On-device recognition failed: $localFailure';
+    _showError(reason);
+  }
+
+  Future<ScanResult> _recognizeLocally(String clientScanId) async {
+    final recognitions = await ref
+        .read(localFoodRecognitionServiceProvider)
+        .recognizeFile(widget.imagePath);
+    return ScanResult(
+      scanId: clientScanId,
+      clientScanId: clientScanId,
+      predictions: [
+        for (var index = 0; index < recognitions.length; index++)
+          ScanPrediction(
+            foodName: recognitions[index].foodName,
+            confidence: recognitions[index].confidence,
+            rankNumber: index + 1,
+            calories: recognitions[index].calories,
+            proteinG: recognitions[index].proteinG,
+            carbsG: recognitions[index].carbsG,
+            fatG: recognitions[index].fatG,
+            estimatedCostPhp: recognitions[index].estimatedCostPhp,
+          ),
+      ],
+    );
+  }
+
+  Future<(ScanResult, String)> _requestCloudScan(
+    String token,
+    String clientScanId,
+  ) async {
+    const baseUrl = AppConfig.fastApiBaseUrl;
+    final uri = Uri.parse('$baseUrl/ai/scan-food');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..headers['Accept'] = 'application/json'
+      ..fields['client_scan_id'] = clientScanId
+      ..fields['meal_type'] = widget.mealType;
+    final ext = widget.imagePath.split('.').last.toLowerCase();
+    final mimeType = ext == 'png'
+        ? MediaType('image', 'png')
+        : ext == 'webp'
+            ? MediaType('image', 'webp')
+            : MediaType('image', 'jpeg');
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        widget.imagePath,
+        contentType: mimeType,
+      ),
+    );
+    final streamedResponse = await request.send().timeout(
+          const Duration(seconds: 60),
+        );
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(_responseError(response));
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (ScanResult.fromJson(body), response.body);
+  }
+
+  String _responseError(http.Response response) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final detail = body['detail'];
+      final rootError = body['error'] as Map<String, dynamic>?;
+      final nestedError = detail is Map<String, dynamic>
+          ? detail['error'] as Map<String, dynamic>?
+          : null;
+      return rootError?['message'] as String? ??
+          (detail is String
+              ? detail
+              : nestedError?['message'] as String? ??
+                  body['message'] as String? ??
+                  'Scan failed with status ${response.statusCode}');
+    } catch (_) {
+      return 'Scan failed with status ${response.statusCode}';
+    }
+  }
+
+  String _localResponseJson(ScanResult result) => jsonEncode({
+        'provider': 'tflite_on_device',
+        'model': 'jcg_two_dish_classifier',
+        'supported_foods': ['Chicken Adobo', 'Sinigang na Baboy'],
+        'client_scan_id': result.clientScanId,
+        'predictions': [
+          for (final prediction in result.predictions)
+            {
+              'food_name': prediction.foodName,
+              'confidence': prediction.confidence,
+              'rank_number': prediction.rankNumber,
+            },
+        ],
+      });
+
+  Future<void> _completeScan(
+    ScanResult result, {
+    required String rawResponse,
+    required String syncStatus,
+  }) async {
+    if (_isCancelled) return;
+    if (mounted) setState(() => _currentStep = 3);
+    final matchedResult = await _matchCatalogFoods(result);
+    await _persistScan(
+      matchedResult,
+      rawResponse: rawResponse,
+      syncStatus: syncStatus,
+    );
+    if (_isCancelled || !mounted) return;
+    ref.read(scanResultProvider.notifier).setResult(matchedResult);
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PredictionResultScreen(
+          scanResult: matchedResult,
+          mealType: widget.mealType,
+          clientScanId: matchedResult.clientScanId,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _persistScan(
+    ScanResult result, {
+    required String rawResponse,
+    required String syncStatus,
+  }) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    final db = await DatabaseProvider().database;
+    final profiles = await db.query(
+      'profiles',
+      where: 'auth_user_id = ?',
+      whereArgs: [user.id],
+      limit: 1,
+    );
+    if (profiles.isEmpty) return;
+    final userId = profiles.first['user_id'] as String;
+    final now = DateTime.now().toUtc().toIso8601String();
+    final topConfidence =
+        result.predictions.isEmpty ? 0.0 : result.predictions.first.confidence;
+    await db.transaction((txn) async {
+      await txn.insert(
+        'ai_scans',
+        {
+          'scan_id': result.scanId,
+          'user_id': userId,
+          'scan_status_code':
+              topConfidence >= 0.60 ? 'completed' : 'low_confidence',
+          'client_scan_id': result.clientScanId,
+          'image_path': widget.imagePath,
+          'raw_response_json': rawResponse,
+          'sync_status': syncStatus,
+          'created_at': now,
+          'completed_at': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      await txn.delete(
+        'ai_scan_predictions',
+        where: 'scan_id = ?',
+        whereArgs: [result.scanId],
+      );
+      for (var index = 0; index < result.predictions.length; index++) {
+        final prediction = result.predictions[index];
+        await txn.insert('ai_scan_predictions', {
+          'prediction_id': UuidHelper.generateUuid(),
+          'scan_id': result.scanId,
+          'food_id': prediction.foodId,
+          'predicted_food_name': prediction.foodName,
+          'confidence': prediction.confidence,
+          'rank_number': prediction.rankNumber ?? index + 1,
+          'calories': prediction.calories,
+          'protein_g': prediction.proteinG,
+          'carbs_g': prediction.carbsG,
+          'fat_g': prediction.fatG,
+          'estimated_cost_php': prediction.estimatedCostPhp,
+          'sync_status': syncStatus,
+        });
+      }
+    });
+  }
+
+  void _showError(String message) {
+    if (!mounted || _isCancelled) return;
+    setState(() {
+      _error = message;
+      _isScanning = false;
+    });
   }
 
   @override

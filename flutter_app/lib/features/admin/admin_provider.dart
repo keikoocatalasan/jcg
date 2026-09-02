@@ -51,6 +51,36 @@ final dashboardKpisProvider = FutureProvider<DashboardKpis>((ref) async {
   return DashboardKpis.fromJson(result as Map<String, dynamic>);
 });
 
+class AdminBlockedWord {
+  final int id;
+  final String word;
+  final bool isActive;
+
+  const AdminBlockedWord({
+    required this.id,
+    required this.word,
+    required this.isActive,
+  });
+}
+
+final adminBlockedWordsProvider =
+    FutureProvider<List<AdminBlockedWord>>((ref) async {
+  final rows = await ref
+      .read(supabaseClientProvider)
+      .from('community_blocked_word')
+      .select('blocked_word_id, blocked_word, is_active')
+      .order('blocked_word');
+  return rows
+      .map(
+        (row) => AdminBlockedWord(
+          id: (row['blocked_word_id'] as num).toInt(),
+          word: row['blocked_word'] as String,
+          isActive: row['is_active'] == true,
+        ),
+      )
+      .toList();
+});
+
 class AdminRoleOption {
   final int id;
   final String code;

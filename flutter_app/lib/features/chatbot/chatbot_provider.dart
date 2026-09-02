@@ -5,6 +5,7 @@ import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/database/chat_message_repository.dart' as db;
 import 'package:jcg_fitness/core/database/chat_session_repository.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/profile_repository.dart';
 import 'package:jcg_fitness/core/database/sync_queue_repository.dart';
 import 'package:jcg_fitness/core/errors/result.dart';
@@ -100,7 +101,7 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
   late final profileRepo = ProfileRepository(dbProvider);
 
   Future<void> loadOrCreateSession() async {
-    final userId = _getUserId();
+    final userId = await _getLocalUserId();
     if (userId == null) return;
 
     final sessions = await chatSessionRepo.queryByUser(userId);
@@ -153,7 +154,7 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
   }
 
   Future<String> _saveLocalUserMessage(String text, ChatSession session) async {
-    final userId = _getUserId();
+    final userId = await _getLocalUserId();
     if (userId == null) return '';
 
     final now = DateTime.now().toUtc().toIso8601String();
@@ -256,11 +257,11 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
   }
 
   Future<Map<String, dynamic>> _buildContext() async {
-    final userId = _getUserId();
-    if (userId == null) return {};
+    final authUserId = _getAuthUserId();
+    if (authUserId == null) return {};
 
     try {
-      final profile = await profileRepo.readByUserId(userId);
+      final profile = await profileRepo.readByUserId(authUserId);
       if (profile == null) return {};
       return {
         'fitness_goal': profile.fitnessGoalCode,
@@ -282,7 +283,7 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     String operation,
     Map<String, dynamic> payload,
   ) async {
-    final userId = _getUserId();
+    final userId = await _getLocalUserId();
     if (userId == null) return;
 
     final sequence = DateTime.now().millisecondsSinceEpoch;
@@ -330,9 +331,15 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     state = session;
   }
 
-  String? _getUserId() {
+  String? _getAuthUserId() {
     final session = _ref.read(authSessionProvider);
     return session?.user.id;
+  }
+
+  Future<String?> _getLocalUserId() async {
+    final authUserId = _getAuthUserId();
+    if (authUserId == null) return null;
+    return LocalUserIdentity.resolve(dbProvider, authUserId);
   }
 }
 

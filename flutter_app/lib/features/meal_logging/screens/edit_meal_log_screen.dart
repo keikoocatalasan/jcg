@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/meal_log_repository.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
@@ -57,9 +58,13 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
     final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) return;
     try {
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final repo = MealLogRepository(DatabaseProvider());
       final logs = await repo.queryByUserAndDate(
-        user.id,
+        localUserId,
         _loggedAt.toUtc().toIso8601String().substring(0, 10),
       );
       final matching = logs
@@ -185,13 +190,17 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
         }
         return;
       }
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
 
       final helper = LocalTransactionHelper(DatabaseProvider());
 
       for (final item in _foodItems) {
         final mealLogData = <String, dynamic>{
           'meal_log_id': widget.mealLogId,
-          'user_id': user.id,
+          'user_id': localUserId,
           'food_id': item.food.foodId,
           'meal_type_code': _mealType,
           'log_source_code': 'manual',
@@ -254,8 +263,12 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
               final user = ref.read(authStateProvider).valueOrNull;
               if (user == null) return;
               try {
+                final localUserId = await LocalUserIdentity.resolve(
+                  DatabaseProvider(),
+                  user.id,
+                );
                 final helper = LocalTransactionHelper(DatabaseProvider());
-                await helper.deleteMealLog(widget.mealLogId, user.id);
+                await helper.deleteMealLog(widget.mealLogId, localUserId);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

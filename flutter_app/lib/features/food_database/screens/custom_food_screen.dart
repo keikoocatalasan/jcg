@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
+import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/food_database/food_provider.dart';
 
@@ -80,8 +82,12 @@ class _CustomFoodScreenState extends ConsumerState<CustomFoodScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final data = FoodFormData(
-        userId: user.id,
+        userId: localUserId,
         foodName: _foodNameController.text.trim(),
         categoryName: _selectedCategory!,
         servingLabel:

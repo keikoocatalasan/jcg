@@ -48,6 +48,7 @@ final updateProfileProvider =
   final profileRepo = ref.watch(profileRepositoryProvider);
   final profile = await profileRepo.readByUserId(user.id);
   if (profile == null) throw Exception('Profile not found');
+  final localUserId = profile.userId;
 
   final now = DateHelper.nowUtc();
   final db = await DatabaseProvider().database;
@@ -89,10 +90,10 @@ final updateProfileProvider =
     );
     await txn.insert('sync_queue', {
       'sync_queue_id': UuidHelper.generateUuid(),
-      'user_id': user.id,
+      'user_id': localUserId,
       'operation_id': operationId,
       'entity_type_code': 'profile',
-      'entity_id': user.id,
+      'entity_id': localUserId,
       'operation_code': 'update',
       'payload_json': jsonEncode(updateMap),
       'changed_fields_json': updateMap.keys.join(','),
@@ -132,7 +133,7 @@ final updateProfileProvider =
     await helper.saveWeightLogAndRecalculate(
       weightLogData: {
         'weight_log_id': weightLogId,
-        'user_id': user.id,
+        'user_id': localUserId,
         'weight_kg': weightKg,
         'logged_at': now,
       },
@@ -165,7 +166,7 @@ final updateProfileProvider =
     );
   } else if (nutritionInputsChanged) {
     final latestWeight =
-        await WeightLogRepository(DatabaseProvider()).readLatest(user.id);
+        await WeightLogRepository(DatabaseProvider()).readLatest(localUserId);
     final weightKg = latestWeight?.weightKg ?? profile.currentWeightKg;
     final sexCode = profile.sexCode ?? 'male';
     final age = update.age ?? profile.age ?? 25;
@@ -189,7 +190,7 @@ final updateProfileProvider =
       final snapshotId = UuidHelper.generateUuid();
       await LocalTransactionHelper(DatabaseProvider())
           .recalculateNutritionTarget(
-        userId: user.id,
+        userId: localUserId,
         newTargetData: {
           'target_id': targetId,
           'formula_version_code': 'mifflin_stjeor',

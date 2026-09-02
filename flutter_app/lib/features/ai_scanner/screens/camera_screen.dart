@@ -1,7 +1,8 @@
-﻿import 'package:camera/camera.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
@@ -23,7 +24,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   bool _isInitialized = false;
   bool _hasPermission = false;
   bool _permissionChecked = false;
+  bool _permissionPermanentlyDenied = false;
   bool _noCameras = false;
+  bool _isInitializing = false;
+  bool _isTakingPhoto = false;
+  String? _cameraError;
 
   @override
   void initState() {
@@ -41,17 +46,26 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_controller!.value.isInitialized) return;
     if (state == AppLifecycleState.resumed) {
-      _controller?.resumePreview();
-    } else if (state == AppLifecycleState.paused) {
-      _controller?.dispose();
-      _controller = null;
-      if (mounted) setState(() => _isInitialized = false);
+      if (!_isInitialized && !_isInitializing) {
+        _initCamera();
+      }
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _disposeCamera();
     }
   }
 
   Future<void> _initCamera() async {
+    if (_isInitializing) return;
+    _isInitializing = true;
+    if (mounted) {
+      setState(() {
+        _permissionChecked = false;
+        _noCameras = false;
+        _cameraError = null;
+      });
+    }
     try {
       await _requestPermission();
       if (!_hasPermission) return;
@@ -67,18 +81,40 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         return;
       }
 
+      final selectedCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
       final controller = CameraController(
-        cameras.first,
+        selectedCamera,
         ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      await _controller?.dispose();
+      setState(() {
+        _controller = controller;
+        _isInitialized = true;
+        _permissionChecked = true;
+        _noCameras = false;
+      });
+    } on CameraException catch (e) {
       if (mounted) {
+        final denied = e.code == 'CameraAccessDenied' ||
+            e.code == 'CameraAccessDeniedWithoutPrompt' ||
+            e.code == 'CameraAccessRestricted';
         setState(() {
-          _controller = controller;
-          _isInitialized = true;
+          _hasPermission = !denied;
+          _permissionPermanentlyDenied =
+              e.code == 'CameraAccessDeniedWithoutPrompt';
+          _noCameras = !denied;
+          _cameraError = e.description ?? e.code;
           _permissionChecked = true;
         });
       }
@@ -86,29 +122,58 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       if (mounted) {
         setState(() {
           _noCameras = true;
+          _cameraError = e.toString();
           _permissionChecked = true;
         });
       }
+    } finally {
+      _isInitializing = false;
     }
   }
 
   Future<void> _requestPermission() async {
-    // Camera package handles permissions internally via availableCameras() and initialize()
-    _hasPermission = true;
+    var status = await Permission.camera.status;
+    if (!status.isGranted) {
+      status = await Permission.camera.request();
+    }
+    _hasPermission = status.isGranted;
+    _permissionPermanentlyDenied = status.isPermanentlyDenied;
+    if (!_hasPermission && mounted) {
+      setState(() => _permissionChecked = true);
+    }
   }
 
-  void _toggleFlash() {
+  Future<void> _disposeCamera() async {
+    final controller = _controller;
+    _controller = null;
+    if (mounted) setState(() => _isInitialized = false);
+    await controller?.dispose();
+  }
+
+  Future<void> _toggleFlash() async {
     if (_controller == null) return;
     const modes = FlashMode.values;
     final currentIndex = modes.indexOf(_flashMode);
     final nextMode = modes[(currentIndex + 1) % modes.length];
-    _controller!.setFlashMode(nextMode);
-    setState(() => _flashMode = nextMode);
+    try {
+      await _controller!.setFlashMode(nextMode);
+      if (mounted) setState(() => _flashMode = nextMode);
+    } on CameraException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.description ?? 'Flash is unavailable')),
+        );
+      }
+    }
   }
 
   Future<void> _pickFromGallery() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 92,
+      maxWidth: 1920,
+    );
     if (picked != null && mounted) {
       Navigator.pushReplacement(
         context,
@@ -123,9 +188,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   Future<void> _takePhoto() async {
-    if (_controller == null || !_controller!.value.isInitialized) return;
+    if (_isTakingPhoto ||
+        _controller == null ||
+        !_controller!.value.isInitialized) {
+      return;
+    }
 
     try {
+      setState(() => _isTakingPhoto = true);
       final xfile = await _controller!.takePicture();
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -143,6 +213,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           SnackBar(content: Text('Failed to take photo: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isTakingPhoto = false);
     }
   }
 
@@ -280,6 +352,14 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   foregroundColor: AppColors.textOnAccent,
                 ),
               ),
+              if (_permissionPermanentlyDenied) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: openAppSettings,
+                  icon: const Icon(Icons.settings),
+                  label: const Text('Open App Settings'),
+                ),
+              ],
             ],
           ),
         ),
@@ -293,7 +373,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.no_photography_outlined, size: 64, color: AppColors.textSecondary),
+              const Icon(Icons.no_photography_outlined,
+                  size: 64, color: AppColors.textSecondary),
               const SizedBox(height: 16),
               Text(
                 'No Camera Detected',
@@ -305,7 +386,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                'We couldn\'t find a camera on this device. You can still upload a photo from your gallery.',
+                _cameraError == null
+                    ? 'We couldn\'t find a camera on this device. You can still upload a photo from your gallery.'
+                    : 'Camera unavailable: $_cameraError\nYou can still upload a photo from your gallery.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -319,7 +402,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.textOnAccent,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -379,11 +463,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.wifi_off, color: AppColors.textPrimary, size: 20),
+                  const Icon(Icons.wifi_off,
+                      color: AppColors.textPrimary, size: 20),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
-                      'Internet connection required for food analysis',
+                      'On-device Adobo/Sinigang recognition works offline. Cloud refinement is unavailable.',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w500,
@@ -432,7 +517,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.lightbulb_outline, color: AppColors.textPrimary, size: 18),
+                  const Icon(Icons.lightbulb_outline,
+                      color: AppColors.textPrimary, size: 18),
                   const SizedBox(width: 6),
                   const Text(
                     'Tips',
@@ -453,7 +539,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           right: 0,
           child: Center(
             child: GestureDetector(
-              onTap: _takePhoto,
+              onTap: _isTakingPhoto ? null : _takePhoto,
               child: Container(
                 width: 72,
                 height: 72,
@@ -465,13 +551,21 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                     width: 4,
                   ),
                 ),
-                child: Container(
-                  margin: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+                child: _isTakingPhoto
+                    ? const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          color: AppColors.surface,
+                        ),
+                      )
+                    : Container(
+                        margin: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
               ),
             ),
           ),

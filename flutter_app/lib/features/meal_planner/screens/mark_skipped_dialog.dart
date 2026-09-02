@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/meal_plan_repository.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/app/theme.dart';
@@ -55,6 +56,10 @@ class _MarkSkippedDialogState extends ConsumerState<MarkSkippedDialog> {
         if (mounted) Navigator.of(context).pop(false);
         return;
       }
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
 
       final db = await DatabaseProvider().database;
       final now = DateTime.now().toUtc().toIso8601String();
@@ -76,7 +81,7 @@ class _MarkSkippedDialogState extends ConsumerState<MarkSkippedDialog> {
 
           await txn.insert('sync_queue', {
             'sync_queue_id': UuidHelper.generateUuid(),
-            'user_id': user.id,
+            'user_id': localUserId,
             'operation_id': UuidHelper.generateOperationId(),
             'entity_type_code': 'meal_plan',
             'entity_id': plan.mealPlanId,

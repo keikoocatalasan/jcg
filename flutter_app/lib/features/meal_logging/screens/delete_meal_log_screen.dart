@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
@@ -92,8 +93,12 @@ class _DeleteMealLogScreenState extends ConsumerState<DeleteMealLogScreen> {
         return;
       }
 
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final helper = LocalTransactionHelper(DatabaseProvider());
-      await helper.deleteMealLog(widget.mealLogId, user.id);
+      await helper.deleteMealLog(widget.mealLogId, localUserId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

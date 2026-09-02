@@ -33,6 +33,7 @@ Future<bool> isGooglePlayServicesAvailable() async {
 }
 
 final authSessionProvider = Provider<Session?>((ref) {
+  ref.watch(authStateProvider);
   return Supabase.instance.client.auth.currentSession;
 });
 

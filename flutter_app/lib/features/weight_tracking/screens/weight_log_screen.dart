@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:jcg_fitness/app/constants.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/profile_repository.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
@@ -107,6 +108,7 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
         }
         return;
       }
+      final localUserId = profile.userId;
 
       final sexCode = profile.sexCode;
       final age = profile.age;
@@ -154,7 +156,7 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
       await helper.saveWeightLogAndRecalculate(
         weightLogData: {
           'weight_log_id': weightLogId,
-          'user_id': user.id,
+          'user_id': localUserId,
           'weight_kg': weightKg,
           'logged_at': loggedAt,
         },
@@ -251,8 +253,12 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
     setState(() => _isDeleting = true);
 
     try {
+      final localUserId = await LocalUserIdentity.resolve(
+        DatabaseProvider(),
+        user.id,
+      );
       final weightRepo = WeightLogRepository(DatabaseProvider());
-      final latest = await weightRepo.readLatest(user.id);
+      final latest = await weightRepo.readLatest(localUserId);
       if (latest == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -261,7 +267,7 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
         return;
       }
 
-      final secondLatest = await weightRepo.readSecondLatest(user.id);
+      final secondLatest = await weightRepo.readSecondLatest(localUserId);
       final helper = LocalTransactionHelper(DatabaseProvider());
 
       if (secondLatest != null) {
@@ -288,7 +294,7 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
 
           await helper.deleteWeightLogAndRecalculate(
             weightLogId: latest.weightLogId,
-            userId: user.id,
+            userId: localUserId,
             newLatestWeightData: {
               'weight_log_id': secondLatest.weightLogId,
               'weight_kg': secondLatest.weightKg,
@@ -322,13 +328,13 @@ class _WeightLogScreenState extends ConsumerState<WeightLogScreen> {
         } else {
           await helper.deleteWeightLogAndRecalculate(
             weightLogId: latest.weightLogId,
-            userId: user.id,
+            userId: localUserId,
           );
         }
       } else {
         await helper.deleteWeightLogAndRecalculate(
           weightLogId: latest.weightLogId,
-          userId: user.id,
+          userId: localUserId,
         );
       }
 
