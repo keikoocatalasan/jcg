@@ -288,6 +288,14 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS %I_admin_all ON %I;',
       lower(t) || '_admin_all', t);
     -- Create explicit per-operation policies
+    EXECUTE format('DROP POLICY IF EXISTS %I_admin_select ON %I;',
+      lower(t) || '_admin_select', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I_admin_insert ON %I;',
+      lower(t) || '_admin_insert', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I_admin_update ON %I;',
+      lower(t) || '_admin_update', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I_admin_delete ON %I;',
+      lower(t) || '_admin_delete', t);
     EXECUTE format('
       CREATE POLICY %I_admin_select ON %I FOR SELECT USING (is_admin());',
       lower(t) || '_admin_select', t);
