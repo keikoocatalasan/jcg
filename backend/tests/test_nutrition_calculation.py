@@ -51,3 +51,8 @@ def test_totals_add_ulam_and_rice_without_double_counting() -> None:
 def test_invalid_grams_are_rejected(grams: float) -> None:
     with pytest.raises(ValueError):
         scale_component(NutritionComponentInput("Ulam", grams, reference()))
+
+
+def test_empty_component_list_is_rejected() -> None:
+    with pytest.raises(ValueError):
+        calculate_totals([])

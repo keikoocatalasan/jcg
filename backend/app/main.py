@@ -41,9 +41,11 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError):
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException):
-    detail = exc.detail if isinstance(exc.detail, dict) else {}
-    error = detail.get("error", detail)
-    if not isinstance(error, dict):
+    if isinstance(exc.detail, dict):
+        error = exc.detail.get("error", exc.detail)
+        if not isinstance(error, dict):
+            error = {"code": "HTTP_ERROR", "message": str(exc.detail)}
+    else:
         error = {"code": "HTTP_ERROR", "message": str(exc.detail)}
     error.setdefault("code", "HTTP_ERROR")
     error.setdefault("message", "Request failed.")

@@ -206,3 +206,22 @@ DROP TRIGGER IF EXISTS trg_ai_scan_component_updated_at
 CREATE TRIGGER trg_ai_scan_component_updated_at
   BEFORE UPDATE ON public.ai_scan_component
   FOR EACH ROW EXECUTE FUNCTION public.touch_ai_scan_component_updated_at();
+
+-- Legacy scan children do not all use ON DELETE CASCADE. Keep scan cleanup
+-- deterministic without rebuilding the existing tables.
+CREATE OR REPLACE FUNCTION public.delete_ai_scan_children()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  DELETE FROM public.ai_scan_confirmation WHERE scan_id = OLD.scan_id;
+  DELETE FROM public.ai_scan_prediction WHERE scan_id = OLD.scan_id;
+  DELETE FROM public.ai_scan_component WHERE scan_id = OLD.scan_id;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_ai_scan_delete_children ON public.ai_scan;
+CREATE TRIGGER trg_ai_scan_delete_children
+  BEFORE DELETE ON public.ai_scan
+  FOR EACH ROW EXECUTE FUNCTION public.delete_ai_scan_children();

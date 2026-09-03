@@ -1,5 +1,6 @@
 from io import BytesIO
 
+import httpx
 import jwt
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -9,7 +10,9 @@ from app.main import app
 from app.routes.auth import _otp_store, _store_otp, _verify_otp
 from app.routes.chat import chatbot_service
 from app.routes.scan_food import scanner_service
+from app.schemas.scan_food import ScanCandidate
 from app.services.nvidia_chat_service import NvidiaChatResult
+from app.services.scanner_service import ScanResult
 
 
 client = TestClient(app)
@@ -46,6 +49,36 @@ def test_validation_errors_use_standard_envelope() -> None:
     assert response.status_code == 422
     assert response.json()["success"] is False
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_protected_route_without_authorization_returns_401() -> None:
+    response = client.post(
+        "/ai/chat",
+        json={
+            "chat_session_id": "chat-auth",
+            "client_message_id": "message-auth",
+            "message": "Suggest breakfast",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["message"] == "Invalid authorization header format"
+
+
+def test_production_rejects_development_hs256_tokens(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "environment", "production")
+    response = client.post(
+        "/ai/chat",
+        headers=auth_headers("production-user"),
+        json={
+            "chat_session_id": "chat-auth-production",
+            "client_message_id": "message-auth-production",
+            "message": "Suggest breakfast",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["message"] == "Invalid token"
 
 
 def test_scan_route_rejects_spoofed_image_content() -> None:
@@ -113,6 +146,44 @@ def test_chat_route_escalates_emergency_symptoms_without_calling_ai(monkeypatch)
     assert "emergency services" in response.json()["reply"]
 
 
+def test_chat_provider_timeout_uses_gateway_error(monkeypatch) -> None:
+    async def fail_with_timeout(*_args, **_kwargs):
+        raise httpx.TimeoutException("provider timeout")
+
+    monkeypatch.setattr(chatbot_service, "get_response", fail_with_timeout)
+    response = client.post(
+        "/ai/chat",
+        headers=auth_headers("chat-timeout-user"),
+        json={
+            "chat_session_id": "chat-timeout",
+            "client_message_id": "message-timeout",
+            "message": "Suggest lunch",
+        },
+    )
+
+    assert response.status_code == 504
+    assert response.json()["error"]["code"] == "AI_TIMEOUT"
+
+
+def test_chat_provider_network_error_uses_unavailable_error(monkeypatch) -> None:
+    async def fail_with_network_error(*_args, **_kwargs):
+        raise httpx.RequestError("provider unavailable")
+
+    monkeypatch.setattr(chatbot_service, "get_response", fail_with_network_error)
+    response = client.post(
+        "/ai/chat",
+        headers=auth_headers("chat-network-error-user"),
+        json={
+            "chat_session_id": "chat-network-error",
+            "client_message_id": "message-network-error",
+            "message": "Suggest lunch",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "AI_UNAVAILABLE"
+
+
 def test_scan_food_route_accepts_valid_image(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ai_model_provider", "deterministic")
     image = Image.new("RGB", (224, 224), color="white")
@@ -135,6 +206,93 @@ def test_scan_food_route_accepts_valid_image(monkeypatch) -> None:
     assert len(body["candidates"]) == 3
     assert body["components"][0]["role"] == "rice"
     assert body["needs_portion_input"] is True
+
+
+def test_scan_route_requires_the_highest_ranked_candidate_to_pass_gate(monkeypatch) -> None:
+    async def fake_scan_image(*_args, **_kwargs) -> ScanResult:
+        return ScanResult(
+            client_scan_id="ranked-scan",
+            candidates=[
+                ScanCandidate(
+                    food_id=None,
+                    food_name="Ambiguous Adobo",
+                    confidence=0.61,
+                    rank_number=1,
+                    calories=None,
+                    protein_g=None,
+                    carbs_g=None,
+                    fat_g=None,
+                    estimated_cost_php=None,
+                ),
+                ScanCandidate(
+                    food_id=None,
+                    food_name="Other Dish",
+                    confidence=0.94,
+                    rank_number=2,
+                    calories=None,
+                    protein_g=None,
+                    carbs_g=None,
+                    fat_g=None,
+                    estimated_cost_php=None,
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(scanner_service, "scan_image", fake_scan_image)
+    image = Image.new("RGB", (224, 224), color="white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    response = client.post(
+        "/ai/scan-food",
+        headers=auth_headers("ranked-scan-user"),
+        files={"file": ("meal.png", buffer, "image/png")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "low_confidence"
+    assert response.json()["manual_search_recommended"] is True
+
+
+def test_scan_provider_timeout_uses_gateway_error(monkeypatch) -> None:
+    async def fail_with_timeout(*_args, **_kwargs):
+        raise httpx.TimeoutException("provider timeout")
+
+    monkeypatch.setattr(scanner_service, "scan_image", fail_with_timeout)
+    image = Image.new("RGB", (224, 224), color="white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    response = client.post(
+        "/ai/scan-food",
+        headers=auth_headers("scan-timeout-user"),
+        files={"file": ("meal.png", buffer, "image/png")},
+    )
+
+    assert response.status_code == 504
+    assert response.json()["error"]["code"] == "AI_TIMEOUT"
+
+
+def test_scan_provider_network_error_uses_unavailable_error(monkeypatch) -> None:
+    async def fail_with_network_error(*_args, **_kwargs):
+        raise httpx.RequestError("provider unavailable")
+
+    monkeypatch.setattr(scanner_service, "scan_image", fail_with_network_error)
+    image = Image.new("RGB", (224, 224), color="white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    response = client.post(
+        "/ai/scan-food",
+        headers=auth_headers("scan-network-error-user"),
+        files={"file": ("meal.png", buffer, "image/png")},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "AI_UNAVAILABLE"
 
 
 def test_openai_provider_paths_are_connected_without_network(monkeypatch) -> None:
@@ -177,6 +335,33 @@ def test_openai_provider_paths_are_connected_without_network(monkeypatch) -> Non
     assert scan_response.json()["candidates"][0]["food_name"] == "Tinola"
     assert chat_response.status_code == 200
     assert "tinola" in chat_response.json()["reply"].lower()
+
+
+def test_scan_rejects_provider_confidence_outside_contract(monkeypatch) -> None:
+    async def fake_create_text(**_kwargs) -> str:
+        return (
+            '{"candidates":[{"food_id":null,"food_name":"Dish",'
+            '"confidence":1.2,"rank_number":1,"calories":100,'
+            '"protein_g":5,"carbs_g":10,"fat_g":2,'
+            '"estimated_cost_php":20}]}'
+        )
+
+    monkeypatch.setattr(settings, "ai_model_provider", "openai")
+    monkeypatch.setattr(settings, "ai_model_api_key", "test-openai-key")
+    monkeypatch.setattr(scanner_service._openai, "create_text", fake_create_text)
+
+    image = Image.new("RGB", (224, 224), color="white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+    response = client.post(
+        "/ai/scan-food",
+        headers=auth_headers("invalid-confidence-user"),
+        files={"file": ("meal.png", buffer, "image/png")},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "AI_INVALID_OUTPUT"
 
 
 def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> None:
@@ -228,6 +413,40 @@ def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> Non
     assert scan_response.json()["needs_portion_input"] is True
     assert chat_response.status_code == 200
     assert "adobo" in chat_response.json()["reply"].lower()
+
+
+def test_nvidia_unknown_result_is_explicitly_manual(monkeypatch) -> None:
+    async def fake_nvidia_create_text(**kwargs) -> NvidiaChatResult:
+        input_content = kwargs["input_content"]
+        if isinstance(input_content, list) and any(
+            item.get("type") == "image_url" for item in input_content
+        ):
+            return NvidiaChatResult(
+                text="dish=unknown; rice=unknown; extras=none",
+                model="meta/llama-3.2-11b-vision-instruct",
+            )
+        return NvidiaChatResult(text="unused", model="test-model")
+
+    monkeypatch.setattr(settings, "ai_model_provider", "nvidia")
+    monkeypatch.setattr(settings, "ai_model_api_key", "test-nvidia-key")
+    monkeypatch.setattr(scanner_service._nvidia, "create_text", fake_nvidia_create_text)
+
+    image = Image.new("RGB", (224, 224), color="white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+    response = client.post(
+        "/ai/scan-food",
+        headers=auth_headers("unknown-scan-user"),
+        files={"file": ("meal.png", buffer, "image/png")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "low_confidence"
+    assert body["manual_search_recommended"] is True
+    assert body["candidates"] == []
+    assert "unknown_or_unsupported" in body["quality_flags"]
 
 
 def test_scan_feedback_route_returns_user_id(monkeypatch) -> None:

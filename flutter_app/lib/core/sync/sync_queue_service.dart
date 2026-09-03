@@ -158,14 +158,17 @@ class SyncQueueService {
     if (alreadySynced) return true;
 
     final db = await dbProvider.database;
-    final pending = await db.query(
+    // A failed dependency must block its children just like a pending one.
+    // Otherwise a child can reach Supabase before its parent and fail with a
+    // foreign-key error; retrying the parent should be required first.
+    final unfinished = await db.query(
       'sync_queue',
       where:
-          'entity_type_code = ? AND entity_id = ? AND sync_status = ? AND sync_queue_id != ?',
-      whereArgs: [depType, depId, 'pending', item.syncQueueId],
+          'entity_type_code = ? AND entity_id = ? AND sync_status != ? AND sync_queue_id != ?',
+      whereArgs: [depType, depId, 'synced', item.syncQueueId],
       limit: 1,
     );
-    return pending.isEmpty;
+    return unfinished.isEmpty;
   }
 
   Future<void> _executeOperation(SyncQueueEntry item) async {

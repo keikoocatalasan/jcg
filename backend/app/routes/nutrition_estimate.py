@@ -28,6 +28,11 @@ async def estimate_nutrition(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail={"code": "AI_TIMEOUT", "message": "Nutrition estimation timed out."},
         ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "AI_UNAVAILABLE", "message": "Nutrition estimation is unavailable."},
+        ) from exc
     except httpx.HTTPStatusError as exc:
         provider_status = exc.response.status_code
         code = "AI_RATE_LIMITED" if provider_status == 429 else "AI_PROVIDER_ERROR"

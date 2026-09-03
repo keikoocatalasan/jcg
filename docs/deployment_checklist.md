@@ -13,7 +13,7 @@
 
 - [ ] Create production Supabase project
 - [ ] Retrieve `SUPABASE_URL` and `SUPABASE_ANON_KEY`
-- [ ] Run all migrations (`000001` through `000024`) in order
+- [ ] Run every migration in `supabase/migrations/` in filename order, including timestamped migrations
 - [ ] Verify every table and relationship exists
 - [ ] Enable Row-Level Security (RLS) on all tables
 - [ ] Write and apply RLS policies for authenticated users
@@ -25,7 +25,7 @@
 - [ ] Create new Web Service on Render (Docker or Python environment)
 - [ ] Point service to `backend/` directory
 - [ ] Set build command: `pip install -r requirements.txt`
-- [ ] Set start command: `uvicorn main:app --host 0.0.0.0 --port 8000`
+- [ ] Set start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 ### Environment Variables (Render)
 

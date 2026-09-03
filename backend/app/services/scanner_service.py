@@ -96,8 +96,8 @@ class ScannerService:
             "properties": {
                 "food_id": {"type": ["string", "null"]},
                 "food_name": {"type": "string"},
-                "confidence": {"type": "number"},
-                "rank_number": {"type": "integer"},
+                "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                "rank_number": {"type": "integer", "minimum": 1, "maximum": 3},
                 "calories": {"type": ["number", "null"]},
                 "protein_g": {"type": ["number", "null"]},
                 "carbs_g": {"type": ["number", "null"]},

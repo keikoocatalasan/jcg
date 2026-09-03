@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: jcg-fitness-backend
+    name: nutrismart-ai-backend
     env: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt

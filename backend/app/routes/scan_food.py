@@ -1,6 +1,9 @@
+import json
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, status
+from pydantic import ValidationError
 from app.auth.jwt_verifier import verify_token
 from app.services.image_validation_service import validate_image
 from app.services.scanner_service import ScannerService
@@ -28,17 +31,56 @@ async def scan_food(
         )
 
     image_bytes = await file.read()
-    scan_result = await scanner_service.scan_image(
-        image_bytes,
-        meal_type,
-        str(client_scan_id) if client_scan_id else None,
-        file.content_type or "image/jpeg",
-    )
+    try:
+        scan_result = await scanner_service.scan_image(
+            image_bytes,
+            meal_type,
+            str(client_scan_id) if client_scan_id else None,
+            file.content_type or "image/jpeg",
+        )
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail={"code": "AI_TIMEOUT", "message": "Food recognition timed out."},
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "AI_UNAVAILABLE", "message": "Food recognition is unavailable."},
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        provider_status = exc.response.status_code
+        code = "AI_RATE_LIMITED" if provider_status == 429 else "AI_PROVIDER_ERROR"
+        raise HTTPException(
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+                if provider_status == 429
+                else status.HTTP_502_BAD_GATEWAY
+            ),
+            detail={"code": code, "message": "Food recognition is unavailable."},
+        ) from exc
+    except (json.JSONDecodeError, ValidationError, KeyError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "code": "AI_INVALID_OUTPUT",
+                "message": "Food recognition returned an invalid result.",
+            },
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "AI_UNAVAILABLE", "message": str(exc)},
+        ) from exc
 
     # A candidate is only considered complete at the release target. Lower
     # scores remain visible, but require confirmation/manual correction.
-    high_conf = [c for c in scan_result.candidates if c.confidence >= 0.80]
-    if high_conf:
+    top_candidate = (
+        min(scan_result.candidates, key=lambda candidate: candidate.rank_number)
+        if scan_result.candidates
+        else None
+    )
+    if top_candidate is not None and top_candidate.confidence >= 0.80:
         status_str = "completed"
         manual = False
         # Keep ranked alternatives in the response so the user can inspect a

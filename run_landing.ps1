@@ -1,3 +1,4 @@
 $host.ui.RawUI.WindowTitle = "JCG Landing Page Server (Port 8080)"
-Set-Location "C:\Users\john\projects\jcg\landing_page"
+$landingDir = Join-Path $PSScriptRoot "landing_page"
+Set-Location $landingDir
 python -m http.server 8080

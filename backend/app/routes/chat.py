@@ -1,5 +1,6 @@
 import uuid
-from fastapi import APIRouter, Depends
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.jwt_verifier import verify_token
 from app.schemas.chatbot import ChatRequest, ChatResponse
 from app.services.chatbot_service import ChatbotService
@@ -43,7 +44,34 @@ async def chat(
             safety_status="redirected",
         )
 
-    result = await chatbot_service.get_response(request.message, request.context)
+    try:
+        result = await chatbot_service.get_response(request.message, request.context)
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail={"code": "AI_TIMEOUT", "message": "Chat response timed out."},
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "AI_UNAVAILABLE", "message": "Chat service is unavailable."},
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        provider_status = exc.response.status_code
+        code = "AI_RATE_LIMITED" if provider_status == 429 else "AI_PROVIDER_ERROR"
+        raise HTTPException(
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+                if provider_status == 429
+                else status.HTTP_502_BAD_GATEWAY
+            ),
+            detail={"code": code, "message": "Chat service is unavailable."},
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "AI_UNAVAILABLE", "message": str(exc)},
+        ) from exc
     return ChatResponse(
         assistant_message_id=str(uuid.uuid4()),
         reply=result.reply,

@@ -37,13 +37,18 @@ def _decode_token(token: str) -> dict:
     )
 
 
-async def verify_token(authorization: str = Header(...)) -> dict:
-    if not authorization.startswith("Bearer "):
+async def verify_token(authorization: str | None = Header(default=None)) -> dict:
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format",
         )
-    token = authorization.removeprefix("Bearer ")
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format",
+        )
     try:
         return _decode_token(token)
     except jwt.ExpiredSignatureError:

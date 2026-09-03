@@ -43,6 +43,15 @@ class MigrationV5 {
       CREATE INDEX IF NOT EXISTS idx_ai_scan_components_scan
       ON ai_scan_components(scan_id, component_order)
     ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS trg_ai_scans_delete_children
+      BEFORE DELETE ON ai_scans
+      BEGIN
+        DELETE FROM ai_scan_feedback WHERE scan_id = OLD.scan_id;
+        DELETE FROM ai_scan_predictions WHERE scan_id = OLD.scan_id;
+        DELETE FROM ai_scan_components WHERE scan_id = OLD.scan_id;
+      END
+    ''');
   }
 
   static Future<void> _addMissingColumns(

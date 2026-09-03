@@ -28,8 +28,8 @@ PortionMethod = Literal[
 class ScanCandidate(BaseModel):
     food_id: str | None
     food_name: str
-    confidence: float
-    rank_number: int
+    confidence: float = Field(ge=0, le=1)
+    rank_number: int = Field(ge=1, le=3)
     calories: float | None
     protein_g: float | None
     carbs_g: float | None

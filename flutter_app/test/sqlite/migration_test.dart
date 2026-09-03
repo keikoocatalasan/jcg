@@ -197,6 +197,51 @@ void main() {
         }),
       );
     });
+
+    test('component rows are tied to a scan and cascade on scan deletion', () async {
+      await MigrationV5.run(db);
+      await db.insert('profiles', {
+        'user_id': 'scan-user',
+        'auth_user_id': 'auth-scan-user',
+        'role_code': 'user',
+        'account_status_code': 'active',
+        'nickname': 'Scanner',
+        'sex_code': 'male',
+        'age': 25,
+        'height_cm': 175.0,
+        'current_weight_kg': 70.0,
+        'activity_level_code': 'moderate',
+        'fitness_goal_code': 'maintenance',
+        'daily_budget_php': 300.0,
+        'onboarding_completed': 1,
+        'sync_status': 'synced',
+        'created_at': '2026-09-03T00:00:00Z',
+        'updated_at': '2026-09-03T00:00:00Z',
+      });
+      await db.insert('ai_scans', {
+        'scan_id': 'scan-1',
+        'user_id': 'scan-user',
+        'scan_status_code': 'low_confidence',
+        'client_scan_id': 'client-scan-1',
+        'pipeline_version': 'scanner-v2',
+        'needs_portion_input': 1,
+        'sync_status': 'pending',
+      });
+      await db.insert('ai_scan_components', {
+        'component_id': 'component-1',
+        'scan_id': 'scan-1',
+        'component_order': 1,
+        'role_code': 'ulam',
+        'predicted_food_name': 'Chicken Adobo',
+        'confidence': 0.59,
+        'reference_grams': 180.0,
+        'portion_method': 'not_provided',
+      });
+
+      expect(await db.query('ai_scan_components'), hasLength(1));
+      await db.delete('ai_scans', where: 'scan_id = ?', whereArgs: ['scan-1']);
+      expect(await db.query('ai_scan_components'), isEmpty);
+    });
   });
 
   group('Profile CRUD', () {
