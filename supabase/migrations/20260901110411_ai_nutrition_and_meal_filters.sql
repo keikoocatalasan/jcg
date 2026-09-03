@@ -230,7 +230,8 @@ WITH CHECK (
   )
 );
 
-CREATE OR REPLACE VIEW public.food_catalog
+DROP VIEW IF EXISTS public.food_catalog;
+CREATE VIEW public.food_catalog
 WITH (security_invoker = true)
 AS
 SELECT f.food_id, c.category_name, f.owner_user_id, f.food_name,
