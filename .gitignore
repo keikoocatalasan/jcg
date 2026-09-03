@@ -7,6 +7,7 @@
 !.env.example
 !backend/.env.example
 !flutter_app/.env.example
+!flutter_app/.env.production.example
 
 # Credentials, signing material, and provider configuration
 *.pem

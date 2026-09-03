@@ -57,6 +57,7 @@
 ## Flutter App
 
 - [ ] Set `FASTAPI_BASE_URL`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY` in `flutter_app/.env`
+- [ ] For production builds, set `FASTAPI_BASE_URL=https://nutrismart-ai-backend.onrender.com` and `APP_ENV=production`
 - [ ] Build release APK: `flutter build apk --release --split-per-abi`
 - [ ] Build release App Bundle: `flutter build appbundle --release`
 - [ ] Sign APK with release keystore

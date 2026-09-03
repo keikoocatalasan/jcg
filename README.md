@@ -66,6 +66,15 @@ To target a specific emulator, use `flutter devices` to find its ID, then run:
 flutter run -d <device-id> --dart-define-from-file=.env
 ```
 
+For a production Android build, use the ignored `flutter_app/.env` file with
+the Render HTTPS API and `APP_ENV=production`, or start from
+`flutter_app/.env.production.example`:
+
+```powershell
+flutter build apk --release --dart-define-from-file=.env
+flutter build appbundle --release --dart-define-from-file=.env
+```
+
 ### 3. Database migrations
 
 For local Supabase development, start the local stack and apply the migrations in `supabase/migrations/`. For a shared or production project, review migrations and Row Level Security policies before applying them through your approved deployment process.
