@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS AI_SCAN (
   CONSTRAINT uq_client_scan_per_user UNIQUE (user_id, client_scan_id)
 );
 
-CREATE INDEX idx_ai_scan_user ON AI_SCAN(user_id);
-CREATE INDEX idx_ai_scan_client ON AI_SCAN(user_id, client_scan_id);
+CREATE INDEX IF NOT EXISTS idx_ai_scan_user ON AI_SCAN(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_scan_client ON AI_SCAN(user_id, client_scan_id);
 
 CREATE TABLE IF NOT EXISTS AI_SCAN_PREDICTION (
   prediction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS AI_SCAN_PREDICTION (
   estimated_cost_php NUMERIC(8,2)
 );
 
-CREATE INDEX idx_ai_scan_prediction_scan ON AI_SCAN_PREDICTION(scan_id);
+CREATE INDEX IF NOT EXISTS idx_ai_scan_prediction_scan ON AI_SCAN_PREDICTION(scan_id);
 
 CREATE TABLE IF NOT EXISTS AI_SCAN_CONFIRMATION (
   confirmation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,4 +43,4 @@ CREATE TABLE IF NOT EXISTS AI_SCAN_CONFIRMATION (
   confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_ai_scan_confirmation_scan ON AI_SCAN_CONFIRMATION(scan_id);
+CREATE INDEX IF NOT EXISTS idx_ai_scan_confirmation_scan ON AI_SCAN_CONFIRMATION(scan_id);

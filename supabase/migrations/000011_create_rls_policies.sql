@@ -24,6 +24,48 @@ $$;
 -- ===== APP_USER =====
 ALTER TABLE APP_USER ENABLE ROW LEVEL SECURITY;
 
+-- Supabase Preview may replay this baseline against a branch that already has
+-- the schema. Remove only the policies owned by this migration before
+-- recreating them below; this keeps the migration repeatable without touching
+-- policies for tables introduced later.
+DO $$
+DECLARE
+  existing_policy RECORD;
+BEGIN
+  FOR existing_policy IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = ANY (ARRAY[
+        'app_user', 'user_profile', 'medical_disclaimer_acceptance',
+        'user_allergy', 'user_dietary_restriction', 'nutrition_target',
+        'daily_target_snapshot', 'food_item', 'food_serving',
+        'food_nutrition_profile', 'food_price', 'food_change_log',
+        'meal_log', 'water_log', 'weight_log', 'meal_plan',
+        'recommendation_session', 'recommendation_item', 'ai_scan',
+        'ai_scan_prediction', 'ai_scan_confirmation', 'chat_session',
+        'chat_message', 'chat_message_context', 'community_post',
+        'community_comment', 'community_like', 'community_report',
+        'moderation_action', 'device', 'sync_queue', 'role',
+        'account_status', 'sex', 'activity_level', 'fitness_goal',
+        'meal_type', 'log_source', 'meal_plan_status', 'allergy',
+        'dietary_restriction', 'food_category', 'data_source',
+        'nutrition_formula_version', 'ai_scan_status', 'chat_role',
+        'chat_safety_status', 'chat_delivery_status', 'report_reason',
+        'report_status', 'moderation_action_type', 'sync_entity_type',
+        'sync_operation_type', 'sync_status'
+      ])
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      existing_policy.policyname,
+      existing_policy.schemaname,
+      existing_policy.tablename
+    );
+  END LOOP;
+END;
+$$;
+
 CREATE POLICY app_user_select_own ON APP_USER
   FOR SELECT USING (auth_user_id = auth.uid()::UUID);
 

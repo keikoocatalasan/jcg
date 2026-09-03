@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS MEAL_LOG (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_meal_log_user_date ON MEAL_LOG(user_id, logged_at);
-CREATE INDEX idx_meal_log_user ON MEAL_LOG(user_id);
-CREATE INDEX idx_meal_log_active ON MEAL_LOG(user_id) WHERE is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_meal_log_user_date ON MEAL_LOG(user_id, logged_at);
+CREATE INDEX IF NOT EXISTS idx_meal_log_user ON MEAL_LOG(user_id);
+CREATE INDEX IF NOT EXISTS idx_meal_log_active ON MEAL_LOG(user_id) WHERE is_deleted = FALSE;
 
 CREATE TABLE IF NOT EXISTS WATER_LOG (
   water_log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS WATER_LOG (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_water_log_user_date ON WATER_LOG(user_id, logged_at);
-CREATE INDEX idx_water_log_user ON WATER_LOG(user_id);
+CREATE INDEX IF NOT EXISTS idx_water_log_user_date ON WATER_LOG(user_id, logged_at);
+CREATE INDEX IF NOT EXISTS idx_water_log_user ON WATER_LOG(user_id);
 
 CREATE TABLE IF NOT EXISTS WEIGHT_LOG (
   weight_log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,17 +45,20 @@ CREATE TABLE IF NOT EXISTS WEIGHT_LOG (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_weight_log_user_date ON WEIGHT_LOG(user_id, logged_at DESC);
-CREATE INDEX idx_weight_log_user ON WEIGHT_LOG(user_id);
+CREATE INDEX IF NOT EXISTS idx_weight_log_user_date ON WEIGHT_LOG(user_id, logged_at DESC);
+CREATE INDEX IF NOT EXISTS idx_weight_log_user ON WEIGHT_LOG(user_id);
 
+DROP TRIGGER IF EXISTS trg_meal_log_updated_at ON MEAL_LOG;
 CREATE TRIGGER trg_meal_log_updated_at
   BEFORE UPDATE ON MEAL_LOG
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trg_water_log_updated_at ON WATER_LOG;
 CREATE TRIGGER trg_water_log_updated_at
   BEFORE UPDATE ON WATER_LOG
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trg_weight_log_updated_at ON WEIGHT_LOG;
 CREATE TRIGGER trg_weight_log_updated_at
   BEFORE UPDATE ON WEIGHT_LOG
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

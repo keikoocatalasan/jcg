@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS CHAT_SESSION (
   ended_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_chat_session_user ON CHAT_SESSION(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_session_user ON CHAT_SESSION(user_id);
 
 CREATE TABLE IF NOT EXISTS CHAT_MESSAGE (
   chat_message_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS CHAT_MESSAGE (
   sent_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_chat_message_session ON CHAT_MESSAGE(chat_session_id);
-CREATE INDEX idx_chat_message_created ON CHAT_MESSAGE(chat_session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_message_session ON CHAT_MESSAGE(chat_session_id);
+CREATE INDEX IF NOT EXISTS idx_chat_message_created ON CHAT_MESSAGE(chat_session_id, created_at);
 
 CREATE TABLE IF NOT EXISTS CHAT_MESSAGE_CONTEXT (
   context_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -30,4 +30,4 @@ CREATE TABLE IF NOT EXISTS CHAT_MESSAGE_CONTEXT (
   context_value_json JSONB NOT NULL
 );
 
-CREATE INDEX idx_chat_context_message ON CHAT_MESSAGE_CONTEXT(chat_message_id);
+CREATE INDEX IF NOT EXISTS idx_chat_context_message ON CHAT_MESSAGE_CONTEXT(chat_message_id);

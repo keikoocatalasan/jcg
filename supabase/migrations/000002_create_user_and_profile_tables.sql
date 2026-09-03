@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS APP_USER (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_app_user_auth_id ON APP_USER(auth_user_id);
-CREATE INDEX idx_app_user_status ON APP_USER(account_status_id);
+CREATE INDEX IF NOT EXISTS idx_app_user_auth_id ON APP_USER(auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_app_user_status ON APP_USER(account_status_id);
 
 CREATE TABLE IF NOT EXISTS USER_PROFILE (
   profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS USER_PROFILE (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_user_profile_user ON USER_PROFILE(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_profile_user ON USER_PROFILE(user_id);
 
 CREATE TABLE IF NOT EXISTS MEDICAL_DISCLAIMER_ACCEPTANCE (
   acceptance_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS MEDICAL_DISCLAIMER_ACCEPTANCE (
   disclaimer_version TEXT NOT NULL
 );
 
-CREATE INDEX idx_medical_disclaimer_user ON MEDICAL_DISCLAIMER_ACCEPTANCE(user_id);
+CREATE INDEX IF NOT EXISTS idx_medical_disclaimer_user ON MEDICAL_DISCLAIMER_ACCEPTANCE(user_id);
 
 CREATE TABLE IF NOT EXISTS USER_ALLERGY (
   user_allergy_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS USER_ALLERGY (
   CONSTRAINT uq_user_allergy UNIQUE (user_id, allergy_id)
 );
 
-CREATE INDEX idx_user_allergy_user ON USER_ALLERGY(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_allergy_user ON USER_ALLERGY(user_id);
 
 CREATE TABLE IF NOT EXISTS USER_DIETARY_RESTRICTION (
   user_restriction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS USER_DIETARY_RESTRICTION (
   CONSTRAINT uq_user_restriction UNIQUE (user_id, restriction_id)
 );
 
-CREATE INDEX idx_user_restriction_user ON USER_DIETARY_RESTRICTION(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_restriction_user ON USER_DIETARY_RESTRICTION(user_id);
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -68,10 +68,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_app_user_updated_at ON APP_USER;
 CREATE TRIGGER trg_app_user_updated_at
   BEFORE UPDATE ON APP_USER
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trg_user_profile_updated_at ON USER_PROFILE;
 CREATE TRIGGER trg_user_profile_updated_at
   BEFORE UPDATE ON USER_PROFILE
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

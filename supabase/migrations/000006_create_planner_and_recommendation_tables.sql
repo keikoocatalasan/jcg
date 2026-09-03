@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS MEAL_PLAN (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_meal_plan_user_date ON MEAL_PLAN(user_id, planned_date);
-CREATE INDEX idx_meal_plan_user ON MEAL_PLAN(user_id);
+CREATE INDEX IF NOT EXISTS idx_meal_plan_user_date ON MEAL_PLAN(user_id, planned_date);
+CREATE INDEX IF NOT EXISTS idx_meal_plan_user ON MEAL_PLAN(user_id);
 
 CREATE TABLE IF NOT EXISTS RECOMMENDATION_SESSION (
   session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS RECOMMENDATION_SESSION (
   generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_recommendation_session_user ON RECOMMENDATION_SESSION(user_id);
+CREATE INDEX IF NOT EXISTS idx_recommendation_session_user ON RECOMMENDATION_SESSION(user_id);
 
 CREATE TABLE IF NOT EXISTS RECOMMENDATION_ITEM (
   recommendation_item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,8 +56,9 @@ CREATE TABLE IF NOT EXISTS RECOMMENDATION_ITEM (
   accepted_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_recommendation_item_session ON RECOMMENDATION_ITEM(session_id);
+CREATE INDEX IF NOT EXISTS idx_recommendation_item_session ON RECOMMENDATION_ITEM(session_id);
 
+DROP TRIGGER IF EXISTS trg_meal_plan_updated_at ON MEAL_PLAN;
 CREATE TRIGGER trg_meal_plan_updated_at
   BEFORE UPDATE ON MEAL_PLAN
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

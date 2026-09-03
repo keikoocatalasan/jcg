@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS COMMUNITY_POST (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_community_post_user ON COMMUNITY_POST(user_id);
-CREATE INDEX idx_community_post_visible ON COMMUNITY_POST(created_at DESC) WHERE is_hidden = FALSE AND is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_community_post_user ON COMMUNITY_POST(user_id);
+CREATE INDEX IF NOT EXISTS idx_community_post_visible ON COMMUNITY_POST(created_at DESC) WHERE is_hidden = FALSE AND is_deleted = FALSE;
 
 CREATE TABLE IF NOT EXISTS COMMUNITY_COMMENT (
   comment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS COMMUNITY_COMMENT (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_community_comment_post ON COMMUNITY_COMMENT(post_id);
-CREATE INDEX idx_community_comment_visible ON COMMUNITY_COMMENT(post_id, created_at) WHERE is_hidden = FALSE AND is_deleted = FALSE;
+CREATE INDEX IF NOT EXISTS idx_community_comment_post ON COMMUNITY_COMMENT(post_id);
+CREATE INDEX IF NOT EXISTS idx_community_comment_visible ON COMMUNITY_COMMENT(post_id, created_at) WHERE is_hidden = FALSE AND is_deleted = FALSE;
 
 CREATE TABLE IF NOT EXISTS COMMUNITY_LIKE (
   like_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS COMMUNITY_LIKE (
   CONSTRAINT uq_post_user_like UNIQUE (post_id, user_id)
 );
 
-CREATE INDEX idx_community_like_post ON COMMUNITY_LIKE(post_id);
+CREATE INDEX IF NOT EXISTS idx_community_like_post ON COMMUNITY_LIKE(post_id);
 
 CREATE TABLE IF NOT EXISTS COMMUNITY_REPORT (
   report_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS COMMUNITY_REPORT (
   reviewed_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_community_report_status ON COMMUNITY_REPORT(status_id);
+CREATE INDEX IF NOT EXISTS idx_community_report_status ON COMMUNITY_REPORT(status_id);
 
 CREATE TABLE IF NOT EXISTS MODERATION_ACTION (
   moderation_action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -61,12 +61,14 @@ CREATE TABLE IF NOT EXISTS MODERATION_ACTION (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_moderation_action_admin ON MODERATION_ACTION(admin_user_id);
+CREATE INDEX IF NOT EXISTS idx_moderation_action_admin ON MODERATION_ACTION(admin_user_id);
 
+DROP TRIGGER IF EXISTS trg_community_post_updated_at ON COMMUNITY_POST;
 CREATE TRIGGER trg_community_post_updated_at
   BEFORE UPDATE ON COMMUNITY_POST
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trg_community_comment_updated_at ON COMMUNITY_COMMENT;
 CREATE TRIGGER trg_community_comment_updated_at
   BEFORE UPDATE ON COMMUNITY_COMMENT
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

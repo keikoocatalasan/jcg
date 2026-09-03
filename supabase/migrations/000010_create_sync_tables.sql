@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS DEVICE (
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_device_user ON DEVICE(user_id);
+CREATE INDEX IF NOT EXISTS idx_device_user ON DEVICE(user_id);
 
 CREATE TABLE IF NOT EXISTS SYNC_QUEUE (
   sync_queue_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS SYNC_QUEUE (
   server_synced_at TIMESTAMPTZ
 );
 
-CREATE INDEX idx_sync_queue_user ON SYNC_QUEUE(user_id);
-CREATE INDEX idx_sync_queue_status ON SYNC_QUEUE(sync_status_id);
-CREATE INDEX idx_sync_queue_operation ON SYNC_QUEUE(operation_id);
-CREATE INDEX idx_sync_queue_entity ON SYNC_QUEUE(entity_id);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_user ON SYNC_QUEUE(user_id);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON SYNC_QUEUE(sync_status_id);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_operation ON SYNC_QUEUE(operation_id);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_entity ON SYNC_QUEUE(entity_id);

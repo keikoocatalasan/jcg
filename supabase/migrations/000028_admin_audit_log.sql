@@ -12,12 +12,14 @@ CREATE TABLE IF NOT EXISTS ADMIN_ROLE_AUDIT (
   changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_admin_role_audit_target ON ADMIN_ROLE_AUDIT(target_user);
-CREATE INDEX idx_admin_role_audit_changed_by ON ADMIN_ROLE_AUDIT(changed_by);
+CREATE INDEX IF NOT EXISTS idx_admin_role_audit_target ON ADMIN_ROLE_AUDIT(target_user);
+CREATE INDEX IF NOT EXISTS idx_admin_role_audit_changed_by ON ADMIN_ROLE_AUDIT(changed_by);
 
 ALTER TABLE ADMIN_ROLE_AUDIT ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS admin_role_audit_select ON ADMIN_ROLE_AUDIT;
 CREATE POLICY admin_role_audit_select ON ADMIN_ROLE_AUDIT
   FOR SELECT USING (is_admin());
+DROP POLICY IF EXISTS admin_role_audit_insert ON ADMIN_ROLE_AUDIT;
 CREATE POLICY admin_role_audit_insert ON ADMIN_ROLE_AUDIT
   FOR INSERT WITH CHECK (is_admin());
 
@@ -75,13 +77,15 @@ CREATE TABLE IF NOT EXISTS MODERATION_AUDIT_LOG (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_moderation_audit_admin ON MODERATION_AUDIT_LOG(admin_user_id);
-CREATE INDEX idx_moderation_audit_report ON MODERATION_AUDIT_LOG(report_id);
-CREATE INDEX idx_moderation_audit_created ON MODERATION_AUDIT_LOG(created_at);
+CREATE INDEX IF NOT EXISTS idx_moderation_audit_admin ON MODERATION_AUDIT_LOG(admin_user_id);
+CREATE INDEX IF NOT EXISTS idx_moderation_audit_report ON MODERATION_AUDIT_LOG(report_id);
+CREATE INDEX IF NOT EXISTS idx_moderation_audit_created ON MODERATION_AUDIT_LOG(created_at);
 
 ALTER TABLE MODERATION_AUDIT_LOG ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS moderation_audit_select ON MODERATION_AUDIT_LOG;
 CREATE POLICY moderation_audit_select ON MODERATION_AUDIT_LOG
   FOR SELECT USING (is_admin());
+DROP POLICY IF EXISTS moderation_audit_insert ON MODERATION_AUDIT_LOG;
 CREATE POLICY moderation_audit_insert ON MODERATION_AUDIT_LOG
   FOR INSERT WITH CHECK (is_admin());
 

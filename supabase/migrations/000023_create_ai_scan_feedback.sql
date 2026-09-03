@@ -14,5 +14,7 @@ CREATE INDEX IF NOT EXISTS idx_ai_scan_feedback_user_created
   ON public.ai_scan_feedback(user_id, created_at DESC);
 
 ALTER TABLE public.ai_scan_feedback ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS ai_scan_feedback_select_own
+  ON public.ai_scan_feedback;
 CREATE POLICY ai_scan_feedback_select_own ON public.ai_scan_feedback
   FOR SELECT USING (user_id = public.get_app_user_id());

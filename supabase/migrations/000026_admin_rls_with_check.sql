@@ -3,6 +3,68 @@
 -- lacked explicit WITH CHECK, defaulting INSERT/UPDATE checks to TRUE.
 -- This closes that gap.
 
+-- Keep this migration repeatable when Supabase Preview replays it against a
+-- branch that already contains the admin policies.
+DO $$
+DECLARE
+  existing_policy RECORD;
+BEGIN
+  FOR existing_policy IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND policyname = ANY (ARRAY[
+        'app_user_admin_update',
+        'profile_admin_select', 'profile_admin_insert',
+        'profile_admin_update', 'profile_admin_delete',
+        'med_disclaimer_admin_select', 'med_disclaimer_admin_insert',
+        'med_disclaimer_admin_update', 'med_disclaimer_admin_delete',
+        'user_allergy_admin_select', 'user_allergy_admin_insert',
+        'user_allergy_admin_update', 'user_allergy_admin_delete',
+        'user_restriction_admin_select', 'user_restriction_admin_insert',
+        'user_restriction_admin_update', 'user_restriction_admin_delete',
+        'nutrition_target_admin_select', 'nutrition_target_admin_insert',
+        'nutrition_target_admin_update', 'nutrition_target_admin_delete',
+        'daily_target_snapshot_admin_select',
+        'daily_target_snapshot_admin_insert',
+        'daily_target_snapshot_admin_update',
+        'food_serving_admin_select', 'food_serving_admin_insert',
+        'food_serving_admin_update', 'food_serving_admin_delete',
+        'food_nutrition_admin_select', 'food_nutrition_admin_insert',
+        'food_nutrition_admin_update', 'food_nutrition_admin_delete',
+        'food_price_admin_select', 'food_price_admin_insert',
+        'food_price_admin_update', 'food_price_admin_delete',
+        'food_change_log_admin_select', 'food_change_log_admin_insert',
+        'meal_log_admin_select', 'meal_log_admin_insert',
+        'meal_log_admin_update', 'meal_log_admin_delete',
+        'water_log_admin_select', 'water_log_admin_insert',
+        'water_log_admin_update', 'water_log_admin_delete',
+        'weight_log_admin_select', 'weight_log_admin_insert',
+        'weight_log_admin_update', 'weight_log_admin_delete',
+        'meal_plan_admin_select', 'meal_plan_admin_insert',
+        'meal_plan_admin_update', 'meal_plan_admin_delete',
+        'community_post_admin_select', 'community_post_admin_insert',
+        'community_post_admin_update', 'community_post_admin_delete',
+        'community_report_admin_select', 'community_report_admin_insert',
+        'community_report_admin_update',
+        'moderation_action_admin_select', 'moderation_action_admin_insert',
+        'ai_scan_admin_select', 'ai_scan_admin_insert',
+        'ai_scan_admin_update', 'ai_scan_prediction_admin_select',
+        'ai_scan_prediction_admin_insert',
+        'ai_scan_confirmation_admin_select',
+        'ai_scan_confirmation_admin_insert'
+      ])
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      existing_policy.policyname,
+      existing_policy.schemaname,
+      existing_policy.tablename
+    );
+  END LOOP;
+END;
+$$;
+
 -- APP_USER: admin update needs WITH CHECK
 DROP POLICY IF EXISTS app_user_admin_update ON APP_USER;
 CREATE POLICY app_user_admin_update ON APP_USER

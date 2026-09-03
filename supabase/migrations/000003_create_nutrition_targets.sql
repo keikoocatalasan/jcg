@@ -39,9 +39,9 @@ CREATE TABLE IF NOT EXISTS NUTRITION_TARGET (
   CONSTRAINT one_active_target_per_user CHECK (NOT (is_active = TRUE AND effective_to IS NULL))
 );
 
-CREATE UNIQUE INDEX idx_one_active_target ON NUTRITION_TARGET(user_id) WHERE is_active = TRUE;
-CREATE INDEX idx_nutrition_target_user ON NUTRITION_TARGET(user_id);
-CREATE INDEX idx_nutrition_target_active ON NUTRITION_TARGET(is_active);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_target ON NUTRITION_TARGET(user_id) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_nutrition_target_user ON NUTRITION_TARGET(user_id);
+CREATE INDEX IF NOT EXISTS idx_nutrition_target_active ON NUTRITION_TARGET(is_active);
 
 CREATE TABLE IF NOT EXISTS DAILY_TARGET_SNAPSHOT (
   snapshot_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -57,4 +57,4 @@ CREATE TABLE IF NOT EXISTS DAILY_TARGET_SNAPSHOT (
   CONSTRAINT uq_user_daily_target UNIQUE (user_id, target_date)
 );
 
-CREATE INDEX idx_daily_target_user_date ON DAILY_TARGET_SNAPSHOT(user_id, target_date);
+CREATE INDEX IF NOT EXISTS idx_daily_target_user_date ON DAILY_TARGET_SNAPSHOT(user_id, target_date);
