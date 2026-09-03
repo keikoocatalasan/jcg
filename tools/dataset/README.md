@@ -8,8 +8,8 @@ TFLite model should be copied into the Flutter app.
 ## Current registry
 
 `dish_registry.json` contains 100 provisional dish IDs. A class is not
-complete merely because search returned 100 URLs. It needs 100 accepted images,
-at least 80 real images, complete provenance, duplicate checks and a human
+complete merely because search returned 300 URLs. It needs 300 accepted images,
+at least 240 real images, complete provenance, duplicate checks and a human
 review status of `approved` or `human_approved`.
 
 ## Collect open-source candidates
@@ -23,7 +23,7 @@ $py = 'C:\Users\HP\AppData\Local\Temp\jcg-two-dish-vision-env\Scripts\python.exe
 & $py -u tools\dataset\collect_food_images.py `
   --registry tools\dataset\dish_registry.json `
   --work-dir 'C:\Users\HP\Desktop\jcg-dataset-work\filipino_food_100' `
-  --target-real 40 `
+  --target-real 300 `
   --max-dishes 10 `
   --source commons `
   --download-delay 2.0
@@ -57,7 +57,7 @@ other-food and ordinary Philippine-scene queries and writes them under the
 ```powershell
 & $py -u tools\dataset\collect_unknown_images.py `
   --work-dir 'C:\Users\HP\Desktop\jcg-dataset-work\filipino_food_100' `
-  --target-real 100 `
+  --target-real 3000 `
   --download-delay 5.0
 ```
 
@@ -104,6 +104,6 @@ per-class metrics and a confusion matrix. It includes an
 
 ## Dataset completion rule
 
-Do not ship a new model until every class has at least 100 approved images,
-80 real images, complete license/provenance fields, no exact duplicates, no
+Do not ship a new model until every class has at least 300 approved images,
+240 real images, complete license/provenance fields, no exact duplicates, no
 source-group leakage and a fresh phone-camera test set.

@@ -1,12 +1,17 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/image_preview_screen.dart';
+import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
   final String mealType;
@@ -28,6 +33,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   bool _noCameras = false;
   bool _isInitializing = false;
   bool _isTakingPhoto = false;
+  bool _isLiveInferenceBusy = false;
+  DateTime? _lastLiveInferenceAt;
+  String? _liveFoodName;
+  double _liveConfidence = 0;
+  int _stableFrameCount = 0;
+  String? _stableFoodName;
   String? _cameraError;
 
   @override
@@ -89,7 +100,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         selectedCamera,
         ResolutionPreset.high,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+        imageFormatGroup: ImageFormatGroup.yuv420,
       );
 
       await controller.initialize();
@@ -104,6 +115,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         _permissionChecked = true;
         _noCameras = false;
       });
+      unawaited(_startLiveInference(controller));
     } on CameraException catch (e) {
       if (mounted) {
         final denied = e.code == 'CameraAccessDenied' ||
@@ -146,6 +158,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   Future<void> _disposeCamera() async {
     final controller = _controller;
     _controller = null;
+    if (controller?.value.isStreamingImages == true) {
+      try {
+        await controller!.stopImageStream();
+      } catch (_) {
+        // The controller may already be closing during an app lifecycle change.
+      }
+    }
     if (mounted) setState(() => _isInitialized = false);
     await controller?.dispose();
   }
@@ -196,6 +215,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
     try {
       setState(() => _isTakingPhoto = true);
+      await _stopLiveInference();
       final xfile = await _controller!.takePicture();
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -216,6 +236,149 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     } finally {
       if (mounted) setState(() => _isTakingPhoto = false);
     }
+  }
+
+  Future<void> _startLiveInference(CameraController controller) async {
+    if (controller.value.isStreamingImages) return;
+    try {
+      await controller.startImageStream(_onCameraImage);
+    } on CameraException {
+      // Live preview is an enhancement; the shutter still works if the device
+      // cannot provide a compatible image stream.
+    }
+  }
+
+  Future<void> _stopLiveInference() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isStreamingImages) return;
+    try {
+      await controller.stopImageStream();
+    } catch (_) {
+      // Ignore a stream that was already stopped by the camera plugin.
+    }
+    if (mounted) {
+      setState(() {
+        _isLiveInferenceBusy = false;
+        _liveFoodName = null;
+        _liveConfidence = 0;
+        _stableFrameCount = 0;
+        _stableFoodName = null;
+      });
+    }
+  }
+
+  void _onCameraImage(CameraImage image) {
+    if (_isTakingPhoto || _isLiveInferenceBusy || !mounted) return;
+    final now = DateTime.now();
+    final last = _lastLiveInferenceAt;
+    if (last != null && now.difference(last).inMilliseconds < 450) return;
+    _lastLiveInferenceAt = now;
+    _isLiveInferenceBusy = true;
+    Future<void>(() async {
+      try {
+        final jpeg = _cameraImageToJpeg(image);
+        if (jpeg == null || !mounted) return;
+        final recognitions = await ref
+            .read(localFoodRecognitionServiceProvider)
+            .recognizeBytes(jpeg);
+        if (!mounted || recognitions.isEmpty) return;
+        final top = recognitions.first;
+        final isSame = top.foodName == _stableFoodName;
+        final nextStableCount = isSame ? _stableFrameCount + 1 : 1;
+        setState(() {
+          _liveFoodName = top.foodName;
+          _liveConfidence = top.confidence;
+          _stableFoodName = top.foodName;
+          _stableFrameCount = nextStableCount;
+        });
+      } catch (_) {
+        // Keep the preview usable; the final still scan reports actionable
+        // errors and can use the online fallback.
+      } finally {
+        _isLiveInferenceBusy = false;
+      }
+    });
+  }
+
+  Uint8List? _cameraImageToJpeg(CameraImage image) {
+    if (image.format.group != ImageFormatGroup.yuv420 ||
+        image.planes.length < 3) {
+      return null;
+    }
+    final width = image.width;
+    final height = image.height;
+    final yPlane = image.planes[0];
+    final uPlane = image.planes[1];
+    final vPlane = image.planes[2];
+    final output = img.Image(width: width, height: height);
+
+    for (var y = 0; y < height; y++) {
+      final yRow = y * yPlane.bytesPerRow;
+      final uvRow = (y ~/ 2) * uPlane.bytesPerRow;
+      for (var x = 0; x < width; x++) {
+        final yValue = yPlane.bytes[yRow + x];
+        final uvColumn = (x ~/ 2) * (uPlane.bytesPerPixel ?? 1);
+        final uValue = uPlane.bytes[uvRow + uvColumn];
+        final vValue = vPlane.bytes[uvRow + uvColumn];
+        final luminance = yValue.toDouble();
+        final red = (luminance + 1.402 * (vValue - 128)).round();
+        final green =
+            (luminance - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128))
+                .round();
+        final blue = (luminance + 1.772 * (uValue - 128)).round();
+        output.setPixelRgb(
+          x,
+          y,
+          red.clamp(0, 255),
+          green.clamp(0, 255),
+          blue.clamp(0, 255),
+        );
+      }
+    }
+    return Uint8List.fromList(img.encodeJpg(output, quality: 65));
+  }
+
+  Widget _buildLiveStatus(ThemeData theme) {
+    final label = _liveFoodName;
+    final isStable = _stableFrameCount >= 3;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isStable ? AppColors.success : Colors.white24,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isStable ? Icons.check_circle : Icons.center_focus_strong,
+            color: isStable ? AppColors.success : Colors.white,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label == null
+                  ? 'Point the camera at one dish'
+                  : isStable
+                      ? 'Preview: $label'
+                      : 'Hold steady: $label',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (label != null)
+            Text(
+              '${(_liveConfidence * 100).toStringAsFixed(0)}%',
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+            ),
+        ],
+      ),
+    );
   }
 
   void _showTipsSheet() {
@@ -450,9 +613,15 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
             ),
           ),
         ),
+        Positioned(
+          top: 16,
+          left: 16,
+          right: 16,
+          child: _buildLiveStatus(theme),
+        ),
         if (!isOnline)
           Positioned(
-            top: 16,
+            top: 78,
             left: 16,
             right: 16,
             child: Container(

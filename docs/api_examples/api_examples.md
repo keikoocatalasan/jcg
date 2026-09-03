@@ -29,6 +29,11 @@ curl -X POST http://localhost:8000/ai/scan-food \
   "client_scan_id": "550e8400-e29b-41d4-a716-446655440000",
   "status": "completed",
   "manual_search_recommended": false,
+  "pipeline_version": "scanner-v2",
+  "composition_confidence": 0.70,
+  "needs_portion_input": true,
+  "quality_flags": ["portion_required"],
+  "messages": ["Confirm each detected component and enter its portion weight."],
   "candidates": [
     {
       "food_id": null,
@@ -39,7 +44,42 @@ curl -X POST http://localhost:8000/ai/scan-food \
       "protein_g": 35,
       "carbs_g": 12,
       "fat_g": 30,
+      "estimated_cost_php": 85,
+      "serving_grams": 180
+    }
+  ],
+  "components": [
+    {
+      "component_id": "550e8400-e29b-41d4-a716-446655440000:ulam",
+      "role": "ulam",
+      "food_id": null,
+      "food_name": "Chicken Adobo",
+      "confidence": 0.87,
+      "alternatives": [],
+      "grams": null,
+      "portion_method": "not_provided",
+      "portion_confidence": null,
+      "calories": 480,
+      "protein_g": 35,
+      "carbs_g": 12,
+      "fat_g": 30,
       "estimated_cost_php": 85
+    },
+    {
+      "component_id": "550e8400-e29b-41d4-a716-446655440000:rice",
+      "role": "rice",
+      "food_id": null,
+      "food_name": "Cooked White Rice",
+      "confidence": 0.82,
+      "alternatives": [],
+      "grams": null,
+      "portion_method": "not_provided",
+      "portion_confidence": null,
+      "calories": null,
+      "protein_g": null,
+      "carbs_g": null,
+      "fat_g": null,
+      "estimated_cost_php": null
     }
   ]
 }

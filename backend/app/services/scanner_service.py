@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from app.config import settings
-from app.schemas.scan_food import ScanCandidate
+from app.schemas.scan_food import ScanCandidate, ScanComponent
 from app.services.nvidia_chat_service import NvidiaChatService
 from app.services.openai_responses_service import OpenAIResponsesService
 
@@ -11,6 +11,9 @@ from app.services.openai_responses_service import OpenAIResponsesService
 class ScanResult:
     client_scan_id: str
     candidates: list[ScanCandidate] = field(default_factory=list)
+    components: list[ScanComponent] = field(default_factory=list)
+    composition_confidence: float | None = None
+    quality_flags: list[str] = field(default_factory=list)
 
 
 class ScannerService:
@@ -73,7 +76,13 @@ class ScannerService:
             ),
         ]
 
-        return ScanResult(client_scan_id=scan_id, candidates=mock_candidates)
+        return ScanResult(
+            client_scan_id=scan_id,
+            candidates=mock_candidates,
+            components=[self._component_from_candidate(mock_candidates[0], scan_id)],
+            composition_confidence=0.70,
+            quality_flags=["portion_required"],
+        )
 
     async def _scan_with_openai(
         self,
@@ -133,7 +142,15 @@ class ScannerService:
             ScanCandidate.model_validate(candidate)
             for candidate in data["candidates"]
         ]
-        return ScanResult(client_scan_id=scan_id, candidates=candidates)
+        return ScanResult(
+            client_scan_id=scan_id,
+            candidates=candidates,
+            components=[
+                self._component_from_candidate(candidates[0], scan_id)
+            ] if candidates else [],
+            composition_confidence=0.55 if candidates else None,
+            quality_flags=["portion_required"] if candidates else ["no_candidate"],
+        )
 
     async def _scan_with_nvidia(
         self,
@@ -144,9 +161,11 @@ class ScannerService:
     ) -> ScanResult:
         text = await self._nvidia.create_text(
             instructions=(
-                "Identify the main Filipino food in the image. Return ONLY one short "
-                "canonical dish name, with no explanation, punctuation, confidence score, "
-                "or markdown. If the image is not food or you are unsure, return unknown."
+                "Analyze this Filipino meal photo. Return exactly one line in this format: "
+                "dish=<one short canonical dish name>; rice=<yes|no|unknown>; "
+                "extras=<none or comma-separated visible side names>. Do not add markdown "
+                "or explanations. If the image is not food or you are unsure, set dish=unknown. "
+                "Do not estimate grams or nutrition."
             ),
             input_content=[
                 {"type": "text", "text": f"Meal type: {meal_type or 'unknown'}"},
@@ -154,25 +173,119 @@ class ScannerService:
             ],
             max_output_tokens=900,
         )
-        food_name = self._clean_nvidia_food_name(text.text)
+        food_name, rice_present, extras = self._parse_nvidia_scan_text(text.text)
         if not food_name or food_name.lower() == "unknown":
-            return ScanResult(client_scan_id=scan_id, candidates=[])
+            return ScanResult(
+                client_scan_id=scan_id,
+                candidates=[],
+                components=[],
+                quality_flags=["unknown_or_unsupported", "manual_confirmation_required"],
+            )
+        candidate = ScanCandidate(
+            food_id=None,
+            food_name=food_name,
+            confidence=0.59,
+            rank_number=1,
+            calories=None,
+            protein_g=None,
+            carbs_g=None,
+            fat_g=None,
+            estimated_cost_php=None,
+        )
+        components = [
+            ScanComponent(
+                component_id=self._component_id(scan_id, "ulam"),
+                role="ulam",
+                food_name=food_name,
+                confidence=0.59,
+            )
+        ]
+        if rice_present is True:
+            components.append(
+                ScanComponent(
+                    component_id=self._component_id(scan_id, "rice"),
+                    role="rice",
+                    food_name="Cooked White Rice",
+                    confidence=0.59,
+                )
+            )
+        for index, extra in enumerate(extras, start=1):
+            components.append(
+                ScanComponent(
+                    component_id=self._component_id(scan_id, f"extra-{index}"),
+                    role="side",
+                    food_name=extra,
+                    confidence=0.50,
+                )
+            )
+        quality_flags = ["portion_required", "manual_confirmation_required"]
+        if rice_present is None:
+            quality_flags.append("rice_presence_uncertain")
         return ScanResult(
             client_scan_id=scan_id,
-            candidates=[
-                ScanCandidate(
-                    food_id=None,
-                    food_name=food_name,
-                    confidence=0.59,
-                    rank_number=1,
-                    calories=None,
-                    protein_g=None,
-                    carbs_g=None,
-                    fat_g=None,
-                    estimated_cost_php=None,
-                )
-            ],
+            candidates=[candidate],
+            components=components,
+            composition_confidence=0.59,
+            quality_flags=quality_flags,
         )
+
+    @classmethod
+    def _parse_nvidia_scan_text(cls, text: str) -> tuple[str, bool | None, list[str]]:
+        """Parse the compact non-JSON contract used by the NVIDIA VLM.
+
+        Structured output is not assumed for this provider. Plain dish-name output
+        remains valid for older deployments and mocked tests.
+        """
+
+        line = text.strip().splitlines()[0] if text.strip() else ""
+        fields: dict[str, str] = {}
+        if "dish=" in line.lower():
+            for part in line.split(";"):
+                if "=" not in part:
+                    continue
+                key, value = part.split("=", 1)
+                fields[key.strip().lower()] = value.strip()
+        food_name = cls._clean_nvidia_food_name(fields.get("dish", line))
+        rice_value = fields.get("rice", "").lower()
+        rice_present: bool | None
+        if rice_value in {"yes", "true", "present"}:
+            rice_present = True
+        elif rice_value in {"no", "false", "absent"}:
+            rice_present = False
+        else:
+            rice_present = None
+        extras_value = fields.get("extras", "")
+        extras = [
+            value.strip()
+            for value in extras_value.split(",")
+            if value.strip() and value.strip().lower() not in {"none", "unknown"}
+        ][:3]
+        return food_name, rice_present, extras
+
+    @staticmethod
+    def _component_from_candidate(
+        candidate: ScanCandidate,
+        scan_id: str,
+    ) -> ScanComponent:
+        lowered = candidate.food_name.lower()
+        role = "rice" if "rice" in lowered else "ulam"
+        return ScanComponent(
+            component_id=ScannerService._component_id(scan_id, "component-1"),
+            role=role,
+            food_id=candidate.food_id,
+            food_name=candidate.food_name,
+            confidence=candidate.confidence,
+            reference_grams=candidate.serving_grams,
+            calories=candidate.calories,
+            protein_g=candidate.protein_g,
+            carbs_g=candidate.carbs_g,
+            fat_g=candidate.fat_g,
+            estimated_cost_php=candidate.estimated_cost_php,
+        )
+
+    @staticmethod
+    def _component_id(scan_id: str, suffix: str) -> str:
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, f"jcg-scan:{scan_id}:{suffix}"))
 
     @staticmethod
     def _clean_nvidia_food_name(text: str) -> str:

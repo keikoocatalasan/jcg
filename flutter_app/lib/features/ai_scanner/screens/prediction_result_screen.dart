@@ -25,6 +25,30 @@ class PredictionResultScreen extends StatelessWidget {
     return sorted;
   }
 
+  String? get _primaryComponentId => scanResult.components.isEmpty
+      ? null
+      : scanResult.components.first.componentId;
+
+  String get _primaryComponentRole => scanResult.components.isEmpty
+      ? 'ulam'
+      : scanResult.components.first.roleCode;
+
+  List<ScanComponent> _componentsForPrediction(ScanPrediction prediction) {
+    if (scanResult.components.isEmpty) return const [];
+    final primary = scanResult.components.first.copyWith(
+      foodId: prediction.foodId,
+      foodName: prediction.foodName,
+      confidence: prediction.confidence,
+      calories: prediction.calories,
+      proteinG: prediction.proteinG,
+      carbsG: prediction.carbsG,
+      fatG: prediction.fatG,
+      estimatedCostPhp: prediction.estimatedCostPhp,
+      referenceGrams: prediction.servingGrams,
+    );
+    return [primary, ...scanResult.components.skip(1)];
+  }
+
   @override
   Widget build(BuildContext context) {
     final predictions = _sortedPredictions;
@@ -96,6 +120,8 @@ class PredictionResultScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTopMatchHeader(context, prediction),
+            const SizedBox(height: 8),
+            _buildCompositionCard(context),
             const SizedBox(height: 8),
             _buildNutritionCard(context, prediction),
             if (predictions.length > 1) ...[
@@ -189,6 +215,9 @@ class PredictionResultScreen extends StatelessWidget {
                       mealType: mealType,
                       clientScanId: clientScanId,
                       scanId: scanResult.scanId,
+                      componentId: _primaryComponentId,
+                      componentRole: _primaryComponentRole,
+                      components: scanResult.components,
                     ),
                   ),
                 );
@@ -227,6 +256,10 @@ class PredictionResultScreen extends StatelessWidget {
                 clientScanId: clientScanId,
                 foodId: prediction.foodId,
                 predictedConfidence: prediction.confidence,
+                servingGrams: prediction.servingGrams,
+                componentId: _primaryComponentId,
+                componentRole: _primaryComponentRole,
+                components: _componentsForPrediction(prediction),
               ),
             ),
           );
@@ -263,6 +296,9 @@ class PredictionResultScreen extends StatelessWidget {
       mealType: mealType,
       clientScanId: clientScanId,
       scanId: scanResult.scanId,
+      componentId: _primaryComponentId,
+      componentRole: _primaryComponentRole,
+      components: scanResult.components,
       showAppBar: true,
     );
   }
@@ -302,6 +338,8 @@ class PredictionResultScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _buildTopMatchHeader(context, predictions.first),
             const SizedBox(height: 8),
+            _buildCompositionCard(context),
+            const SizedBox(height: 8),
             _buildNutritionCard(context, predictions.first),
             if (predictions.length > 1) ...[
               const SizedBox(height: 24),
@@ -316,6 +354,92 @@ class PredictionResultScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildCompositionCard(BuildContext context) {
+    if (scanResult.components.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'What is on the plate?',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Review each component separately so rice and sides are not counted as part of the ulam.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final component in scanResult.components)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      component.roleCode == 'rice'
+                          ? Icons.rice_bowl_outlined
+                          : Icons.restaurant_outlined,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${_componentRoleLabel(component.roleCode)}: ${component.foodName}',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                    Text(
+                      '${(component.confidence * 100).toStringAsFixed(0)}%',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 4),
+            const Text(
+              'Portion weight is required for a more accurate total.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _componentRoleLabel(String roleCode) {
+    switch (roleCode) {
+      case 'ulam':
+        return 'Ulam';
+      case 'rice':
+        return 'Rice';
+      case 'vegetable':
+        return 'Vegetable';
+      case 'soup':
+        return 'Soup';
+      case 'side':
+        return 'Side';
+      case 'drink':
+        return 'Drink';
+      case 'dessert':
+        return 'Dessert';
+      default:
+        return 'Item';
+    }
   }
 
   Widget _buildNutritionCard(BuildContext context, ScanPrediction prediction) {
@@ -398,6 +522,9 @@ class _CandidateSelectionScreen extends StatefulWidget {
   final String mealType;
   final String clientScanId;
   final String scanId;
+  final String? componentId;
+  final String componentRole;
+  final List<ScanComponent> components;
   final bool showAppBar;
 
   const _CandidateSelectionScreen({
@@ -405,6 +532,9 @@ class _CandidateSelectionScreen extends StatefulWidget {
     required this.mealType,
     required this.clientScanId,
     required this.scanId,
+    this.componentId,
+    this.componentRole = 'ulam',
+    this.components = const [],
     this.showAppBar = false,
   });
 
@@ -442,6 +572,22 @@ class _CandidateSelectionScreenState extends State<_CandidateSelectionScreen> {
     }
 
     final prediction = _sortedPredictions[_selectedIndex!];
+    final components = widget.components.isEmpty
+        ? const <ScanComponent>[]
+        : [
+            widget.components.first.copyWith(
+              foodId: prediction.foodId,
+              foodName: prediction.foodName,
+              confidence: prediction.confidence,
+              calories: prediction.calories,
+              proteinG: prediction.proteinG,
+              carbsG: prediction.carbsG,
+              fatG: prediction.fatG,
+              estimatedCostPhp: prediction.estimatedCostPhp,
+              referenceGrams: prediction.servingGrams,
+            ),
+            ...widget.components.skip(1),
+          ];
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -457,6 +603,10 @@ class _CandidateSelectionScreenState extends State<_CandidateSelectionScreen> {
           clientScanId: widget.clientScanId,
           foodId: prediction.foodId,
           predictedConfidence: prediction.confidence,
+          servingGrams: prediction.servingGrams,
+          componentId: widget.componentId,
+          componentRole: widget.componentRole,
+          components: components,
         ),
       ),
     );

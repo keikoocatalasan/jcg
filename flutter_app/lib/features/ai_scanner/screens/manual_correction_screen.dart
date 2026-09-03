@@ -134,6 +134,7 @@ class _ManualCorrectionScreenState
             scanId: widget.scanId,
             clientScanId: widget.clientScanId,
             foodId: food.foodId,
+            servingGrams: food.servingGrams,
             isManualCorrection: true,
             correctionReason: 'search_selected',
           ),
@@ -356,15 +357,15 @@ class _ManualCorrectionScreenState
                       ),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) {
-                        return 'This field is required';
-                      }
-                      final val = double.tryParse(v);
-                      if (val == null) return 'Please enter a valid number';
-                      if (val <= 0) return 'Value must be greater than 0';
-                      return null;
-                    },
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return 'This field is required';
+                        }
+                        final val = double.tryParse(v);
+                        if (val == null) return 'Please enter a valid number';
+                        if (val <= 0) return 'Value must be greater than 0';
+                        return null;
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),

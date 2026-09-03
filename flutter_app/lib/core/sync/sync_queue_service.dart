@@ -61,6 +61,7 @@ class SyncQueueService {
     'recommendation_item',
     'ai_scan',
     'ai_scan_prediction',
+    'ai_scan_component',
     'ai_scan_feedback',
     'chat_session',
     'chat_message',
@@ -222,6 +223,15 @@ class SyncQueueService {
         return;
       case 'custom_food':
         await _syncCustomFood(item, payload);
+        return;
+      case 'ai_scan':
+        await _syncAiScan(item, payload);
+        return;
+      case 'ai_scan_prediction':
+        await _syncAiScanPrediction(item, payload);
+        return;
+      case 'ai_scan_component':
+        await _syncAiScanComponent(item, payload);
         return;
       case 'ai_scan_feedback':
         await _syncAiScanFeedback(item, payload);
@@ -960,6 +970,121 @@ class SyncQueueService {
     });
   }
 
+  Future<void> _syncAiScan(
+    SyncQueueEntry item,
+    Map<String, dynamic> payload,
+  ) async {
+    if (item.operationCode == 'delete') {
+      await supabaseClient
+          .from('ai_scan')
+          .delete()
+          .eq('scan_id', item.entityId);
+      return;
+    }
+    final appUserId = await _currentAppUserId();
+    final scanStatusId = await _lookupId(
+      'ai_scan_status',
+      'status_code',
+      payload['scan_status_code'] as String? ?? 'low_confidence',
+      'scan_status_id',
+    );
+    dynamic rawResponse = payload['raw_response_json'];
+    if (rawResponse is String && rawResponse.isNotEmpty) {
+      try {
+        rawResponse = jsonDecode(rawResponse);
+      } on FormatException {
+        rawResponse = {'raw_text': rawResponse};
+      }
+    }
+    await supabaseClient.from('ai_scan').upsert({
+      'scan_id': item.entityId,
+      'user_id': appUserId,
+      'scan_status_id': scanStatusId,
+      'client_scan_id': payload['client_scan_id'],
+      // A local filesystem path is not portable and must not be uploaded.
+      'image_path': null,
+      'pipeline_version': payload['pipeline_version'] ?? 'scanner-v2',
+      'composition_confidence': payload['composition_confidence'],
+      'needs_portion_input': payload['needs_portion_input'] == true ||
+          payload['needs_portion_input'] == 1,
+      'created_at': payload['created_at'],
+      'completed_at': payload['completed_at'],
+      'raw_response_json': rawResponse,
+    });
+  }
+
+  Future<void> _syncAiScanPrediction(
+    SyncQueueEntry item,
+    Map<String, dynamic> payload,
+  ) async {
+    if (item.operationCode == 'delete') {
+      await supabaseClient
+          .from('ai_scan_prediction')
+          .delete()
+          .eq('prediction_id', item.entityId);
+      return;
+    }
+    await supabaseClient.from('ai_scan_prediction').upsert({
+      'prediction_id': item.entityId,
+      'scan_id': payload['scan_id'],
+      'food_id': payload['food_id'],
+      'predicted_food_name': payload['predicted_food_name'],
+      'confidence': payload['confidence'],
+      'rank_number': payload['rank_number'],
+      'calories': payload['calories'],
+      'protein_g': payload['protein_g'],
+      'carbs_g': payload['carbs_g'],
+      'fat_g': payload['fat_g'],
+      'estimated_cost_php': payload['estimated_cost_php'],
+      'serving_grams': payload['serving_grams'],
+    });
+  }
+
+  Future<void> _syncAiScanComponent(
+    SyncQueueEntry item,
+    Map<String, dynamic> payload,
+  ) async {
+    if (item.operationCode == 'delete') {
+      await supabaseClient
+          .from('ai_scan_component')
+          .delete()
+          .eq('component_id', item.entityId);
+      return;
+    }
+    dynamic alternatives = payload['alternative_names'];
+    if (alternatives is String && alternatives.isNotEmpty) {
+      try {
+        alternatives = jsonDecode(alternatives);
+      } on FormatException {
+        alternatives = <String>[];
+      }
+    }
+    if (alternatives is! List) alternatives = <String>[];
+    await supabaseClient.from('ai_scan_component').upsert({
+      'component_id': item.entityId,
+      'scan_id': payload['scan_id'],
+      'component_order': payload['component_order'],
+      'role_code': payload['role_code'],
+      'food_id': payload['food_id'],
+      'predicted_food_name': payload['predicted_food_name'],
+      'confidence': payload['confidence'],
+      'alternative_names': alternatives,
+      'reference_grams': payload['reference_grams'],
+      'grams': payload['grams'],
+      'portion_method': payload['portion_method'] ?? 'not_provided',
+      'portion_confidence': payload['portion_confidence'],
+      'calories': payload['calories'],
+      'protein_g': payload['protein_g'],
+      'carbs_g': payload['carbs_g'],
+      'fat_g': payload['fat_g'],
+      'estimated_cost_php': payload['estimated_cost_php'],
+      'is_confirmed':
+          payload['is_confirmed'] == true || payload['is_confirmed'] == 1,
+      'created_at': payload['created_at'],
+      'updated_at': payload['updated_at'],
+    });
+  }
+
   Future<void> _executeCreate(
       String table, Map<String, dynamic> payload) async {
     final filtered = Map<String, dynamic>.from(payload)
@@ -1068,6 +1193,8 @@ class SyncQueueService {
         return 'ai_scan';
       case 'ai_scan_prediction':
         return 'ai_scan_prediction';
+      case 'ai_scan_component':
+        return 'ai_scan_component';
       case 'ai_scan_feedback':
         return 'ai_scan_feedback';
       case 'chat_session':
@@ -1106,6 +1233,8 @@ class SyncQueueService {
         return 'ai_scans';
       case 'ai_scan_prediction':
         return 'ai_scan_predictions';
+      case 'ai_scan_component':
+        return 'ai_scan_components';
       case 'ai_scan_feedback':
         return 'ai_scan_feedback';
       case 'chat_session':
@@ -1155,6 +1284,8 @@ class SyncQueueService {
       case 'ai_scan_predictions':
       case 'ai_scan_prediction':
         return 'ai_scan_prediction';
+      case 'ai_scan_component':
+        return 'ai_scan_component';
       case 'ai_scan_feedback':
         return 'ai_scan_feedback';
       case 'chat_sessions':
@@ -1194,6 +1325,8 @@ class SyncQueueService {
         return 'scan_id';
       case 'ai_scan_prediction':
         return 'prediction_id';
+      case 'ai_scan_component':
+        return 'component_id';
       case 'ai_scan_feedback':
         return 'feedback_id';
       case 'chat_session':

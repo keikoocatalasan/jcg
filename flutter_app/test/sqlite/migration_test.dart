@@ -4,6 +4,7 @@ import 'package:jcg_fitness/core/database/migration_v1.dart';
 import 'package:jcg_fitness/core/database/migration_v2.dart';
 import 'package:jcg_fitness/core/database/migration_v3.dart';
 import 'package:jcg_fitness/core/database/migration_v4.dart';
+import 'package:jcg_fitness/core/database/migration_v5.dart';
 import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 
 void main() {
@@ -161,6 +162,38 @@ void main() {
           'fitness_goal_code',
           'minimum_price_php',
           'maximum_price_php',
+        }),
+      );
+    });
+  });
+
+  group('Migration V5', () {
+    test('adds component-aware scan storage and is idempotent', () async {
+      await MigrationV5.run(db);
+      await MigrationV5.run(db);
+
+      final scanColumns = await db.rawQuery('PRAGMA table_info(ai_scans)');
+      final scanNames = scanColumns.map((row) => row['name']).toSet();
+      expect(
+        scanNames,
+        containsAll(<String>{
+          'pipeline_version',
+          'composition_confidence',
+          'needs_portion_input',
+        }),
+      );
+
+      final componentColumns =
+          await db.rawQuery('PRAGMA table_info(ai_scan_components)');
+      final componentNames = componentColumns.map((row) => row['name']).toSet();
+      expect(
+        componentNames,
+        containsAll(<String>{
+          'role_code',
+          'reference_grams',
+          'grams',
+          'portion_method',
+          'portion_confidence',
         }),
       );
     });

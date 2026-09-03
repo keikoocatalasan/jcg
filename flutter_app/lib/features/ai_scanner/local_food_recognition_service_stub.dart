@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 class LocalDishRecognition {
   final String modelLabel;
   final String foodName;
@@ -7,6 +9,7 @@ class LocalDishRecognition {
   final double carbsG;
   final double fatG;
   final double estimatedCostPhp;
+  final double? servingGrams;
 
   const LocalDishRecognition({
     required this.modelLabel,
@@ -17,11 +20,13 @@ class LocalDishRecognition {
     required this.carbsG,
     required this.fatG,
     required this.estimatedCostPhp,
+    this.servingGrams,
   });
 }
 
 class LocalFoodRecognitionService {
   static const modelName = 'jcg_two_dish_classifier';
+  static const modelVersion = 'two-dish-v1';
   static const confidentThreshold = 0.95;
   static const confidentMarginThreshold = 0.20;
 
@@ -34,6 +39,10 @@ class LocalFoodRecognitionService {
   }
 
   Future<List<LocalDishRecognition>> recognizeFile(String imagePath) {
+    throw UnsupportedError('On-device vision is available on Android and iOS.');
+  }
+
+  Future<List<LocalDishRecognition>> recognizeBytes(Uint8List bytes) {
     throw UnsupportedError('On-device vision is available on Android and iOS.');
   }
 

@@ -160,6 +160,21 @@ def evaluate_model(
     }
 
 
+def release_gate(test_report: dict[str, Any], labels: list[str]) -> dict[str, Any]:
+    """Return the measurable production gate without hiding weak classes."""
+
+    per_class = test_report.get("per_class", {})
+    recalls = [float(row.get("recall", 0)) for row in per_class.values()]
+    unknown = per_class.get("unknown_or_unsupported")
+    return {
+        "top1_accuracy_at_least_80_percent": test_report.get("accuracy", 0) >= 0.80,
+        "macro_recall_at_least_80_percent": test_report.get("macro_recall", 0) >= 0.80,
+        "no_class_recall_below_70_percent": bool(recalls) and min(recalls) >= 0.70,
+        "unknown_class_present": "unknown_or_unsupported" in labels,
+        "unknown_class_has_test_support": bool(unknown and unknown.get("support", 0) > 0),
+    }
+
+
 def train(args: argparse.Namespace) -> dict[str, Any]:
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -171,6 +186,18 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     missing_registry_labels = [label for label in split_labels if label not in registry_ids and label != "unknown_or_unsupported"]
     if missing_registry_labels:
         raise ValueError(f"Split contains labels missing from registry: {missing_registry_labels}")
+    missing_required_labels = [label for label in registry_ids if label not in split_labels]
+    if missing_required_labels and not args.allow_partial:
+        raise ValueError(
+            "Refusing to train a partial production model. Missing registry labels: "
+            + ", ".join(missing_required_labels)
+            + ". Use --allow-partial only for experiments."
+        )
+    if "unknown_or_unsupported" not in split_labels and not args.allow_missing_unknown:
+        raise ValueError(
+            "Refusing to train without unknown_or_unsupported evaluation data. "
+            "Use --allow-missing-unknown only for experiments."
+        )
     labels = [label for label in registry_ids if label in split_labels]
     if "unknown_or_unsupported" in split_labels:
         labels.append("unknown_or_unsupported")
@@ -221,6 +248,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     test_report = evaluate_model(model, test_dataset, labels)
+    gate = release_gate(test_report, labels)
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.target_spec.supported_types = [tf.float16]
@@ -250,6 +278,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "fine_tune_epochs": len(fine_history.history["loss"]),
         "model_bytes": len(tflite_model),
         "test": test_report,
+        "release_gate": gate,
+        "release_ready": all(gate.values()),
     }
     (output_dir / "filifood100_training_report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -268,6 +298,16 @@ def main() -> None:
     parser.add_argument("--fine-tune-layers", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="Allow an incomplete registry for experiments; never use for a release.",
+    )
+    parser.add_argument(
+        "--allow-missing-unknown",
+        action="store_true",
+        help="Allow experiments without unknown-class test data; never use for a release.",
+    )
     args = parser.parse_args()
     print(json.dumps(train(args), indent=2, ensure_ascii=False))
 

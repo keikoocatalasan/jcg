@@ -120,7 +120,7 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work-dir", required=True, type=Path)
-    parser.add_argument("--target-real", type=int, default=100)
+    parser.add_argument("--target-real", type=int, default=3000)
     parser.add_argument("--search-limit", type=int, default=30)
     parser.add_argument("--min-short-side", type=int, default=640)
     parser.add_argument("--download-delay", type=float, default=5.0)

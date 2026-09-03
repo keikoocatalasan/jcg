@@ -1,8 +1,8 @@
 {
   "dataset_id": "filipino_food_100",
-  "version": "0.1.0",
-  "target_images_per_class": 100,
-  "minimum_real_images_per_class": 80,
+  "version": "0.2.0",
+  "target_images_per_class": 300,
+  "minimum_real_images_per_class": 240,
   "maximum_synthetic_fraction": 0.2,
   "classes": [
     {"id":"chicken_adobo","display_name":"Chicken Adobo","region":"nationwide","aliases":["chicken adobo","adobong manok","filipino chicken adobo"]},

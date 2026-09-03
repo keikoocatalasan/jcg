@@ -132,7 +132,9 @@ def test_scan_food_route_accepts_valid_image(monkeypatch) -> None:
     assert body["status"] == "completed"
     assert body["client_scan_id"] == "11111111-1111-4111-8111-111111111111"
     assert body["manual_search_recommended"] is False
-    assert len(body["candidates"]) == 2
+    assert len(body["candidates"]) == 3
+    assert body["components"][0]["role"] == "rice"
+    assert body["needs_portion_input"] is True
 
 
 def test_openai_provider_paths_are_connected_without_network(monkeypatch) -> None:
@@ -185,7 +187,7 @@ def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> Non
         )
         if is_image_request:
             return NvidiaChatResult(
-                text="Chicken Adobo",
+                text="dish=Chicken Adobo; rice=yes; extras=atchara",
                 model="meta/llama-3.2-11b-vision-instruct",
             )
         return NvidiaChatResult(
@@ -220,6 +222,10 @@ def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> Non
 
     assert scan_response.status_code == 200
     assert scan_response.json()["candidates"][0]["food_name"] == "Chicken Adobo"
+    assert scan_response.json()["components"][0]["role"] == "ulam"
+    assert scan_response.json()["components"][1]["role"] == "rice"
+    assert scan_response.json()["components"][2]["food_name"] == "atchara"
+    assert scan_response.json()["needs_portion_input"] is True
     assert chat_response.status_code == 200
     assert "adobo" in chat_response.json()["reply"].lower()
 

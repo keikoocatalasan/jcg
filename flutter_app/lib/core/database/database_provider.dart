@@ -4,6 +4,7 @@ import 'migration_v1.dart';
 import 'migration_v2.dart';
 import 'migration_v3.dart';
 import 'migration_v4.dart';
+import 'migration_v5.dart';
 
 class DatabaseProvider {
   static final DatabaseProvider _instance = DatabaseProvider._internal();
@@ -24,7 +25,7 @@ class DatabaseProvider {
 
     return openDatabase(
       path,
-      version: MigrationV4.version,
+      version: MigrationV5.version,
       onCreate: (db, version) async {
         final batch = db.batch();
         await MigrationV1.run(batch);
@@ -32,6 +33,7 @@ class DatabaseProvider {
         await MigrationV2.run(db);
         await MigrationV3.run(db);
         await MigrationV4.run(db);
+        await MigrationV5.run(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < MigrationV2.version) {
@@ -42,6 +44,9 @@ class DatabaseProvider {
         }
         if (oldVersion < MigrationV4.version) {
           await MigrationV4.run(db);
+        }
+        if (oldVersion < MigrationV5.version) {
+          await MigrationV5.run(db);
         }
       },
       onConfigure: (db) async {

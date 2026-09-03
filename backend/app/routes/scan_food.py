@@ -35,11 +35,15 @@ async def scan_food(
         file.content_type or "image/jpeg",
     )
 
-    high_conf = [c for c in scan_result.candidates if c.confidence > 0.60]
+    # A candidate is only considered complete at the release target. Lower
+    # scores remain visible, but require confirmation/manual correction.
+    high_conf = [c for c in scan_result.candidates if c.confidence >= 0.80]
     if high_conf:
         status_str = "completed"
         manual = False
-        candidates = high_conf
+        # Keep ranked alternatives in the response so the user can inspect a
+        # close runner-up even when the top candidate passes the release gate.
+        candidates = scan_result.candidates
     else:
         status_str = "low_confidence"
         manual = True
@@ -50,4 +54,13 @@ async def scan_food(
         status=status_str,
         manual_search_recommended=manual,
         candidates=candidates,
+        components=scan_result.components,
+        composition_confidence=scan_result.composition_confidence,
+        needs_portion_input=bool(scan_result.components),
+        quality_flags=scan_result.quality_flags,
+        messages=(
+            ["Confirm each detected component and enter its portion weight."]
+            if scan_result.components
+            else ["No reliable food component was detected."]
+        ),
     )

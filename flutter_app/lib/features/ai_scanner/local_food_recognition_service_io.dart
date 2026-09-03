@@ -1,5 +1,6 @@
-import 'dart:io';
+import 'dart:convert';
 
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -8,11 +9,12 @@ class LocalDishRecognition {
   final String modelLabel;
   final String foodName;
   final double confidence;
-  final double calories;
-  final double proteinG;
-  final double carbsG;
-  final double fatG;
-  final double estimatedCostPhp;
+  final double? calories;
+  final double? proteinG;
+  final double? carbsG;
+  final double? fatG;
+  final double? estimatedCostPhp;
+  final double? servingGrams;
 
   const LocalDishRecognition({
     required this.modelLabel,
@@ -23,6 +25,7 @@ class LocalDishRecognition {
     required this.carbsG,
     required this.fatG,
     required this.estimatedCostPhp,
+    this.servingGrams,
   });
 
   LocalDishRecognition withConfidence(double value) => LocalDishRecognition(
@@ -34,14 +37,20 @@ class LocalDishRecognition {
         carbsG: carbsG,
         fatG: fatG,
         estimatedCostPhp: estimatedCostPhp,
+        servingGrams: servingGrams,
       );
 }
 
 class LocalFoodRecognitionService {
   static const modelPath = 'assets/models/two_dish_classifier.tflite';
   static const labelsPath = 'assets/models/two_dish_labels.txt';
+  static const expandedModelPath = 'assets/models/filifood100_v1.tflite';
+  static const expandedLabelsPath = 'assets/models/filifood100_labels.txt';
+  static const expandedDisplayNamesPath =
+      'assets/models/filifood100_display_names.json';
   static const inputSize = 224;
   static const modelName = 'jcg_two_dish_classifier';
+  static const modelVersion = 'two-dish-v1';
   // The two-class prototype has no unknown-food class, so use a conservative
   // auto-accept gate until the expanded model is trained with negatives.
   static const confidentThreshold = 0.95;
@@ -57,6 +66,7 @@ class LocalFoodRecognitionService {
       carbsG: 8,
       fatG: 28,
       estimatedCostPhp: 65,
+      servingGrams: null,
     ),
     'sinigang': LocalDishRecognition(
       modelLabel: 'sinigang',
@@ -67,11 +77,13 @@ class LocalFoodRecognitionService {
       carbsG: 15,
       fatG: 26,
       estimatedCostPhp: 65,
+      servingGrams: null,
     ),
   };
 
   Interpreter? _interpreter;
   List<String>? _labels;
+  Map<String, String> _displayNames = const {};
 
   static bool isConfident(List<LocalDishRecognition> results) {
     if (results.isEmpty || results.first.confidence < confidentThreshold) {
@@ -84,11 +96,20 @@ class LocalFoodRecognitionService {
   Future<List<LocalDishRecognition>> recognizeFile(String imagePath) async {
     await _ensureInitialized();
     final bytes = await File(imagePath).readAsBytes();
+    return recognizeBytes(bytes);
+  }
+
+  Future<List<LocalDishRecognition>> recognizeBytes(Uint8List bytes) async {
+    await _ensureInitialized();
     final decoded = img.decodeImage(bytes);
     if (decoded == null) {
       throw const FormatException('Unsupported or damaged image');
     }
 
+    return _recognizeDecodedImage(decoded);
+  }
+
+  List<LocalDishRecognition> _recognizeDecodedImage(img.Image decoded) {
     final oriented = img.bakeOrientation(decoded);
     final resized = img.copyResize(
       oriented,
@@ -120,8 +141,17 @@ class LocalFoodRecognitionService {
     final results = <LocalDishRecognition>[];
     for (var index = 0; index < _labels!.length; index++) {
       final label = _labels![index];
-      final profile = _dishProfiles[label];
-      if (profile == null) continue;
+      final profile = _dishProfiles[label] ??
+          LocalDishRecognition(
+            modelLabel: label,
+            foodName: _displayNames[label] ?? _displayNameFromLabel(label),
+            confidence: 0,
+            calories: null,
+            proteinG: null,
+            carbsG: null,
+            fatG: null,
+            estimatedCostPhp: null,
+          );
       results.add(
         profile.withConfidence(output.first[index].clamp(0.0, 1.0).toDouble()),
       );
@@ -132,20 +162,46 @@ class LocalFoodRecognitionService {
 
   Future<void> _ensureInitialized() async {
     if (_interpreter != null && _labels != null) return;
-    final labelsText = await rootBundle.loadString(labelsPath);
+    var selectedModelPath = modelPath;
+    var selectedLabelsPath = labelsPath;
+    try {
+      await rootBundle.load(expandedModelPath);
+      await rootBundle.loadString(expandedLabelsPath);
+      selectedModelPath = expandedModelPath;
+      selectedLabelsPath = expandedLabelsPath;
+      try {
+        final displayNamesJson =
+            await rootBundle.loadString(expandedDisplayNamesPath);
+        final decoded = jsonDecode(displayNamesJson);
+        if (decoded is Map) {
+          _displayNames = {
+            for (final entry in decoded.entries)
+              if (entry.key is String && entry.value is String)
+                entry.key as String: entry.value as String,
+          };
+        }
+      } catch (_) {
+        _displayNames = const {};
+      }
+    } catch (_) {
+      // The expanded asset is intentionally optional until its release gate
+      // passes; keep the working two-dish model as a safe fallback.
+      _displayNames = const {};
+    }
+
+    final labelsText = await rootBundle.loadString(selectedLabelsPath);
     final labels = labelsText
         .split('\n')
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
         .toList(growable: false);
-    if (labels.length != _dishProfiles.length ||
-        labels.any((label) => !_dishProfiles.containsKey(label))) {
-      throw StateError('Two-dish model labels do not match app profiles');
+    if (labels.isEmpty) {
+      throw StateError('Food model has no labels');
     }
 
     final options = InterpreterOptions()..threads = 2;
     final interpreter =
-        await Interpreter.fromAsset(modelPath, options: options);
+        await Interpreter.fromAsset(selectedModelPath, options: options);
     final inputShape = interpreter.getInputTensor(0).shape;
     final outputShape = interpreter.getOutputTensor(0).shape;
     if (inputShape.length != 4 ||
@@ -156,16 +212,25 @@ class LocalFoodRecognitionService {
         outputShape[1] != labels.length) {
       interpreter.close();
       throw StateError(
-        'Unexpected two-dish model shape: input=$inputShape output=$outputShape',
+        'Unexpected food model shape: input=$inputShape output=$outputShape',
       );
     }
     _labels = labels;
     _interpreter = interpreter;
   }
 
+  static String _displayNameFromLabel(String label) {
+    return label
+        .split('_')
+        .where((word) => word.isNotEmpty)
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
+  }
+
   void close() {
     _interpreter?.close();
     _interpreter = null;
     _labels = null;
+    _displayNames = const {};
   }
 }

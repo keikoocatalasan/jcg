@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
+import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/local_food_recognition_service.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/prediction_result_screen.dart';
@@ -136,7 +137,7 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
         await _completeScan(
           cloud.$1,
           rawResponse: cloud.$2,
-          syncStatus: 'synced',
+          syncStatus: 'pending',
         );
         return;
       } catch (cloudError) {
@@ -180,8 +181,29 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
             carbsG: recognitions[index].carbsG,
             fatG: recognitions[index].fatG,
             estimatedCostPhp: recognitions[index].estimatedCostPhp,
+            servingGrams: recognitions[index].servingGrams,
           ),
       ],
+      components: recognitions.isEmpty
+          ? const []
+          : [
+              ScanComponent(
+                componentId: UuidHelper.generateUuid(),
+                roleCode: 'ulam',
+                foodName: recognitions.first.foodName,
+                confidence: recognitions.first.confidence,
+                calories: recognitions.first.calories,
+                proteinG: recognitions.first.proteinG,
+                carbsG: recognitions.first.carbsG,
+                fatG: recognitions.first.fatG,
+                estimatedCostPhp: recognitions.first.estimatedCostPhp,
+                referenceGrams: recognitions.first.servingGrams,
+              ),
+            ],
+      pipelineVersion: LocalFoodRecognitionService.modelVersion,
+      needsPortionInput: recognitions.isNotEmpty,
+      qualityFlags:
+          recognitions.isNotEmpty ? const ['portion_required'] : const [],
     );
   }
 
@@ -242,6 +264,7 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
   String _localResponseJson(ScanResult result) => jsonEncode({
         'provider': 'tflite_on_device',
         'model': LocalFoodRecognitionService.modelName,
+        'model_version': LocalFoodRecognitionService.modelVersion,
         'supported_foods': ['Chicken Adobo', 'Sinigang na Baboy'],
         'client_scan_id': result.clientScanId,
         'predictions': [
@@ -250,6 +273,15 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
               'food_name': prediction.foodName,
               'confidence': prediction.confidence,
               'rank_number': prediction.rankNumber,
+            },
+        ],
+        'components': [
+          for (final component in result.components)
+            {
+              'component_id': component.componentId,
+              'role': component.roleCode,
+              'food_name': component.foodName,
+              'confidence': component.confidence,
             },
         ],
       });
@@ -313,6 +345,9 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
           'client_scan_id': result.clientScanId,
           'image_path': widget.imagePath,
           'raw_response_json': rawResponse,
+          'pipeline_version': result.pipelineVersion,
+          'composition_confidence': result.compositionConfidence,
+          'needs_portion_input': result.needsPortionInput ? 1 : 0,
           'sync_status': syncStatus,
           'created_at': now,
           'completed_at': now,
@@ -324,10 +359,13 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
         where: 'scan_id = ?',
         whereArgs: [result.scanId],
       );
+      final predictionIds = <String>[];
       for (var index = 0; index < result.predictions.length; index++) {
         final prediction = result.predictions[index];
+        final predictionId = UuidHelper.generateUuid();
+        predictionIds.add(predictionId);
         await txn.insert('ai_scan_predictions', {
-          'prediction_id': UuidHelper.generateUuid(),
+          'prediction_id': predictionId,
           'scan_id': result.scanId,
           'food_id': prediction.foodId,
           'predicted_food_name': prediction.foodName,
@@ -338,10 +376,145 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
           'carbs_g': prediction.carbsG,
           'fat_g': prediction.fatG,
           'estimated_cost_php': prediction.estimatedCostPhp,
+          'serving_grams': prediction.servingGrams,
           'sync_status': syncStatus,
         });
       }
+      await txn.delete(
+        'ai_scan_components',
+        where: 'scan_id = ?',
+        whereArgs: [result.scanId],
+      );
+      for (var index = 0; index < result.components.length; index++) {
+        final component = result.components[index];
+        await txn.insert('ai_scan_components', {
+          'component_id': component.componentId,
+          'scan_id': result.scanId,
+          'component_order': index + 1,
+          'role_code': component.roleCode,
+          'food_id': component.foodId,
+          'predicted_food_name': component.foodName,
+          'confidence': component.confidence,
+          'alternative_names': jsonEncode(component.alternatives),
+          'reference_grams': component.referenceGrams,
+          'grams': component.grams,
+          'portion_method': component.portionMethod,
+          'portion_confidence': component.portionConfidence,
+          'calories': component.calories,
+          'protein_g': component.proteinG,
+          'carbs_g': component.carbsG,
+          'fat_g': component.fatG,
+          'estimated_cost_php': component.estimatedCostPhp,
+          'is_confirmed': 0,
+          'sync_status': syncStatus,
+          'created_at': now,
+          'updated_at': now,
+        });
+      }
+
+      final baseSequence = DateTime.now().millisecondsSinceEpoch;
+      await txn.insert('sync_queue', {
+        'sync_queue_id': UuidHelper.generateUuid(),
+        'user_id': userId,
+        'operation_id': UuidHelper.generateUuid(),
+        'entity_type_code': 'ai_scan',
+        'entity_id': result.scanId,
+        'operation_code': 'create',
+        'payload_json': jsonEncode({
+          'scan_id': result.scanId,
+          'user_id': userId,
+          'scan_status_code':
+              topConfidence >= LocalFoodRecognitionService.confidentThreshold
+                  ? 'completed'
+                  : 'low_confidence',
+          'client_scan_id': result.clientScanId,
+          'image_path': widget.imagePath,
+          'raw_response_json': rawResponse,
+          'pipeline_version': result.pipelineVersion,
+          'composition_confidence': result.compositionConfidence,
+          'needs_portion_input': result.needsPortionInput ? 1 : 0,
+          'created_at': now,
+          'completed_at': now,
+        }),
+        'client_sequence': baseSequence,
+        'attempt_count': 0,
+        'sync_status': 'pending',
+        'created_at': now,
+      });
+      for (var index = 0; index < result.predictions.length; index++) {
+        final prediction = result.predictions[index];
+        final predictionId = predictionIds[index];
+        await txn.insert('sync_queue', {
+          'sync_queue_id': UuidHelper.generateUuid(),
+          'user_id': userId,
+          'operation_id': UuidHelper.generateUuid(),
+          'entity_type_code': 'ai_scan_prediction',
+          'entity_id': predictionId,
+          'operation_code': 'create',
+          'payload_json': jsonEncode({
+            'prediction_id': predictionId,
+            'scan_id': result.scanId,
+            'food_id': prediction.foodId,
+            'predicted_food_name': prediction.foodName,
+            'confidence': prediction.confidence,
+            'rank_number': prediction.rankNumber ?? index + 1,
+            'calories': prediction.calories,
+            'protein_g': prediction.proteinG,
+            'carbs_g': prediction.carbsG,
+            'fat_g': prediction.fatG,
+            'estimated_cost_php': prediction.estimatedCostPhp,
+            'serving_grams': prediction.servingGrams,
+          }),
+          'client_sequence': baseSequence + index + 1,
+          'depends_on_entity_type': 'ai_scan',
+          'depends_on_entity_id': result.scanId,
+          'attempt_count': 0,
+          'sync_status': 'pending',
+          'created_at': now,
+        });
+      }
+      for (var index = 0; index < result.components.length; index++) {
+        final component = result.components[index];
+        await txn.insert('sync_queue', {
+          'sync_queue_id': UuidHelper.generateUuid(),
+          'user_id': userId,
+          'operation_id': UuidHelper.generateUuid(),
+          'entity_type_code': 'ai_scan_component',
+          'entity_id': component.componentId,
+          'operation_code': 'create',
+          'payload_json': jsonEncode({
+            'component_id': component.componentId,
+            'scan_id': result.scanId,
+            'component_order': index + 1,
+            'role_code': component.roleCode,
+            'food_id': component.foodId,
+            'predicted_food_name': component.foodName,
+            'confidence': component.confidence,
+            'alternative_names': component.alternatives,
+            'reference_grams': component.referenceGrams,
+            'grams': component.grams,
+            'portion_method': component.portionMethod,
+            'portion_confidence': component.portionConfidence,
+            'calories': component.calories,
+            'protein_g': component.proteinG,
+            'carbs_g': component.carbsG,
+            'fat_g': component.fatG,
+            'estimated_cost_php': component.estimatedCostPhp,
+            'is_confirmed': false,
+            'created_at': now,
+            'updated_at': now,
+          }),
+          'client_sequence':
+              baseSequence + result.predictions.length + index + 1,
+          'depends_on_entity_type': 'ai_scan',
+          'depends_on_entity_id': result.scanId,
+          'attempt_count': 0,
+          'sync_status': 'pending',
+          'created_at': now,
+        });
+      }
     });
+    ref.read(syncProvider.notifier).startSync();
   }
 
   void _showError(String message) {
@@ -519,27 +692,12 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
     final foods = await FoodRepository(DatabaseProvider()).readActiveOfficial();
     if (foods.isEmpty) return result;
     final matched = result.predictions.map((prediction) {
-      final predictionTokens = _foodTokens(prediction.foodName);
-      Food? best;
-      var bestScore = 0.0;
-      for (final food in foods) {
-        final foodTokens = _foodTokens(food.normalizedName);
-        final union = predictionTokens.union(foodTokens);
-        if (union.isEmpty) continue;
-        final score =
-            predictionTokens.intersection(foodTokens).length / union.length;
-        final contains = food.normalizedName.contains(
-              prediction.foodName.toLowerCase(),
-            ) ||
-            prediction.foodName.toLowerCase().contains(food.normalizedName);
-        final effectiveScore = contains ? 1.0 : score;
-        if (effectiveScore > bestScore) {
-          best = food;
-          bestScore = effectiveScore;
-        }
-      }
-      if (best == null || bestScore < 0.5) return prediction;
-      return prediction.copyWith(
+      return _matchPrediction(prediction, foods);
+    }).toList();
+    final matchedComponents = result.components.map((component) {
+      final best = _findBestFood(component.foodName, foods);
+      if (best == null) return component;
+      return component.copyWith(
         foodId: best.foodId,
         foodName: best.foodName,
         calories: best.calories,
@@ -547,13 +705,64 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
         carbsG: best.carbsG,
         fatG: best.fatG,
         estimatedCostPhp: best.estimatedPricePhp,
+        referenceGrams: best.servingGrams,
       );
     }).toList();
-    return result.copyWith(predictions: matched);
+    return result.copyWith(
+      predictions: matched,
+      components: matchedComponents,
+    );
+  }
+
+  ScanPrediction _matchPrediction(ScanPrediction prediction, List<Food> foods) {
+    final best = _findBestFood(prediction.foodName, foods);
+    if (best == null) return prediction;
+    return prediction.copyWith(
+      foodId: best.foodId,
+      foodName: best.foodName,
+      calories: best.calories,
+      proteinG: best.proteinG,
+      carbsG: best.carbsG,
+      fatG: best.fatG,
+      estimatedCostPhp: best.estimatedPricePhp,
+      servingGrams: best.servingGrams,
+    );
+  }
+
+  Food? _findBestFood(String name, List<Food> foods) {
+    final predictionTokens = _foodTokens(name);
+    Food? best;
+    var bestScore = 0.0;
+    final scored = <MapEntry<Food, double>>[];
+    for (final food in foods) {
+      final foodTokens = _foodTokens(food.normalizedName);
+      final union = predictionTokens.union(foodTokens);
+      if (union.isEmpty) continue;
+      final score =
+          predictionTokens.intersection(foodTokens).length / union.length;
+      final contains = food.normalizedName.contains(name.toLowerCase()) ||
+          name.toLowerCase().contains(food.normalizedName);
+      final effectiveScore = contains ? 1.0 : score;
+      scored.add(MapEntry(food, effectiveScore));
+      if (effectiveScore > bestScore) {
+        best = food;
+        bestScore = effectiveScore;
+      }
+    }
+    if (best == null || bestScore < 0.5) return null;
+    final tiedBest = scored
+        .where((entry) => (entry.value - bestScore).abs() < 0.0001)
+        .toList();
+    if (tiedBest.length > 1) return null;
+    return best;
   }
 
   Set<String> _foodTokens(String value) => value
       .toLowerCase()
+      .replaceAll('caldereta', 'kaldereta')
+      .replaceAll('adobong', 'adobo')
+      .replaceAll('kare kare', 'kare-kare')
+      .replaceAll("tokwa't", 'tokwa')
       .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
       .split(RegExp(r'\s+'))
       .where((token) => token.length > 2 && token != 'cooked')

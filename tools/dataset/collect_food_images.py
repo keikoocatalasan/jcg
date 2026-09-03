@@ -9,7 +9,7 @@ Example:
     python tools/dataset/collect_food_images.py \
       --registry tools/dataset/dish_registry.json \
       --work-dir C:/Users/HP/Desktop/jcg-dataset-work/filipino_food_100 \
-      --target-real 40 --max-dishes 10
+      --target-real 300 --max-dishes 10
 
 The raw dataset is deliberately kept outside the repository. Generated and
 captured images can later be added to the same manifest with the fields used
@@ -550,7 +550,7 @@ def main() -> None:
     parser.add_argument("--dish-id", action="append", help="Repeat to select specific dish IDs")
     parser.add_argument("--max-dishes", type=int)
     parser.add_argument("--source", choices=("commons", "openverse", "both"), default="commons")
-    parser.add_argument("--target-real", type=int, default=40)
+    parser.add_argument("--target-real", type=int, default=300)
     parser.add_argument("--query-limit", type=int, default=4)
     parser.add_argument("--search-limit", type=int, default=50)
     parser.add_argument("--min-short-side", type=int, default=640)
