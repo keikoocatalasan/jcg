@@ -9,6 +9,7 @@ from app.main import app
 from app.routes.auth import _otp_store, _store_otp, _verify_otp
 from app.routes.chat import chatbot_service
 from app.routes.scan_food import scanner_service
+from app.services.nvidia_chat_service import NvidiaChatResult
 
 
 client = TestClient(app)
@@ -32,6 +33,8 @@ def test_health_and_version_routes() -> None:
     version_response = client.get("/version")
     assert version_response.status_code == 200
     assert version_response.json()["data"]["api_version"] == "1.0.0"
+    assert version_response.json()["data"]["ai_provider"] == settings.ai_model_provider
+    assert version_response.json()["data"]["ai_model"] == settings.ai_model_name
 
     readiness_response = client.get("/readiness")
     assert readiness_response.status_code == 200
@@ -172,6 +175,58 @@ def test_openai_provider_paths_are_connected_without_network(monkeypatch) -> Non
     assert scan_response.json()["candidates"][0]["food_name"] == "Tinola"
     assert chat_response.status_code == 200
     assert "tinola" in chat_response.json()["reply"].lower()
+
+
+def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> None:
+    async def fake_nvidia_create_text(**kwargs) -> NvidiaChatResult:
+        input_content = kwargs["input_content"]
+        is_image_request = isinstance(input_content, list) and any(
+            item.get("type") == "image_url" for item in input_content
+        )
+        if is_image_request:
+            return NvidiaChatResult(
+                text=(
+                    '{"candidates":[{"food_id":null,"food_name":"Chicken Adobo",'
+                    '"confidence":0.94,"rank_number":1,"calories":430,'
+                    '"protein_g":35,"carbs_g":8,"fat_g":28,'
+                    '"estimated_cost_php":65}]}'
+                ),
+                model="meta/llama-3.2-11b-vision-instruct",
+            )
+        return NvidiaChatResult(
+            text="Try chicken adobo with vegetables within your remaining budget.",
+            model="meta/llama-3.2-11b-vision-instruct",
+        )
+
+    monkeypatch.setattr(settings, "ai_model_provider", "nvidia")
+    monkeypatch.setattr(settings, "ai_model_api_key", "test-nvidia-key")
+    monkeypatch.setattr(scanner_service._nvidia, "create_text", fake_nvidia_create_text)
+    monkeypatch.setattr(chatbot_service._nvidia, "create_text", fake_nvidia_create_text)
+
+    image = Image.new("RGB", (224, 224), color="white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+    scan_response = client.post(
+        "/ai/scan-food",
+        headers=auth_headers(),
+        data={"client_scan_id": "55555555-5555-4555-8555-555555555555"},
+        files={"file": ("meal.png", buffer, "image/png")},
+    )
+    chat_response = client.post(
+        "/ai/chat",
+        headers=auth_headers(),
+        json={
+            "chat_session_id": "chat-nvidia",
+            "client_message_id": "message-nvidia",
+            "message": "Suggest lunch",
+        },
+    )
+
+    assert scan_response.status_code == 200
+    assert scan_response.json()["candidates"][0]["food_name"] == "Chicken Adobo"
+    assert chat_response.status_code == 200
+    assert "adobo" in chat_response.json()["reply"].lower()
 
 
 def test_scan_feedback_route_returns_user_id(monkeypatch) -> None:

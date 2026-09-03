@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app.config import settings
+
 router = APIRouter()
 
 
@@ -10,6 +12,8 @@ async def get_version():
         "data": {
             "api_version": "1.0.0",
             "enabled_modules": ["scan_food", "scan_feedback", "chat"],
+            "ai_provider": settings.ai_model_provider,
+            "ai_model": settings.ai_model_name,
         },
         "message": "OK",
     }

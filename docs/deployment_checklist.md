@@ -33,9 +33,10 @@
 - [ ] `SUPABASE_ANON_KEY`
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`
 - [ ] `SUPABASE_JWT_SECRET` — optional legacy HS256 verification fallback
-- [ ] `AI_MODEL_PROVIDER` — `deterministic` or `openai`
-- [ ] `AI_MODEL_API_KEY` — required when `AI_MODEL_PROVIDER=openai`
-- [ ] `AI_MODEL_NAME`
+- [ ] `AI_MODEL_PROVIDER` — `deterministic`, `openai`, or `nvidia`
+- [ ] `AI_MODEL_API_KEY` — required when `AI_MODEL_PROVIDER` is `openai` or `nvidia`
+- [ ] `AI_MODEL_NAME` — use `meta/llama-3.2-11b-vision-instruct` for NVIDIA text + image inference
+- [ ] `NVIDIA_BASE_URL` — `https://integrate.api.nvidia.com/v1` when using NVIDIA NIM
 - [ ] `AI_WEB_SEARCH_ENABLED` — enable only after the configured model passes a web-search smoke test
 - [ ] `AI_ALLOWED_DOMAINS` — comma-separated approved nutrition-source domains
 - [ ] `ALLOWED_ORIGINS` — comma-separated list of allowed origins

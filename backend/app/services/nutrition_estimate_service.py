@@ -7,19 +7,56 @@ from app.schemas.nutrition_estimate import (
     NutritionEstimateResult,
     NutritionSource,
 )
+from app.services.nvidia_chat_service import NvidiaChatService
 from app.services.openai_responses_service import OpenAIResponsesService
 
 
 class NutritionEstimateService:
     def __init__(self) -> None:
         self._openai = OpenAIResponsesService()
+        self._nvidia = NvidiaChatService()
 
     async def estimate(
         self,
         request: NutritionEstimateRequest,
     ) -> NutritionEstimateResult:
-        if settings.ai_model_provider.lower() != "openai":
+        provider = settings.ai_model_provider.lower()
+        if provider == "deterministic":
             return self._deterministic_estimate(request)
+
+        if provider == "nvidia":
+            result = await self._nvidia.create_text(
+                instructions=(
+                    "Estimate nutrition for the exact serving supplied by an administrator. "
+                    "Prefer authoritative nutrition knowledge, distinguish prepared dishes "
+                    "from raw ingredients, avoid false precision, and return review warnings "
+                    "when ingredients or preparation are ambiguous. Return ONLY valid JSON "
+                    "with the fields food_name, serving_label, serving_grams, calories, "
+                    "protein_g, carbs_g, fat_g, suggested_meal_types, confidence, and warnings. "
+                    "suggested_meal_types must contain only breakfast, lunch, dinner, or snack. "
+                    "Do not wrap the JSON in markdown."
+                ),
+                input_content=(
+                    f"Food: {request.food_name}\n"
+                    f"Category: {request.category_name}\n"
+                    f"Serving: {request.serving_label} ({request.serving_grams:g} g)\n"
+                    f"Description: {request.description or 'not provided'}"
+                ),
+                max_output_tokens=1200,
+            )
+            payload = NutritionEstimatePayload.model_validate(
+                self._nvidia.parse_json(result.text)
+            )
+            warnings = list(payload.warnings)
+            self._append_consistency_warning(payload, warnings)
+            return NutritionEstimateResult(
+                **payload.model_dump(exclude={"warnings"}),
+                estimate_id=str(uuid.uuid4()),
+                warnings=warnings,
+                sources=[],
+                provider="nvidia",
+                model=result.model or settings.ai_model_name,
+            )
 
         schema = {
             "type": "object",

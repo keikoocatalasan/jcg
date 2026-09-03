@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 
 from app.config import settings
 from app.schemas.scan_food import ScanCandidate
+from app.services.nvidia_chat_service import NvidiaChatService
 from app.services.openai_responses_service import OpenAIResponsesService
 
 
@@ -15,6 +16,7 @@ class ScanResult:
 class ScannerService:
     def __init__(self) -> None:
         self._openai = OpenAIResponsesService()
+        self._nvidia = NvidiaChatService()
 
     async def scan_image(
         self,
@@ -27,6 +29,10 @@ class ScannerService:
 
         if settings.ai_model_provider.lower() == "openai":
             return await self._scan_with_openai(
+                scan_id, image_bytes, media_type, meal_type
+            )
+        if settings.ai_model_provider.lower() == "nvidia":
+            return await self._scan_with_nvidia(
                 scan_id, image_bytes, media_type, meal_type
             )
 
@@ -123,6 +129,36 @@ class ScannerService:
             json_schema=schema,
         )
         data = self._openai.parse_json(text)
+        candidates = [
+            ScanCandidate.model_validate(candidate)
+            for candidate in data["candidates"]
+        ]
+        return ScanResult(client_scan_id=scan_id, candidates=candidates)
+
+    async def _scan_with_nvidia(
+        self,
+        scan_id: str,
+        image_bytes: bytes,
+        media_type: str,
+        meal_type: str | None,
+    ) -> ScanResult:
+        text = await self._nvidia.create_text(
+            instructions=(
+                "Identify likely Filipino foods in the image. Return ONLY a JSON object "
+                "with a candidates array containing up to three ranked candidates. Each "
+                "candidate must contain food_id (null), food_name (string), confidence "
+                "(number from 0 to 1), rank_number (integer), calories, protein_g, carbs_g, "
+                "fat_g, and estimated_cost_php. Use null for nutrition or cost when the "
+                "image is unclear. Estimate nutrition per visible serving in Philippine "
+                "context, do not invent certainty, and do not wrap the JSON in markdown."
+            ),
+            input_content=[
+                {"type": "text", "text": f"Meal type: {meal_type or 'unknown'}"},
+                self._nvidia.image_content(image_bytes, media_type),
+            ],
+            max_output_tokens=900,
+        )
+        data = self._nvidia.parse_json(text.text)
         candidates = [
             ScanCandidate.model_validate(candidate)
             for candidate in data["candidates"]

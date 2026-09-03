@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ai_model_api_key: str = ""
     ai_model_name: str = "gpt-5-mini"
     openai_base_url: str = "https://api.openai.com/v1"
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
     ai_request_timeout_seconds: float = 45.0
     ai_web_search_enabled: bool = False
     ai_allowed_domains: str = ""
@@ -46,8 +47,8 @@ class Settings(BaseSettings):
         ]
 
     def validate_runtime(self) -> None:
-        if self.ai_model_provider.lower() not in {"deterministic", "openai"}:
-            raise ValueError("AI_MODEL_PROVIDER must be 'deterministic' or 'openai'")
+        if self.ai_model_provider.lower() not in {"deterministic", "openai", "nvidia"}:
+            raise ValueError("AI_MODEL_PROVIDER must be 'deterministic', 'openai', or 'nvidia'")
         if self.max_image_upload_mb <= 0:
             raise ValueError("MAX_IMAGE_UPLOAD_MB must be greater than zero")
         if self.rate_limit_requests <= 0 or self.rate_limit_window_seconds <= 0:
@@ -70,8 +71,10 @@ class Settings(BaseSettings):
         ]
         if missing:
             raise ValueError(f"Missing required production configuration: {', '.join(missing)}")
-        if self.ai_model_provider.lower() == "openai" and not self.ai_model_api_key:
-            raise ValueError("AI_MODEL_API_KEY is required when AI_MODEL_PROVIDER=openai")
+        if self.ai_model_provider.lower() in {"openai", "nvidia"} and not self.ai_model_api_key:
+            raise ValueError(
+                "AI_MODEL_API_KEY is required when AI_MODEL_PROVIDER is openai or nvidia"
+            )
         if self.allowed_origins.strip() == "*":
             raise ValueError("ALLOWED_ORIGINS must not be '*' in production")
 
