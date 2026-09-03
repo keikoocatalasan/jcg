@@ -1,7 +1,9 @@
 -- 000014: Seed allergies, dietary restrictions, and Filipino food database
 
 -- ALLERGY
-INSERT INTO ALLERGY (allergy_name, is_active) VALUES
+INSERT INTO ALLERGY (allergy_name, is_active)
+SELECT seed.allergy_name, seed.is_active
+FROM (VALUES
   ('Peanut', TRUE),
   ('Tree Nut', TRUE),
   ('Milk', TRUE),
@@ -13,10 +15,17 @@ INSERT INTO ALLERGY (allergy_name, is_active) VALUES
   ('Gluten', TRUE),
   ('Sesame', TRUE),
   ('Sulfite', TRUE),
-  ('Corn', TRUE);
+  ('Corn', TRUE)
+) AS seed(allergy_name, is_active)
+WHERE NOT EXISTS (
+  SELECT 1 FROM ALLERGY existing
+  WHERE existing.allergy_name = seed.allergy_name
+);
 
 -- DIETARY_RESTRICTION
-INSERT INTO DIETARY_RESTRICTION (restriction_name, is_active) VALUES
+INSERT INTO DIETARY_RESTRICTION (restriction_name, is_active)
+SELECT seed.restriction_name, seed.is_active
+FROM (VALUES
   ('Vegetarian', TRUE),
   ('Vegan', TRUE),
   ('Lactose Intolerant', TRUE),
@@ -26,7 +35,12 @@ INSERT INTO DIETARY_RESTRICTION (restriction_name, is_active) VALUES
   ('Diabetic-Friendly', TRUE),
   ('Halal', TRUE),
   ('No Pork', TRUE),
-  ('No Beef', TRUE);
+  ('No Beef', TRUE)
+) AS seed(restriction_name, is_active)
+WHERE NOT EXISTS (
+  SELECT 1 FROM DIETARY_RESTRICTION existing
+  WHERE existing.restriction_name = seed.restriction_name
+);
 
 -- ===== FOOD SEED DATA =====
 -- Each food item gets one active default serving, one active nutrition profile, and one active price.
@@ -47,6 +61,12 @@ DECLARE
   v_fnri_source SMALLINT := 1; v_est_source SMALLINT := 2;
   v_food_id UUID;
 BEGIN
+  -- The initial food seed is an atomic set. If its sentinel already exists,
+  -- the set has already been applied and must not generate random duplicates
+  -- when Supabase Preview replays the migration.
+  IF NOT EXISTS (
+    SELECT 1 FROM FOOD_ITEM WHERE normalized_name = 'rice cooked'
+  ) THEN
   SELECT category_id INTO v_rice_cat FROM FOOD_CATEGORY WHERE category_name = 'Rice and Grains';
   SELECT category_id INTO v_meat_cat FROM FOOD_CATEGORY WHERE category_name = 'Meat and Poultry';
   SELECT category_id INTO v_seafood_cat FROM FOOD_CATEGORY WHERE category_name = 'Seafood';
@@ -631,5 +651,6 @@ BEGIN
   INSERT INTO FOOD_PRICE (food_id, serving_id, source_id, estimated_price_php, is_active)
     SELECT food_id, serving_id, v_est_source, 20, TRUE FROM FOOD_SERVING WHERE food_id = v_food_id AND is_default = TRUE;
 
+  END IF;
 END;
 $$;
