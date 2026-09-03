@@ -144,13 +144,9 @@ class ScannerService:
     ) -> ScanResult:
         text = await self._nvidia.create_text(
             instructions=(
-                "Identify likely Filipino foods in the image. Return ONLY a JSON object "
-                "with a candidates array containing up to three ranked candidates. Each "
-                "candidate must contain food_id (null), food_name (string), confidence "
-                "(number from 0 to 1), rank_number (integer), calories, protein_g, carbs_g, "
-                "fat_g, and estimated_cost_php. Use null for nutrition or cost when the "
-                "image is unclear. Estimate nutrition per visible serving in Philippine "
-                "context, do not invent certainty, and do not wrap the JSON in markdown."
+                "Identify the main Filipino food in the image. Return ONLY one short "
+                "canonical dish name, with no explanation, punctuation, confidence score, "
+                "or markdown. If the image is not food or you are unsure, return unknown."
             ),
             input_content=[
                 {"type": "text", "text": f"Meal type: {meal_type or 'unknown'}"},
@@ -158,9 +154,40 @@ class ScannerService:
             ],
             max_output_tokens=900,
         )
-        data = self._nvidia.parse_json(text.text)
-        candidates = [
-            ScanCandidate.model_validate(candidate)
-            for candidate in data["candidates"]
-        ]
-        return ScanResult(client_scan_id=scan_id, candidates=candidates)
+        food_name = self._clean_nvidia_food_name(text.text)
+        if not food_name or food_name.lower() == "unknown":
+            return ScanResult(client_scan_id=scan_id, candidates=[])
+        return ScanResult(
+            client_scan_id=scan_id,
+            candidates=[
+                ScanCandidate(
+                    food_id=None,
+                    food_name=food_name,
+                    confidence=0.59,
+                    rank_number=1,
+                    calories=None,
+                    protein_g=None,
+                    carbs_g=None,
+                    fat_g=None,
+                    estimated_cost_php=None,
+                )
+            ],
+        )
+
+    @staticmethod
+    def _clean_nvidia_food_name(text: str) -> str:
+        value = text.strip().splitlines()[0] if text.strip() else ""
+        if value.startswith("```"):
+            value = value.strip("`").strip()
+        for prefix in (
+            "the dish shown is ",
+            "the dish is ",
+            "this is ",
+            "likely dish: ",
+            "food: ",
+            "answer: ",
+        ):
+            if value.lower().startswith(prefix):
+                value = value[len(prefix):].strip()
+                break
+        return value.rstrip(".!?;:").strip().strip('"\'')

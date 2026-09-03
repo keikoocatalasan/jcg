@@ -1,4 +1,5 @@
 import base64
+import asyncio
 import json
 from dataclasses import dataclass
 
@@ -46,17 +47,26 @@ class NvidiaChatService:
         async with httpx.AsyncClient(
             timeout=settings.ai_request_timeout_seconds,
         ) as client:
-            response = await client.post(
-                f"{settings.nvidia_base_url.rstrip('/')}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.ai_model_api_key}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                },
-                json=body,
-            )
-            response.raise_for_status()
-            payload = response.json()
+            for attempt in range(2):
+                try:
+                    response = await client.post(
+                        f"{settings.nvidia_base_url.rstrip('/')}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {settings.ai_model_api_key}",
+                            "Accept": "application/json",
+                            "Content-Type": "application/json",
+                        },
+                        json=body,
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    break
+                except httpx.HTTPStatusError as exc:
+                    retryable = exc.response.status_code in {429, 500, 502, 503, 504}
+                    if attempt == 0 and retryable:
+                        await asyncio.sleep(0.75)
+                        continue
+                    raise
 
         text = self._extract_text(payload)
         if not text:

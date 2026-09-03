@@ -185,12 +185,7 @@ def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> Non
         )
         if is_image_request:
             return NvidiaChatResult(
-                text=(
-                    '{"candidates":[{"food_id":null,"food_name":"Chicken Adobo",'
-                    '"confidence":0.94,"rank_number":1,"calories":430,'
-                    '"protein_g":35,"carbs_g":8,"fat_g":28,'
-                    '"estimated_cost_php":65}]}'
-                ),
+                text="Chicken Adobo",
                 model="meta/llama-3.2-11b-vision-instruct",
             )
         return NvidiaChatResult(
