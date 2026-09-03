@@ -198,6 +198,24 @@ class _ConfirmAiLogScreenState extends ConsumerState<ConfirmAiLogScreen> {
     setState(() => _isSaving = true);
 
     try {
+      final unresolvedComponents = widget.components.where(
+        (component) =>
+            component.foodId == null &&
+            component.calories == null &&
+            component.proteinG == null &&
+            component.carbsG == null &&
+            component.fatG == null,
+      );
+      final unresolvedComponent =
+          unresolvedComponents.isEmpty ? null : unresolvedComponents.first;
+      if (unresolvedComponent != null) {
+        setState(() {
+          _errorMessage =
+              'Choose a catalog food for ${unresolvedComponent.foodName}, or correct the scan manually before saving.';
+          _isSaving = false;
+        });
+        return;
+      }
       final missingComponentWeight = widget.components.any(
         (component) =>
             component.referenceGrams != null &&
