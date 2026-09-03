@@ -63,6 +63,11 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
         if row.get("dish_id") == "unknown_or_unsupported"
         and row.get("status") == "downloaded_pending_review"
     ]
+    existing_source_ids = {
+        str(row.get("source_id"))
+        for row in records.values()
+        if row.get("dish_id") == "unknown_or_unsupported" and row.get("source_id")
+    }
     remaining = max(0, args.target_real - len(existing))
     candidates: dict[str, dict[str, Any]] = {}
     for query in UNKNOWN_QUERIES:
@@ -72,6 +77,8 @@ def collect(args: argparse.Namespace) -> dict[str, Any]:
             max_results=args.search_limit,
         ):
             if candidate["license_decision"] not in ("allow", "allow_with_review"):
+                continue
+            if str(candidate.get("source_id")) in existing_source_ids:
                 continue
             candidate["candidate_key"] = f"unknown:{candidate['source_id']}"
             candidate["dish_id"] = "unknown_or_unsupported"

@@ -179,6 +179,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     random.seed(args.seed)
     np.random.seed(args.seed)
     tf.keras.utils.set_random_seed(args.seed)
+    model_name = args.model_name.strip()
+    if not model_name or not model_name.replace("_", "").replace("-", "").isalnum():
+        raise ValueError("model-name may contain only letters, numbers, underscores, and hyphens")
     registry_ids, display_names = load_registry(args.registry)
     split_rows, split_labels, synthetic_counts = load_split_rows(
         args.split_file, args.dataset_root
@@ -253,12 +256,12 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.target_spec.supported_types = [tf.float16]
     tflite_model = converter.convert()
-    model_path = output_dir / "filifood100_v1.tflite"
+    model_path = output_dir / f"{model_name}.tflite"
     model_path.write_bytes(tflite_model)
-    (output_dir / "filifood100_labels.txt").write_text(
+    (output_dir / f"{model_name}_labels.txt").write_text(
         "\n".join(labels) + "\n", encoding="utf-8"
     )
-    (output_dir / "filifood100_display_names.json").write_text(
+    (output_dir / f"{model_name}_display_names.json").write_text(
         json.dumps(
             {label: display_names.get(label, "Unknown or unsupported food") for label in labels},
             indent=2,
@@ -267,7 +270,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         encoding="utf-8",
     )
     report = {
-        "model": "filifood100_v1",
+        "model": model_name,
         "labels": labels,
         "image_size": IMAGE_SIZE,
         "train_images": len(split_rows["train"]),
@@ -281,7 +284,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "release_gate": gate,
         "release_ready": all(gate.values()),
     }
-    (output_dir / "filifood100_training_report.json").write_text(
+    (output_dir / f"{model_name}_training_report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     return report
@@ -293,6 +296,11 @@ def main() -> None:
     parser.add_argument("--split-file", required=True, type=Path)
     parser.add_argument("--dataset-root", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--model-name",
+        default="filifood100_v1",
+        help="Output artifact basename; use a distinct name for pilot experiments.",
+    )
     parser.add_argument("--epochs", type=int, default=18)
     parser.add_argument("--fine-tune-epochs", type=int, default=8)
     parser.add_argument("--fine-tune-layers", type=int, default=30)

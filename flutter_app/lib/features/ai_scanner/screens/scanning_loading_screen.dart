@@ -265,7 +265,9 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
         'provider': 'tflite_on_device',
         'model': LocalFoodRecognitionService.modelName,
         'model_version': LocalFoodRecognitionService.modelVersion,
-        'supported_foods': ['Chicken Adobo', 'Sinigang na Baboy'],
+        'supported_foods': result.predictions
+            .map((prediction) => prediction.foodName)
+            .toList(growable: false),
         'client_scan_id': result.clientScanId,
         'predictions': [
           for (final prediction in result.predictions)

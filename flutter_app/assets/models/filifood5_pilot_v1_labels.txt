@@ -1,0 +1,6 @@
+chicken_adobo
+kare_kare
+pork_adobo
+sinigang_na_baboy
+sinigang_na_hipon
+unknown_or_unsupported

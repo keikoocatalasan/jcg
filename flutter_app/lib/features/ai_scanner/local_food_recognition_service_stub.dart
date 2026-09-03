@@ -25,8 +25,8 @@ class LocalDishRecognition {
 }
 
 class LocalFoodRecognitionService {
-  static const modelName = 'jcg_two_dish_classifier';
-  static const modelVersion = 'two-dish-v1';
+  static const modelName = 'jcg_filifood5_pilot';
+  static const modelVersion = 'filifood5-pilot-v1';
   static const confidentThreshold = 0.95;
   static const confidentMarginThreshold = 0.20;
 

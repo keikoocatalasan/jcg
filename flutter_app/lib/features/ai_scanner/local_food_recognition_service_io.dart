@@ -42,17 +42,21 @@ class LocalDishRecognition {
 }
 
 class LocalFoodRecognitionService {
-  static const modelPath = 'assets/models/two_dish_classifier.tflite';
-  static const labelsPath = 'assets/models/two_dish_labels.txt';
+  static const modelPath = 'assets/models/filifood5_pilot_v1.tflite';
+  static const labelsPath = 'assets/models/filifood5_pilot_v1_labels.txt';
+  static const fallbackModelPath = 'assets/models/two_dish_classifier.tflite';
+  static const fallbackLabelsPath = 'assets/models/two_dish_labels.txt';
   static const expandedModelPath = 'assets/models/filifood100_v1.tflite';
   static const expandedLabelsPath = 'assets/models/filifood100_labels.txt';
   static const expandedDisplayNamesPath =
       'assets/models/filifood100_display_names.json';
+  static const pilotDisplayNamesPath =
+      'assets/models/filifood5_pilot_v1_display_names.json';
   static const inputSize = 224;
-  static const modelName = 'jcg_two_dish_classifier';
-  static const modelVersion = 'two-dish-v1';
-  // The two-class prototype has no unknown-food class, so use a conservative
-  // auto-accept gate until the expanded model is trained with negatives.
+  static const modelName = 'jcg_filifood5_pilot';
+  static const modelVersion = 'filifood5-pilot-v1';
+  // The pilot contains an unknown class, but keep a conservative auto-accept
+  // gate until it is validated on fresh phone-camera captures.
   static const confidentThreshold = 0.95;
   static const confidentMarginThreshold = 0.20;
 
@@ -184,9 +188,24 @@ class LocalFoodRecognitionService {
         _displayNames = const {};
       }
     } catch (_) {
-      // The expanded asset is intentionally optional until its release gate
-      // passes; keep the working two-dish model as a safe fallback.
-      _displayNames = const {};
+      try {
+        final pilotDisplayNamesJson =
+            await rootBundle.loadString(pilotDisplayNamesPath);
+        final decoded = jsonDecode(pilotDisplayNamesJson);
+        if (decoded is Map) {
+          _displayNames = {
+            for (final entry in decoded.entries)
+              if (entry.key is String && entry.value is String)
+                entry.key as String: entry.value as String,
+          };
+        }
+      } catch (_) {
+        // Keep the two-dish asset as a final fallback if a pilot build is
+        // rolled back or an older install has not received the new assets.
+        selectedModelPath = fallbackModelPath;
+        selectedLabelsPath = fallbackLabelsPath;
+        _displayNames = const {};
+      }
     }
 
     final labelsText = await rootBundle.loadString(selectedLabelsPath);
