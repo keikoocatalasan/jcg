@@ -272,13 +272,13 @@ CREATE POLICY ai_scan_confirmation_admin_insert ON AI_SCAN_CONFIRMATION
 DO $$
 DECLARE
   lookup_tables TEXT[] := ARRAY[
-    'ROLE', 'ACCOUNT_STATUS', 'SEX', 'ACTIVITY_LEVEL', 'FITNESS_GOAL',
-    'MEAL_TYPE', 'LOG_SOURCE', 'MEAL_PLAN_STATUS', 'ALLERGY',
-    'DIETARY_RESTRICTION', 'FOOD_CATEGORY', 'DATA_SOURCE',
-    'NUTRITION_FORMULA_VERSION', 'AI_SCAN_STATUS', 'CHAT_ROLE',
-    'CHAT_SAFETY_STATUS', 'CHAT_DELIVERY_STATUS', 'REPORT_REASON',
-    'REPORT_STATUS', 'MODERATION_ACTION_TYPE', 'SYNC_ENTITY_TYPE',
-    'SYNC_OPERATION_TYPE', 'SYNC_STATUS'
+    'role', 'account_status', 'sex', 'activity_level', 'fitness_goal',
+    'meal_type', 'log_source', 'meal_plan_status', 'allergy',
+    'dietary_restriction', 'food_category', 'data_source',
+    'nutrition_formula_version', 'ai_scan_status', 'chat_role',
+    'chat_safety_status', 'chat_delivery_status', 'report_reason',
+    'report_status', 'moderation_action_type', 'sync_entity_type',
+    'sync_operation_type', 'sync_status'
   ];
   t TEXT;
 BEGIN
