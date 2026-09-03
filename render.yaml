@@ -17,11 +17,11 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: AI_MODEL_PROVIDER
-        value: deterministic
+        value: nvidia
       - key: AI_MODEL_API_KEY
         sync: false
       - key: AI_MODEL_NAME
-        value: gpt-5-mini
+        value: meta/llama-3.2-11b-vision-instruct
       - key: AI_REQUEST_TIMEOUT_SECONDS
         value: 45
       - key: AI_WEB_SEARCH_ENABLED
@@ -31,7 +31,7 @@ services:
       - key: MAX_IMAGE_UPLOAD_MB
         sync: false
       - key: ALLOWED_ORIGINS
-        sync: false
+        value: https://nutrismart-ai.onrender.com
       - key: ENVIRONMENT
         value: production
       - key: RATE_LIMIT_REQUESTS
