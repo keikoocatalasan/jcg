@@ -66,6 +66,30 @@ To target a specific emulator, use `flutter devices` to find its ID, then run:
 flutter run -d <device-id> --dart-define-from-file=.env
 ```
 
+For a local defense walkthrough, use the isolated demo identity and keep the
+backend on a dedicated port if another local service already uses 8000:
+
+```powershell
+$env:JCG_DEVICE_ID = "emulator-5554" # or the physical device ID
+$env:JCG_BACKEND_PORT = "8001"
+$env:JCG_FASTAPI_BASE_URL = "http://10.0.2.2:8001"
+$env:JCG_APP_ENV = "development"
+$env:JCG_DEV_BYPASS_AUTH = "true"
+$env:JCG_LIVE_PREVIEW = "false" # enable only for bounded live hints
+# From the repository root, run the backend in one terminal:
+.\run_backend.ps1
+# In a second terminal, keep the same environment values and run:
+.\run_flutter.ps1
+```
+
+`JCG_DEV_BYPASS_AUTH` is compile-time, visible as `LOCAL QA`, and rejected in
+release/production builds. It must never be used for a production APK.
+
+The chatbot can inherit the existing server-side provider or use Groq
+independently with `CHAT_MODEL_PROVIDER=groq`, `CHAT_MODEL_API_KEY`,
+`CHAT_MODEL_NAME`, and `GROQ_BASE_URL`. Keep those values on the backend; do
+not put a Groq key in Flutter or source control.
+
 For a production Android build, use the ignored `flutter_app/.env` file with
 the Render HTTPS API and `APP_ENV=production`, or start from
 `flutter_app/.env.production.example`:
@@ -74,6 +98,16 @@ the Render HTTPS API and `APP_ENV=production`, or start from
 flutter build apk --release --dart-define-from-file=.env
 flutter build appbundle --release --dart-define-from-file=.env
 ```
+
+### Updating the downloadable APK
+
+The landing page uses GitHub's `releases/latest` redirect, so it does not need
+to be edited for every app update. Increase the version and Android build
+number in `flutter_app/pubspec.yaml`, run the test suite, then push a matching
+version tag such as `v1.0.2`. The `.github/workflows/android-release.yml`
+workflow builds and publishes the APK assets and checksums. Configure the
+documented Android signing and production API secrets in GitHub Actions once;
+never commit the keystore or passwords.
 
 ### 3. Database migrations
 

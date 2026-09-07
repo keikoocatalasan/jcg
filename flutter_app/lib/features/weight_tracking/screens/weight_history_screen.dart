@@ -7,6 +7,7 @@ import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
+import 'package:jcg_fitness/core/utils/date_helper.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/profile_settings/profile_provider.dart';
@@ -165,6 +166,8 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
               lowestLog),
           const SizedBox(height: 16),
           _buildMotivationBanner(theme, change, goalWeight, currentWeight),
+          const SizedBox(height: 16),
+          _buildRecentEntries(theme, logs),
           const SizedBox(height: 16),
           _buildLogNewWeightButton(),
           const SizedBox(height: 16),
@@ -634,6 +637,58 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRecentEntries(ThemeData theme, List<WeightLog> logs) {
+    final recent = logs.reversed.take(8).toList(growable: false);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Recent entries',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...recent.map(
+            (log) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: AppColors.accentSoft,
+                  child: Icon(Icons.monitor_weight_outlined,
+                      color: AppColors.accentPrimary),
+                ),
+                title: Text(
+                  '${log.weightKg.toStringAsFixed(1)} kg',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  DateHelper.formatDateTime(log.loggedAt),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                trailing: const Icon(Icons.edit_outlined,
+                    color: AppColors.textSecondary),
+                onTap: () async {
+                  await context.push(
+                    '/edit-weight-log',
+                    extra: {'weightLogId': log.weightLogId},
+                  );
+                  if (mounted) _loadData();
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

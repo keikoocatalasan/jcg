@@ -17,6 +17,7 @@ import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/local_food_recognition_service.dart';
+import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/prediction_result_screen.dart';
 import 'package:jcg_fitness/app/theme.dart';
 
@@ -129,7 +130,11 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
     }
 
     final online = ref.read(isOnlineProvider);
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    // Local QA deliberately has no Supabase session. Keep the fallback
+    // entirely on-device instead of touching the uninitialized hosted client.
+    final token = AppConfig.isLocalTestMode
+        ? null
+        : Supabase.instance.client.auth.currentSession?.accessToken;
     if (online && token != null && !_isCancelled) {
       try {
         if (mounted) setState(() => _currentStep = 2);
@@ -320,7 +325,9 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
     required String rawResponse,
     required String syncStatus,
   }) async {
-    final user = Supabase.instance.client.auth.currentUser;
+    // Use the app auth provider so local test mode can persist scans under its
+    // isolated demo identity without creating a fake Supabase session.
+    final user = ref.read(authStateProvider).valueOrNull;
     if (user == null) return;
     final db = await DatabaseProvider().database;
     final profiles = await db.query(

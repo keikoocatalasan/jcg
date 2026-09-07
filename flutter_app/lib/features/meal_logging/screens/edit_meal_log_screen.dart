@@ -7,10 +7,15 @@ import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/meal_log_repository.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
+import 'package:jcg_fitness/core/sync/sync_provider.dart';
+import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/sync/local_transaction_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
+import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
+import 'package:jcg_fitness/features/meal_logging/meal_log_provider.dart';
+import 'package:jcg_fitness/features/meal_logging/recent_logs_provider.dart';
 import 'package:jcg_fitness/features/meal_logging/screens/food_search_sheet.dart';
 import 'package:jcg_fitness/features/meal_logging/screens/quantity_sheet.dart';
 
@@ -35,8 +40,11 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
   String _mealType = 'breakfast';
   DateTime _loggedAt = DateTime.now();
   bool _isSaving = false;
+  bool _isLoading = true;
+  String? _loadError;
   bool _showMoreNutrients = false;
   final _foodItems = <_FoodItem>[];
+  final _removedMealLogIds = <String>{};
 
   static const _mealTypes = [
     ('breakfast', 'Breakfast'),
@@ -55,34 +63,105 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
   }
 
   Future<void> _loadExistingFoods() async {
-    final user = ref.read(authStateProvider).valueOrNull;
-    if (user == null) return;
     try {
+      final user = await ref.read(authStateProvider.future);
+      if (user == null) throw StateError('You must be logged in.');
       final localUserId = await LocalUserIdentity.resolve(
         DatabaseProvider(),
         user.id,
       );
       final repo = MealLogRepository(DatabaseProvider());
+      final selected =
+          await repo.readByIdForUser(widget.mealLogId, localUserId);
+      if (selected == null) {
+        throw StateError('This meal entry is no longer available.');
+      }
+      final selectedDate =
+          DateTime.tryParse(selected.loggedAt)?.toLocal() ?? DateTime.now();
       final logs = await repo.queryByUserAndDate(
         localUserId,
-        _loggedAt.toUtc().toIso8601String().substring(0, 10),
+        _dateOnly(selectedDate),
       );
       final matching = logs
           .where(
             (l) =>
-                l.mealTypeCode == widget.mealType &&
-                l.mealLogId == widget.mealLogId &&
+                l.mealTypeCode == selected.mealTypeCode &&
+                l.loggedAt == selected.loggedAt &&
                 !l.isDeleted,
           )
           .toList();
-      if (matching.isNotEmpty && mounted) {
+      final foodRepo = FoodRepository(DatabaseProvider());
+      final items = <_FoodItem>[];
+      for (final log in matching.isEmpty ? [selected] : matching) {
+        final food =
+            log.foodId == null ? null : await foodRepo.readById(log.foodId!);
+        items.add(
+          _FoodItem(
+            food: food ?? _foodFromSnapshot(log),
+            quantity: log.quantity,
+            unit: 'serving',
+            mealLogId: log.mealLogId,
+          ),
+        );
+      }
+      if (mounted) {
         setState(() {
-          _loggedAt = DateTime.tryParse(matching.first.loggedAt)?.toLocal() ??
-              _loggedAt;
+          _mealType = selected.mealTypeCode;
+          _loggedAt = selectedDate;
+          _foodItems
+            ..clear()
+            ..addAll(items);
           _notesController.text = widget.notes ?? '';
+          _isLoading = false;
+          _loadError = null;
         });
       }
-    } catch (_) {}
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadError = error.toString().replaceFirst('Bad state: ', '');
+        });
+      }
+    }
+  }
+
+  static String _dateOnly(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
+
+  static Food _foodFromSnapshot(MealLog log) {
+    final now = DateTime.now().toUtc().toIso8601String();
+    return Food(
+      foodId: log.foodId ?? 'snapshot-${log.mealLogId}',
+      categoryName: 'Logged food',
+      foodName: log.foodNameSnapshot,
+      normalizedName: log.foodNameSnapshot.toLowerCase(),
+      servingLabel: 'Saved serving',
+      servingGrams: log.servingGramsSnapshot,
+      calories: log.quantity == 0
+          ? log.caloriesSnapshot
+          : log.caloriesSnapshot / log.quantity,
+      proteinG: log.quantity == 0
+          ? log.proteinGsnapshot
+          : log.proteinGsnapshot / log.quantity,
+      carbsG: log.quantity == 0
+          ? log.carbsGsnapshot
+          : log.carbsGsnapshot / log.quantity,
+      fatG: log.quantity == 0
+          ? log.fatGsnapshot
+          : log.fatGsnapshot / log.quantity,
+      estimatedPricePhp: log.quantity == 0
+          ? log.costPhpSnapshot
+          : log.costPhpSnapshot / log.quantity,
+      isLocalFood: true,
+      isActive: true,
+      isDeleted: false,
+      syncStatus: 'synced',
+      createdAt: now,
+      updatedAt: now,
+    );
   }
 
   @override
@@ -119,27 +198,33 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
         onConfirm: (result) {
           setState(() => _foodItems.add(_FoodItem(
                 food: result.food,
-                quantity: result.quantity.round(),
-                unit: result.unit,
+                quantity: result.servingMultiplier,
+                unit: 'serving',
               )));
         },
       ),
     );
   }
 
-  void _updateQuantity(int index, int delta) {
+  void _updateQuantity(int index, double delta) {
     final newQty = _foodItems[index].quantity + delta;
-    if (newQty < 1) return;
+    if (newQty <= 0) {
+      _removeFood(index);
+      return;
+    }
     setState(() {
       _foodItems[index] = _FoodItem(
         food: _foodItems[index].food,
         quantity: newQty,
         unit: _foodItems[index].unit,
+        mealLogId: _foodItems[index].mealLogId,
       );
     });
   }
 
   void _removeFood(int index) {
+    final existingId = _foodItems[index].mealLogId;
+    if (existingId != null) _removedMealLogIds.add(existingId);
     setState(() => _foodItems.removeAt(index));
   }
 
@@ -148,7 +233,7 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
     final date = await showDatePicker(
       context: context,
       initialDate: _loggedAt,
-      firstDate: DateTime(now.year - 1),
+      firstDate: DateTime(2000),
       lastDate: now,
     );
     if (date == null || !mounted) return;
@@ -181,7 +266,7 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final user = ref.read(authStateProvider).valueOrNull;
+      final user = await ref.read(authStateProvider.future);
       if (user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -197,9 +282,12 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
 
       final helper = LocalTransactionHelper(DatabaseProvider());
 
+      final keptIds = <String>{};
       for (final item in _foodItems) {
+        final mealLogId = item.mealLogId ?? UuidHelper.generateUuid();
+        keptIds.add(mealLogId);
         final mealLogData = <String, dynamic>{
-          'meal_log_id': widget.mealLogId,
+          'meal_log_id': mealLogId,
           'user_id': localUserId,
           'food_id': item.food.foodId,
           'meal_type_code': _mealType,
@@ -215,10 +303,25 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
           'logged_at': _loggedAt.toUtc().toIso8601String(),
           'is_deleted': 0,
         };
-        await helper.updateMealLog(mealLogData);
+        if (item.mealLogId == null) {
+          await helper.createMealLog(mealLogData);
+        } else {
+          await helper.updateMealLog(mealLogData);
+        }
+      }
+
+      for (final mealLogId in _removedMealLogIds) {
+        if (!keptIds.contains(mealLogId)) {
+          await helper.deleteMealLog(mealLogId, localUserId);
+        }
       }
 
       if (mounted) {
+        ref.invalidate(todayMealLogsProvider);
+        ref.invalidate(mealLogsForDateProvider);
+        ref.invalidate(dashboardDataProvider);
+        ref.invalidate(recentLogsProvider);
+        ref.read(syncProvider.notifier).startSync();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Row(
@@ -353,114 +456,136 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
         ],
       ),
       body: GlassBackground(
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 16),
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(
-                'Update your meal details and foods.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-              ),
-            ),
-            if (!isOnline)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.cloud_off,
-                        size: 18, color: AppColors.warning),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "You're offline. Changes will be saved locally and synced later.",
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.warning,
-                            ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _loadError != null
+                ? _LoadError(
+                    message: _loadError!,
+                    onRetry: () {
+                      setState(() {
+                        _isLoading = true;
+                        _loadError = null;
+                      });
+                      _loadExistingFoods();
+                    },
+                  )
+                : ListView(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: Text(
+                          'Update your meal details and foods.',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            const _SectionHeader(number: '1', title: 'Meal Details'),
-            _MealDetailsSection(
-              mealType: _mealType,
-              loggedAt: _loggedAt,
-              notesController: _notesController,
-              onMealTypeChanged: (v) => setState(() => _mealType = v),
-              onDateTap: _pickDate,
-              onTimeTap: _pickTime,
-            ),
-            const _SectionHeader(number: '2', title: 'Foods'),
-            _FoodsSection(
-              foodItems: _foodItems,
-              onAddFood: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => FoodSearchSheet(onFoodSelected: _addFood),
-                );
-              },
-              onUpdateQuantity: _updateQuantity,
-              onRemoveFood: _removeFood,
-            ),
-            const _SectionHeader(number: '3', title: 'Meal Summary (Updated)'),
-            _MealSummarySection(
-              totalCalories: _totalCalories,
-              totalProtein: _totalProtein,
-              totalCarbs: _totalCarbs,
-              totalFat: _totalFat,
-              showMore: _showMoreNutrients,
-              onToggleMore: () =>
-                  setState(() => _showMoreNutrients = !_showMoreNutrients),
-            ),
-            const _SectionHeader(number: '4', title: 'Actions'),
-            _ActionsSection(
-              onDuplicate: _duplicateMeal,
-              onDelete: _deleteMeal,
-              onMove: _moveToAnotherMeal,
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _save,
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Save Changes'),
-                    ),
+                      if (!isOnline)
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color:
+                                    AppColors.warning.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.cloud_off,
+                                  size: 18, color: AppColors.warning),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  "You're offline. Changes will be saved locally and synced later.",
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.warning,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const _SectionHeader(number: '1', title: 'Meal Details'),
+                      _MealDetailsSection(
+                        mealType: _mealType,
+                        loggedAt: _loggedAt,
+                        notesController: _notesController,
+                        onMealTypeChanged: (v) => setState(() => _mealType = v),
+                        onDateTap: _pickDate,
+                        onTimeTap: _pickTime,
+                      ),
+                      const _SectionHeader(number: '2', title: 'Foods'),
+                      _FoodsSection(
+                        foodItems: _foodItems,
+                        onAddFood: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) =>
+                                FoodSearchSheet(onFoodSelected: _addFood),
+                          );
+                        },
+                        onUpdateQuantity: _updateQuantity,
+                        onRemoveFood: _removeFood,
+                      ),
+                      const _SectionHeader(
+                          number: '3', title: 'Meal Summary (Updated)'),
+                      _MealSummarySection(
+                        totalCalories: _totalCalories,
+                        totalProtein: _totalProtein,
+                        totalCarbs: _totalCarbs,
+                        totalFat: _totalFat,
+                        showMore: _showMoreNutrients,
+                        onToggleMore: () => setState(
+                            () => _showMoreNutrients = !_showMoreNutrients),
+                      ),
+                      const _SectionHeader(number: '4', title: 'Actions'),
+                      _ActionsSection(
+                        onDuplicate: _duplicateMeal,
+                        onDelete: _deleteMeal,
+                        onMove: _moveToAnotherMeal,
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _isSaving ? null : _save,
+                                child: _isSaving
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      )
+                                    : const Text('Save Changes'),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: _isSaving
+                                    ? null
+                                    : () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed:
-                          _isSaving ? null : () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -468,11 +593,59 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
 
 class _FoodItem {
   final Food food;
-  final int quantity;
+  final double quantity;
   final String unit;
+  final String? mealLogId;
 
-  const _FoodItem(
-      {required this.food, required this.quantity, this.unit = 'g'});
+  const _FoodItem({
+    required this.food,
+    required this.quantity,
+    this.unit = 'serving',
+    this.mealLogId,
+  });
+}
+
+class _LoadError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _LoadError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.receipt_long_outlined,
+                size: 48, color: AppColors.textSecondary),
+            const SizedBox(height: 12),
+            Text(
+              'Unable to load this meal',
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -566,7 +739,9 @@ class _MealDetailsSection extends StatelessWidget {
                           prefixIcon: Icon(Icons.calendar_today),
                         ),
                         child: Text(
-                          '${loggedAt.month.toString().padLeft(2, '0')}/${loggedAt.day.toString().padLeft(2, '0')}/${loggedAt.year}',
+                          _shortDate(loggedAt),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),
@@ -606,12 +781,33 @@ class _MealDetailsSection extends StatelessWidget {
       ),
     );
   }
+
+  static String _shortDate(DateTime value) =>
+      '${_month(value.month)} ${value.day}, ${value.year % 100}';
+
+  static String _month(int month) {
+    const names = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return names[month - 1];
+  }
 }
 
 class _FoodsSection extends StatelessWidget {
   final List<_FoodItem> foodItems;
   final VoidCallback onAddFood;
-  final void Function(int index, int delta) onUpdateQuantity;
+  final void Function(int index, double delta) onUpdateQuantity;
   final ValueChanged<int> onRemoveFood;
 
   const _FoodsSection({
@@ -657,7 +853,7 @@ class _FoodsSection extends StatelessWidget {
 
 class _FoodItemTile extends StatelessWidget {
   final Food food;
-  final int quantity;
+  final double quantity;
   final String unit;
   final VoidCallback onIncrement;
   final VoidCallback onDecrement;
@@ -688,7 +884,7 @@ class _FoodItemTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child:
-                  const Icon(Icons.restaurant, color: AppColors.textSecondary),
+                  const Icon(Icons.restaurant, color: AppColors.accentPrimary),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -718,27 +914,31 @@ class _FoodItemTile extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _QtyButton(icon: Icons.remove, onTap: onDecrement),
-                  Container(
-                    width: 40,
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$quantity $unit',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+            Tooltip(
+              message: '${_formatQuantity(quantity)} servings',
+              child: Container(
+                width: 112,
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.divider),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _QtyButton(icon: Icons.remove, onTap: onDecrement),
+                    Expanded(
+                      child: Text(
+                        '${_formatQuantity(quantity)}×',
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
                     ),
-                  ),
-                  _QtyButton(icon: Icons.add, onTap: onIncrement),
-                ],
+                    _QtyButton(icon: Icons.add, onTap: onIncrement),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -756,6 +956,12 @@ class _FoodItemTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _formatQuantity(double value) {
+    return value == value.roundToDouble()
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
   }
 }
 

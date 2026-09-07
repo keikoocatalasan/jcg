@@ -927,11 +927,26 @@ class _WaterLogScreenState extends ConsumerState<WaterLogScreen> {
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, size: 20),
                   onSelected: (value) {
-                    if (value == 'delete') {
+                    if (value == 'edit') {
+                      context.push(
+                        '/edit-water-log',
+                        extra: {'waterLogId': log.waterLogId},
+                      );
+                    } else if (value == 'delete') {
                       _showDeleteConfirmation(log);
                     }
                   },
                   itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuItem(
                       value: 'delete',
                       child: Row(

@@ -244,7 +244,31 @@ class _AiScannerContentState extends ConsumerState<_AiScannerContent> {
           children: [
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Image.asset(assetPath, fit: BoxFit.cover),
+              child: Image.asset(
+                assetPath,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: AppColors.surfaceAlt,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.restaurant_outlined,
+                        color: AppColors.textSecondary,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sample image unavailable',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),

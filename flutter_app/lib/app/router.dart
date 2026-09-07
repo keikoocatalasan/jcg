@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
+import 'package:jcg_fitness/core/widgets/local_test_banner.dart';
 import 'package:jcg_fitness/core/widgets/offline_banner.dart';
 import 'package:jcg_fitness/features/admin/screens/admin_screen.dart';
 import 'package:jcg_fitness/features/admin/screens/admin_food_form_screen.dart';
@@ -34,6 +36,7 @@ import 'package:jcg_fitness/features/food_database/screens/custom_food_screen.da
 import 'package:jcg_fitness/features/food_database/screens/food_search_screen.dart';
 import 'package:jcg_fitness/features/hydration/screens/hydration_screen.dart';
 import 'package:jcg_fitness/features/hydration/screens/hydration_history_screen.dart';
+import 'package:jcg_fitness/features/hydration/screens/edit_water_log_screen.dart';
 import 'package:jcg_fitness/features/meal_logging/screens/meal_log_screen.dart';
 import 'package:jcg_fitness/features/meal_logging/screens/edit_meal_log_screen.dart';
 import 'package:jcg_fitness/features/meal_logging/screens/delete_meal_log_screen.dart';
@@ -56,6 +59,7 @@ import 'package:jcg_fitness/features/recommendations/screens/recommendation_deta
 import 'package:jcg_fitness/features/recommendations/screens/recommendations_screen.dart';
 import 'package:jcg_fitness/features/weight_tracking/screens/weight_screen.dart';
 import 'package:jcg_fitness/features/weight_tracking/screens/weight_history_screen.dart';
+import 'package:jcg_fitness/features/weight_tracking/screens/edit_weight_log_screen.dart';
 import 'package:jcg_fitness/features/nutrition/screens/nutrition_target_screen.dart';
 import 'package:jcg_fitness/features/onboarding/onboarding_completion_provider.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
@@ -64,6 +68,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   final rootNavigatorKey = GlobalKey<NavigatorState>();
   final shellNavigatorKey = GlobalKey<NavigatorState>();
   ref.watch(authStateProvider);
+  final localTestEnabled = ref.watch(localTestAuthEnabledProvider);
   final sessionChecked = ref.watch(launchSessionCheckedProvider);
   final onboardingComplete = ref.watch(onboardingCompleteProvider);
 
@@ -73,7 +78,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     overridePlatformDefaultLocation: true,
     redirect: (context, state) {
       final location = state.matchedLocation;
-      final session = Supabase.instance.client.auth.currentSession;
+      final session = AppConfig.isLocalTestMode
+          ? null
+          : Supabase.instance.client.auth.currentSession;
+      final isAuthenticated =
+          AppConfig.isLocalTestMode ? localTestEnabled : session != null;
       const publicRoutes = {
         '/login',
         '/register',
@@ -87,7 +96,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       if (!sessionChecked) {
         return location == '/session-loading' ? null : '/session-loading';
       }
-      if (session == null) {
+      if (!isAuthenticated) {
         return isPublic ? null : '/login';
       }
       if (location == '/session-loading') return null;
@@ -237,12 +246,30 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const HydrationHistoryScreen(),
       ),
       GoRoute(
+        path: '/edit-water-log',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return EditWaterLogScreen(
+            waterLogId: extra['waterLogId'] as String? ?? '',
+          );
+        },
+      ),
+      GoRoute(
         path: '/weight',
         builder: (_, __) => const WeightScreen(),
       ),
       GoRoute(
         path: '/weight/history',
         builder: (_, __) => const WeightHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/edit-weight-log',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return EditWeightLogScreen(
+            weightLogId: extra['weightLogId'] as String? ?? '',
+          );
+        },
       ),
       GoRoute(
         path: '/recommendation-detail',
@@ -439,6 +466,7 @@ class DashboardShell extends StatelessWidget {
     return Scaffold(
       body: Column(
         children: [
+          if (AppConfig.isLocalTestMode) const LocalTestBanner(),
           const OfflineBanner(),
           Expanded(child: child),
         ],

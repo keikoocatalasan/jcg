@@ -21,6 +21,8 @@ async def get_version():
             "scanner_pipeline": "scanner-v2",
             "ai_provider": settings.ai_model_provider,
             "ai_model": settings.ai_model_name,
+            "chat_provider": settings.effective_chat_provider,
+            "chat_model": settings.effective_chat_model,
         },
         "message": "OK",
     }

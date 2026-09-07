@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/foundation.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/sync/sync_queue_service.dart';
@@ -14,6 +15,8 @@ const String backgroundSyncTaskName = 'jcg-fitness-background-sync';
 void backgroundSyncCallbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
+      if (AppConfig.isLocalTestMode) return true;
+
       // Ensure Supabase is initialized if the app was killed.
       const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
       const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');

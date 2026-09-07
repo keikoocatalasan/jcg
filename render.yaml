@@ -22,6 +22,14 @@ services:
         sync: false
       - key: AI_MODEL_NAME
         value: meta/llama-3.2-11b-vision-instruct
+      - key: CHAT_MODEL_PROVIDER
+        value: inherit
+      - key: CHAT_MODEL_API_KEY
+        sync: false
+      - key: CHAT_MODEL_NAME
+        value: openai/gpt-oss-20b
+      - key: GROQ_BASE_URL
+        value: https://api.groq.com/openai/v1
       - key: AI_REQUEST_TIMEOUT_SECONDS
         value: 45
       - key: AI_WEB_SEARCH_ENABLED

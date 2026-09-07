@@ -72,6 +72,18 @@ class WaterLogRepository extends BaseRepository<WaterLog> {
     return results.map(fromMap).toList();
   }
 
+  Future<WaterLog?> readByIdForUser(String waterLogId, String userId) async {
+    final db = await database;
+    final results = await db.query(
+      tableName,
+      where: 'water_log_id = ? AND user_id = ?',
+      whereArgs: [waterLogId, userId],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return fromMap(results.first);
+  }
+
   Future<List<WaterLog>> queryByUserAndDateRange(
     String userId,
     String startDate,

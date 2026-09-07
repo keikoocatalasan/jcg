@@ -37,6 +37,10 @@
 - [ ] `AI_MODEL_API_KEY` — required when `AI_MODEL_PROVIDER` is `openai` or `nvidia`
 - [ ] `AI_MODEL_NAME` — use `meta/llama-3.2-11b-vision-instruct` for NVIDIA text + image inference
 - [ ] `NVIDIA_BASE_URL` — `https://integrate.api.nvidia.com/v1` when using NVIDIA NIM
+- [ ] `CHAT_MODEL_PROVIDER` — keep `inherit` for the existing NVIDIA setup, or set `groq` for the independent free-tier chatbot path
+- [ ] `CHAT_MODEL_API_KEY` — store the Groq key here when `CHAT_MODEL_PROVIDER=groq`; never put it in Flutter or source control
+- [ ] `CHAT_MODEL_NAME` — use the currently active Groq text model selected from the official model list (default: `openai/gpt-oss-20b`)
+- [ ] `GROQ_BASE_URL` — `https://api.groq.com/openai/v1` when using Groq
 - [ ] `AI_WEB_SEARCH_ENABLED` — enable only after the configured model passes a web-search smoke test
 - [ ] `AI_ALLOWED_DOMAINS` — comma-separated approved nutrition-source domains
 - [ ] `ALLOWED_ORIGINS` — comma-separated list of allowed origins
@@ -75,6 +79,7 @@
 - [ ] Weight logging updates targets
 - [ ] AI food scan captures and processes image
 - [ ] Chatbot responds to queries
+- [ ] If Groq is enabled, verify `/version` reports the intended chat provider/model and run a real chat request within the account's free limits
 - [ ] Analytics displays charts
 - [ ] Admin food management functions
 - [ ] Community feed loads

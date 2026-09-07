@@ -37,10 +37,11 @@ class StatusTag extends StatelessWidget {
       ),
       child: Text(
         '[${label.toUpperCase()}]',
-        style: GoogleFonts.jetBrainsMono(
+        style: GoogleFonts.manrope(
           fontSize: 10,
-          fontWeight:
-              style == StatusTagStyle.filled ? FontWeight.w700 : FontWeight.w500,
+          fontWeight: style == StatusTagStyle.filled
+              ? FontWeight.w700
+              : FontWeight.w500,
           color: _textColor,
           letterSpacing: 0.04,
         ),

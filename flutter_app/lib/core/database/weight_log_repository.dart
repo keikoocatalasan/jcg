@@ -72,6 +72,18 @@ class WeightLogRepository extends BaseRepository<WeightLog> {
     return results.map(fromMap).toList();
   }
 
+  Future<WeightLog?> readByIdForUser(String weightLogId, String userId) async {
+    final db = await database;
+    final results = await db.query(
+      tableName,
+      where: 'weight_log_id = ? AND user_id = ?',
+      whereArgs: [weightLogId, userId],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return fromMap(results.first);
+  }
+
   Future<List<WeightLog>> queryByUserAndDateRange(
     String userId,
     String startDate,
@@ -97,6 +109,17 @@ class WeightLogRepository extends BaseRepository<WeightLog> {
     );
     if (results.isEmpty) return null;
     return fromMap(results.first);
+  }
+
+  Future<List<WeightLog>> queryByUser(String userId) async {
+    final db = await database;
+    final results = await db.query(
+      tableName,
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'logged_at DESC, created_at DESC',
+    );
+    return results.map(fromMap).toList();
   }
 
   Future<WeightLog?> readSecondLatest(String userId) async {

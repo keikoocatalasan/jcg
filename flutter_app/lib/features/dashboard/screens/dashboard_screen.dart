@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
@@ -528,6 +529,33 @@ class _OfflineSyncBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isOnline = ref.watch(isOnlineProvider);
     final syncState = ref.watch(syncProvider);
+
+    if (AppConfig.isLocalTestMode) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.accentSoft,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.accentBorder),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.phone_android, size: 20, color: AppColors.accentPrimary),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Local QA mode: changes stay on this device.',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (!isOnline) {
       return Container(

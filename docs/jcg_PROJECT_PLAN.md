@@ -156,7 +156,7 @@
 | 10 | **recommendations** | ✅ Built | Multi-factor scoring engine (affordability, protein, calories, macros, goal match, allergen filtering) |
 | 11 | **analytics** | ✅ Built | Calorie adherence, macro consistency chart, spending chart |
 | 12 | **community** | ✅ Built | Posts, create post, post detail, report dialog, community cache |
-| 13 | **chatbot** | 🟡 UI Built, Backend Stubbed | Chat UI + history screen, but backend returns hardcoded reply |
+| 13 | **chatbot** | 🟢 Connected | Chat UI + history, safety gate, local demo responder, configurable server-side LLM (Groq or inherited NVIDIA/OpenAI) |
 | 14 | **ai_scanner** | 🟢 Connected | Camera → scan → prediction → manual correction; OpenAI vision is configurable with deterministic demo fallback |
 | 15 | **profile_settings** | ✅ Built | Edit profile, settings, sync status, clear cache |
 | 16 | **admin** | ✅ Built | Admin dashboard, food management, moderation, price history, reports |
@@ -173,7 +173,7 @@
 | `/auth/register` | POST | ✅ Built | User registration |
 | `/ai/scan-food` | POST | 🟢 Connected | Image upload → configured OpenAI vision or deterministic demo recognition |
 | `/ai/scan-feedback` | POST | ✅ Built | Submit scan correction feedback |
-| `/ai/chat` | POST | 🟢 Connected | Safety-gated configured OpenAI response or deterministic demo response |
+| `/ai/chat` | POST | 🟢 Connected | Safety-gated server-side Groq, NVIDIA, OpenAI, or deterministic response |
 | `/ai/explain-recommendation` | POST | 🟡 Stubbed | Explain why a food was recommended |
 
 ---
@@ -192,14 +192,14 @@
 - **Safety Guardrails**: Chatbot topic blocking (medical, eating disorders, extreme fasting), rate limiting (30 req/60s)
 - **Admin Panel**: Food management, moderation, price history, reports
 
-### What's Stubbed / Not Connected
+### What's Configurable / Remaining
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **AI Food Scanner** | Mock data | `ScannerService.scan_image()` returns hardcoded rice candidates (`scanner_service.py:17`) |
-| **AI Chatbot** | Configurable | OpenAI Responses API in `openai_responses_service.py`; deterministic mode remains available for tests and offline demos |
+| **AI Food Scanner** | Configurable | Provider-backed vision inference with deterministic demo fallback; results still require confidence and portion review |
+| **AI Chatbot** | Connected | `ChatbotService` routes to Groq independently or inherits the configured scanner provider; deterministic mode remains available for offline demos |
 | **Recommendation Explainer** | Deterministic | Route returns a nutrition, goal, and budget explanation from submitted recommendation data |
-| **AI Model Integration** | Configurable | OpenAI Responses API is wired; `deterministic` remains the default deployment mode until provider credentials are configured |
+| **AI Model Integration** | Configurable | OpenAI, NVIDIA, and Groq-compatible providers are wired; `deterministic` remains available for offline QA until provider credentials are configured |
 | **Real-time Sync** | Partial | Supabase realtime enabled but Flutter side uses polling-based WorkManager |
 
 ### What Doesn't Exist
@@ -207,7 +207,7 @@
 - **No 3D features**: No Three.js, Babylon.js, React Three Fiber, or `.gltf`/`.glb` files
 - **No SISP Portal**: No Node.js, no Spring Boot, no separate portal application
 - **No Kotlin/Jetpack Compose**: The Android app is pure Flutter, not native Android
-- **No on-device TensorFlow Lite**: AI inference is server-side, with OpenAI and deterministic provider modes
+- **No on-device TensorFlow Lite**: AI inference is server-side, with configured providers and deterministic local QA mode
 - **No vector database / RAG**: Chatbot has no retrieval-augmented generation
 - **No Docker**: No containerization setup
 - **No CI/CD pipeline**: No GitHub Actions workflows
@@ -218,17 +218,18 @@
 
 ### Phase 1: Food Scanner — Real Vision Model
 
-**Current**: Mock candidates in `ScannerService`
+**Current**: NVIDIA/OpenAI provider-backed inference with deterministic local fallback; the UI requires portion and confirmation review for uncertain results
 **Target**: Real food recognition from uploaded images
 
 | Option | Pros | Cons |
 |--------|------|------|
+| **NVIDIA NIM vision model** | Existing production-compatible path, supports image input | Requires server-side API key and quota |
 | **OpenAI Vision API** | High accuracy, easy integration, supports food recognition | Cost per image, requires internet |
 | **Google Cloud Vision** | Good food detection, PHP-friendly pricing | Setup complexity |
 | **Hugging Face Inference** | Free tier available, open models | Lower accuracy for food |
 | **Custom TFLite model** | Offline capable, no per-call cost | Training data needed, large model size |
 
-**Recommended**: OpenAI Vision API via FastAPI backend (already has `ai_model_api_key` config)
+**Recommended**: Keep the configured NVIDIA NIM path for production scanner traffic, with OpenAI as a compatible alternative and deterministic mode only for local QA.
 
 **Implementation plan**:
 1. Configure and validate the selected scanner provider in the target environment
@@ -236,26 +237,39 @@
 3. Add food name → Supabase food catalog lookup for nutrition data
 4. Keep existing confidence threshold (>0.60 = auto, else manual search)
 
-### Phase 2: Chatbot — LLM Integration
+### Phase 2: Chatbot — Free LLM Integration
 
-**Current**: Hardcoded reply in `ChatbotService`
-**Target**: Context-aware nutrition assistant
+**Current**: Safety-gated, context-aware provider routing is implemented. The default production setting remains `inherit` so the existing NVIDIA setup is not changed without an explicit key. The independent free-tier path uses Groq's OpenAI-compatible API.
+**Target**: A reliable, server-side nutrition assistant with a verified provider, transparent failure states, rate-limit handling, and no client-side secrets.
 
 | Option | Pros | Cons |
 |--------|------|------|
-| **OpenAI GPT-4o-mini** | Cheap, fast, good nutrition knowledge | API dependency |
-| **OpenAI GPT-4o** | Best reasoning | Higher cost |
-| **Ollama (local)** | Free, offline | Needs server resources |
-| **Supabase Edge Function + AI** | Integrated with existing infra | Limited runtime |
+| **Groq `openai/gpt-oss-20b`** | Free-plan text inference, fast, OpenAI-compatible endpoint | Requires a Groq key and free-tier limits |
+| **Inherited NVIDIA provider** | Keeps the existing deployed provider and key path | Shares scanner provider quota/cost |
+| **OpenAI Responses API** | Existing compatible implementation | Paid API dependency |
+| **Ollama (local)** | Free, offline | Needs local server resources and model download |
 
-**Recommended**: OpenAI GPT-4o-mini with system prompt + user context injection
+**Recommended**: Groq `openai/gpt-oss-20b` for chatbot-only traffic, while keeping the food scanner on its independently configured provider. If Groq verification or quota is unavailable, keep `CHAT_MODEL_PROVIDER=inherit` and use the existing NVIDIA path or deterministic local QA mode.
 
 **Implementation plan**:
-1. Build system prompt with nutrition guidelines, Filipino food knowledge, safety rules
-2. Inject `ChatContext` (fitness goal, remaining calories, dietary restrictions) into user message
-3. Call OpenAI API via httpx in `ChatbotService.get_response()`
-4. Keep existing safety guardrails (`safety_service.py`) as pre-filter
-5. Store conversations in Supabase `chat_messages` table
+1. Create a separate `CHAT_MODEL_PROVIDER` switch so chatbot changes do not alter vision scanning.
+2. Keep the Groq key in Render/backend environment variables only; never compile it into Flutter or commit it.
+3. Build a system prompt with Filipino food, budget, portion, allergy, and safety guidance.
+4. Inject `ChatContext` (goal, budget, calories, protein, allergies, restrictions) as model input data.
+5. Call Groq's `/openai/v1/chat/completions` endpoint through `GroqChatService` with bounded output, timeout, retry, and empty-response handling.
+6. Keep `safety_service.py` as the pre-filter for blocked and emergency topics; never send blocked requests to the model.
+7. Persist user and assistant messages locally first, then sync to Supabase when online.
+8. Verify `/version` exposes only provider/model metadata, never API keys.
+9. Complete a real Groq smoke test after trusted-device verification: safe nutrition question, context-aware budget question, blocked medical question, rate-limit/error response, and conversation persistence.
+
+**Activation gate**:
+
+- [x] Groq adapter, configuration, server-side key selection, and tests implemented.
+- [x] Local QA chatbot works without a network key using the isolated demo identity.
+- [ ] Finish Groq account trusted-device verification and create a key.
+- [ ] Add the key to Render as `CHAT_MODEL_API_KEY` and set `CHAT_MODEL_PROVIDER=groq`.
+- [ ] Verify Render `/version` and one authenticated `/ai/chat` request.
+- [ ] Keep `CHAT_MODEL_PROVIDER=inherit` until the previous two checks pass.
 
 ### Phase 3: Recommendation Explainer
 
@@ -408,9 +422,9 @@ allergies (lookup)
 
 | Gap | Impact | Effort |
 |-----|--------|--------|
-| Deterministic AI mode is used in production | Results remain demo-only | Configure and validate the OpenAI provider before release |
-| Chatbot returns hardcoded reply | Core feature non-functional | Medium (LLM integration) |
-| No real AI model configured | `AI_MODEL_PROVIDER=deterministic` | Low (config change) |
+| Production AI provider is not verified after the latest deployment | Results could remain demo-only | Verify NVIDIA scanner and Groq/inherited chat through `/version` and authenticated smoke tests |
+| Groq key is not yet verified in the account | Chatbot cannot be switched to the independent free provider | Complete trusted-device verification, then set one Render secret |
+| No production provider smoke test after the latest deployment | Runtime configuration may be wrong even when code is green | Verify `/version` and authenticated `/ai/chat` in Render |
 
 ### High
 
@@ -451,13 +465,14 @@ allergies (lookup)
 |------|----------|------|
 | Integrate OpenAI Vision API in `ScannerService` | P0 | 3 days |
 | Wire food name → Supabase catalog lookup | P0 | 1 day |
-| Implement LLM chatbot in `ChatbotService` | P0 | 3 days |
-| Build system prompt with nutrition context | P0 | 1 day |
+| Implement provider-routed LLM chatbot in `ChatbotService` | P0 | Done |
+| Build system prompt with nutrition context | P0 | Done |
+| Verify Groq key and enable the independent chat provider | P0 | 0.5 day |
 | Implement `explain-recommendation` endpoint | P1 | 1 day |
 | Add API key rotation / error handling | P1 | 1 day |
 | Test AI endpoints end-to-end | P1 | 1 day |
 
-**Exit criteria**: Food scanner identifies real foods, chatbot responds to nutrition questions
+**Exit criteria**: Food scanner identifies real foods, chatbot responds to safe nutrition questions, blocked topics are refused, and provider status is verified through `/version`.
 
 ### Phase 2: Polish & Testing (Weeks 4-5)
 
@@ -515,7 +530,7 @@ allergies (lookup)
 | `backend/app/config.py` | Pydantic settings from `.env` |
 | `backend/app/auth/jwt_verifier.py` | JWT verification (HS256 dev, ES256/RS256 prod) |
 | `backend/app/services/scanner_service.py` | Food scanner with OpenAI and deterministic providers |
-| `backend/app/services/chatbot_service.py` | Safety-aware chatbot with OpenAI and deterministic providers |
+| `backend/app/services/chatbot_service.py` | Safety-aware chatbot with Groq, NVIDIA, OpenAI, and deterministic providers |
 | `backend/app/services/safety_service.py` | Content safety guardrails |
 | `backend/app/routes/chat.py` | `/ai/chat` endpoint |
 | `backend/app/routes/scan_food.py` | `/ai/scan-food` endpoint |

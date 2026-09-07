@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jcg_fitness/app/config.dart';
+import 'package:jcg_fitness/core/dev/local_test_data.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/errors/result.dart';
@@ -52,6 +54,18 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
   }
 
   Future<void> _runChecks() async {
+    if (AppConfig.isLocalTestMode) {
+      if (!mounted) return;
+      // Seed after the first frame so the app can render its loading state
+      // immediately instead of blocking startup on SQLite initialization.
+      await LocalTestDataSeeder.ensure();
+      if (!mounted) return;
+      ref.read(onboardingCompleteProvider.notifier).state = true;
+      ref.read(launchSessionCheckedProvider.notifier).state = true;
+      if (mounted) context.go('/dashboard');
+      return;
+    }
+
     await _ensureSupabaseInitialized();
     if (!mounted) return;
 

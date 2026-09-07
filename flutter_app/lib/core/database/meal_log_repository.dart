@@ -117,6 +117,18 @@ class MealLogRepository extends BaseRepository<MealLog> {
     return results.map(fromMap).toList();
   }
 
+  Future<MealLog?> readByIdForUser(String mealLogId, String userId) async {
+    final db = await database;
+    final results = await db.query(
+      tableName,
+      where: 'meal_log_id = ? AND user_id = ? AND is_deleted = 0',
+      whereArgs: [mealLogId, userId],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return fromMap(results.first);
+  }
+
   Future<List<MealLog>> queryByUserAndDateRange(
     String userId,
     String startDate,

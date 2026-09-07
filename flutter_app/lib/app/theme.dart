@@ -73,7 +73,7 @@ class AppTheme {
   AppTheme._();
 
   static TextStyle _monoStyle(TextStyle base) {
-    return GoogleFonts.jetBrainsMono(
+    return GoogleFonts.manrope(
       fontSize: base.fontSize,
       fontWeight: base.fontWeight,
       letterSpacing: base.letterSpacing,
@@ -84,7 +84,7 @@ class AppTheme {
   }
 
   static TextTheme _monoTextTheme(TextTheme base) {
-    return TextTheme(
+    final theme = TextTheme(
       displayLarge: _monoStyle(base.displayLarge ?? const TextStyle()),
       displayMedium: _monoStyle(base.displayMedium ?? const TextStyle()),
       displaySmall: _monoStyle(base.displaySmall ?? const TextStyle()),
@@ -101,6 +101,16 @@ class AppTheme {
       labelMedium: _monoStyle(base.labelMedium ?? const TextStyle()),
       labelSmall: _monoStyle(base.labelSmall ?? const TextStyle()),
     );
+    return theme.copyWith(
+      bodySmall: _minimumFont(theme.bodySmall!, 12),
+      labelSmall: _minimumFont(theme.labelSmall!, 11),
+      titleSmall: _minimumFont(theme.titleSmall!, 13),
+    );
+  }
+
+  static TextStyle _minimumFont(TextStyle style, double minimum) {
+    final size = style.fontSize ?? minimum;
+    return size < minimum ? style.copyWith(fontSize: minimum) : style;
   }
 
   static ThemeData get light {
@@ -134,7 +144,7 @@ class AppTheme {
         backgroundColor: colors.surfaceGlassStrong,
         foregroundColor: colors.textPrimary,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: GoogleFonts.jetBrainsMono(
+        titleTextStyle: GoogleFonts.manrope(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: colors.textPrimary,
@@ -161,7 +171,7 @@ class AppTheme {
           elevation: 0,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          textStyle: GoogleFonts.jetBrainsMono(
+          textStyle: GoogleFonts.manrope(
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -262,7 +272,7 @@ class AppTheme {
         backgroundColor: AppColors.bgGlassStrong,
         foregroundColor: AppColors.textPrimary,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: GoogleFonts.jetBrainsMono(
+        titleTextStyle: GoogleFonts.manrope(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -290,7 +300,7 @@ class AppTheme {
             borderRadius: BorderRadius.circular(10),
           ),
           elevation: 0,
-          textStyle: GoogleFonts.jetBrainsMono(
+          textStyle: GoogleFonts.manrope(
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -305,7 +315,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          textStyle: GoogleFonts.jetBrainsMono(
+          textStyle: GoogleFonts.manrope(
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -314,7 +324,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.accentPrimary,
-          textStyle: GoogleFonts.jetBrainsMono(
+          textStyle: GoogleFonts.manrope(
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -323,11 +333,11 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.bgTertiary,
-        labelStyle: GoogleFonts.jetBrainsMono(
+        labelStyle: GoogleFonts.manrope(
           fontSize: 13,
           color: AppColors.textSecondary,
         ),
-        hintStyle: GoogleFonts.jetBrainsMono(
+        hintStyle: GoogleFonts.manrope(
           fontSize: 13,
           color: AppColors.textMuted,
         ),
@@ -366,7 +376,7 @@ class AppTheme {
         indicatorColor: AppColors.accentSoft,
         height: 70,
         labelTextStyle: WidgetStateProperty.all(
-          GoogleFonts.jetBrainsMono(
+          GoogleFonts.manrope(
             fontSize: 11,
             fontWeight: FontWeight.w500,
           ),
@@ -390,7 +400,7 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.bgElevated,
-        contentTextStyle: GoogleFonts.jetBrainsMono(
+        contentTextStyle: GoogleFonts.manrope(
           fontSize: 13,
           color: AppColors.textPrimary,
         ),
@@ -410,7 +420,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.bgTertiary,
-        labelStyle: GoogleFonts.jetBrainsMono(
+        labelStyle: GoogleFonts.manrope(
           fontSize: 12,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
@@ -432,11 +442,11 @@ class AppTheme {
         labelColor: AppColors.accentPrimary,
         unselectedLabelColor: AppColors.textMuted,
         indicatorColor: AppColors.accentPrimary,
-        labelStyle: GoogleFonts.jetBrainsMono(
+        labelStyle: GoogleFonts.manrope(
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: GoogleFonts.jetBrainsMono(
+        unselectedLabelStyle: GoogleFonts.manrope(
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
@@ -480,7 +490,7 @@ class AppTheme {
         thumbColor: AppColors.accentPrimary,
         overlayColor: AppColors.accentSoft,
         valueIndicatorColor: AppColors.accentPrimary,
-        valueIndicatorTextStyle: GoogleFonts.jetBrainsMono(
+        valueIndicatorTextStyle: GoogleFonts.manrope(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: AppColors.textOnAccent,
@@ -497,7 +507,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.borderDefault, width: 1),
         ),
-        textStyle: GoogleFonts.jetBrainsMono(
+        textStyle: GoogleFonts.manrope(
           fontSize: 12,
           color: AppColors.textPrimary,
         ),
@@ -509,7 +519,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: AppColors.borderDefault, width: 1),
         ),
-        textStyle: GoogleFonts.jetBrainsMono(
+        textStyle: GoogleFonts.manrope(
           fontSize: 13,
           color: AppColors.textPrimary,
         ),

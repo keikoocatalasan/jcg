@@ -80,7 +80,16 @@ final chatMessagesProvider =
   final dbProvider = DatabaseProvider();
   final repo = db.ChatMessageRepository(dbProvider);
   final rows = await repo.queryBySession(sessionId);
-  return rows.map(ChatMessage.fromDb).toList();
+  return rows.map((row) {
+    final message = ChatMessage.fromDb(row);
+    // The local QA responder is synchronous and never has a remote delivery
+    // queue. Normalize messages left by an interrupted earlier walkthrough so
+    // the UI cannot display an infinite "Sending..." state.
+    if (AppConfig.isLocalTestMode && message.deliveryStatus == 'local_saved') {
+      return message.copyWith(deliveryStatus: 'sent_to_api');
+    }
+    return message;
+  }).toList();
 });
 
 final sendMessageProvider =
@@ -183,6 +192,26 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
 
   Future<void> _sendToApiAndRespond(
       String userMsgId, String text, ChatSession session) async {
+    if (AppConfig.isLocalTestMode) {
+      await chatMsgRepo.updateDeliveryStatus(userMsgId, 'sent_to_api');
+      final assistantNow = DateTime.now().toUtc().toIso8601String();
+      await chatMsgRepo.insert(
+        db.ChatMessage(
+          chatMessageId: UuidHelper.generateUuid(),
+          chatSessionId: session.chatSessionId,
+          roleCode: 'assistant',
+          messageText:
+              'Local QA reply: keep portions measurable, stay within your budget, '
+              'and pair your ulam with a sensible amount of rice and water.',
+          safetyStatusCode: 'safe',
+          deliveryStatusCode: 'sent_to_api',
+          createdAt: assistantNow,
+        ),
+      );
+      _ref.invalidate(chatMessagesProvider(session.chatSessionId));
+      return;
+    }
+
     final isOnline = _ref.read(isOnlineProvider);
     if (!isOnline) {
       await chatMsgRepo.updateDeliveryStatus(userMsgId, 'failed');
@@ -283,6 +312,8 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     String operation,
     Map<String, dynamic> payload,
   ) async {
+    if (AppConfig.isLocalTestMode) return;
+
     final userId = await _getLocalUserId();
     if (userId == null) return;
 

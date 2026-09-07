@@ -1,6 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
@@ -41,6 +43,11 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
       _error = null;
     });
     try {
+      if (AppConfig.isLocalTestMode) {
+        _loadLocalDemoData();
+        return;
+      }
+
       final supabase = ref.read(supabaseClientProvider);
       final result = await supabase.rpc('admin_analytics_snapshot', params: {
         'p_range_days': _selectedRangeDays,
@@ -74,6 +81,36 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     }
   }
 
+  void _loadLocalDemoData() {
+    final today = DateTime.now();
+    List<_DailyCount> series(int base, {bool cumulative = false}) {
+      return List.generate(_selectedRangeDays, (index) {
+        final day = today.subtract(
+          Duration(days: _selectedRangeDays - index - 1),
+        );
+        final wave = (index % 5) - 2;
+        final count =
+            cumulative ? base + index * 2 + wave : (base + wave).clamp(0, 9999);
+        return _DailyCount(
+          date: DateFormat('yyyy-MM-dd').format(day),
+          count: count,
+        );
+      });
+    }
+
+    _userGrowth = series(90, cumulative: true);
+    _mealLogs = series(22);
+    _hydrationLogs = series(16);
+    _weightLogs = series(4);
+    _aiScans = series(7);
+    _postsCreated = series(8);
+    _reportsFiled = series(2);
+    _totalFoods = 100;
+    _totalOfficialFoods = 100;
+    _reportResolutionRate = 92;
+    if (mounted) setState(() => _isLoading = false);
+  }
+
   List<_DailyCount> _parseDailyCounts(dynamic raw) {
     if (raw == null || raw is! List) return [];
     return raw
@@ -91,27 +128,6 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Statistics'),
-        actions: [
-          SegmentedButton<int>(
-            segments: const [
-              ButtonSegment(value: 7, label: Text('7d')),
-              ButtonSegment(value: 30, label: Text('30d')),
-              ButtonSegment(value: 90, label: Text('90d')),
-            ],
-            selected: {_selectedRangeDays},
-            onSelectionChanged: (v) {
-              setState(() => _selectedRangeDays = v.first);
-              _loadData();
-            },
-            style: SegmentedButton.styleFrom(
-              selectedBackgroundColor: AppColors.accentPrimary,
-              selectedForegroundColor: AppColors.textOnAccent,
-              backgroundColor: AppColors.surface,
-              foregroundColor: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(width: 12),
-        ],
       ),
       body: GlassBackground(
         child: _isLoading
@@ -136,6 +152,8 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      _buildRangeSelector(),
+                      const SizedBox(height: 20),
                       _buildSectionHeader('User Growth', Icons.people),
                       _buildLineChart(_userGrowth, AppColors.accentPrimary),
                       const SizedBox(height: 24),
@@ -165,6 +183,29 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                       const SizedBox(height: 32),
                     ],
                   ),
+      ),
+    );
+  }
+
+  Widget _buildRangeSelector() {
+    return SegmentedButton<int>(
+      segments: const [
+        ButtonSegment(value: 7, label: Text('7 days')),
+        ButtonSegment(value: 30, label: Text('30 days')),
+        ButtonSegment(value: 90, label: Text('90 days')),
+      ],
+      selected: {_selectedRangeDays},
+      onSelectionChanged: (value) {
+        setState(() => _selectedRangeDays = value.first);
+        _loadData();
+      },
+      style: SegmentedButton.styleFrom(
+        selectedBackgroundColor: AppColors.accentPrimary,
+        selectedForegroundColor: AppColors.textOnAccent,
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.textSecondary,
+        visualDensity: VisualDensity.compact,
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -221,8 +262,20 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                 },
               ),
             ),
-            leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: true, reservedSize: 36)),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) => Text(
+                  value.toInt().toString(),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
             topTitles:
                 const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             rightTitles:
@@ -288,7 +341,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                   if (i < 0 || i >= data.length) return const SizedBox.shrink();
                   return Text(_shortDate(data[i].date),
                       style: const TextStyle(
-                          fontSize: 8, color: AppColors.textSecondary));
+                          fontSize: 10, color: AppColors.textSecondary));
                 },
               ),
             ),
@@ -300,7 +353,8 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                         ? const SizedBox.shrink()
                         : Text('${value.toInt()}',
                             style: const TextStyle(
-                                fontSize: 9, color: AppColors.textSecondary)))),
+                                fontSize: 10,
+                                color: AppColors.textSecondary)))),
             topTitles:
                 const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             rightTitles:
@@ -319,6 +373,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
                 data2.fold<int>(0, (m, d) => d.count > m ? d.count : m))
             ? data1.fold<int>(0, (m, d) => d.count > m ? d.count : m)
             : data2.fold<int>(0, (m, d) => d.count > m ? d.count : m);
+    final chartMaxY = overallMax > 0 ? (overallMax * 1.2).ceilToDouble() : 1.0;
 
     return Column(
       children: [
@@ -327,7 +382,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.center,
-              maxY: (overallMax * 1.2).ceilToDouble(),
+              maxY: chartMaxY,
               barGroups: data1.asMap().entries.map((e) {
                 final count2 = e.key < data2.length ? data2[e.key].count : 0;
                 return BarChartGroupData(

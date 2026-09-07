@@ -4,6 +4,7 @@ from app.config import settings
 from app.schemas.chatbot import ChatContext
 from app.services.nvidia_chat_service import NvidiaChatService
 from app.services.openai_responses_service import OpenAIResponsesService
+from app.services.groq_chat_service import GroqChatService
 
 
 @dataclass
@@ -15,6 +16,7 @@ class ChatbotService:
     def __init__(self):
         self._openai = OpenAIResponsesService()
         self._nvidia = NvidiaChatService()
+        self._groq = GroqChatService()
         self.blocked_topics = [
             "medical diagnosis",
             "disease treatment",
@@ -30,8 +32,18 @@ class ChatbotService:
             parts = []
             if context.fitness_goal:
                 parts.append(f"fitness goal: {context.fitness_goal}")
+            if context.remaining_budget_php is not None:
+                parts.append(
+                    f"remaining daily food budget: PHP {context.remaining_budget_php:.2f}"
+                )
             if context.remaining_calories is not None:
                 parts.append(f"remaining calories: {context.remaining_calories} kcal")
+            if context.remaining_protein_g is not None:
+                parts.append(
+                    f"remaining protein: {context.remaining_protein_g:.1f} g"
+                )
+            if context.allergies:
+                parts.append(f"allergies: {', '.join(context.allergies)}")
             if context.dietary_restrictions:
                 parts.append(f"dietary restrictions: {', '.join(context.dietary_restrictions)}")
             if parts:
@@ -42,7 +54,7 @@ class ChatbotService:
                 reply="I can't provide guidance on that. For health concerns, please see a professional."
             )
 
-        provider = settings.ai_model_provider.lower()
+        provider = settings.effective_chat_provider
         instructions = (
             "You are NutriSmart AI, a concise budget-aware nutrition assistant for "
             "the Filipino market. Use Philippine pesos and familiar Filipino foods. "
@@ -59,6 +71,13 @@ class ChatbotService:
             return ChatResult(reply=reply)
         if provider == "nvidia":
             result = await self._nvidia.create_text(
+                instructions=instructions,
+                input_content=f"{message}{context_hint}",
+                max_output_tokens=700,
+            )
+            return ChatResult(reply=result.text)
+        if provider == "groq":
+            result = await self._groq.create_text(
                 instructions=instructions,
                 input_content=f"{message}{context_hint}",
                 max_output_tokens=700,

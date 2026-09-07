@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     ai_model_name: str = "gpt-5-mini"
     openai_base_url: str = "https://api.openai.com/v1"
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    chat_model_provider: str = "inherit"
+    chat_model_api_key: str = ""
+    chat_model_name: str = "openai/gpt-oss-20b"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
     ai_request_timeout_seconds: float = 45.0
     ai_web_search_enabled: bool = False
     ai_allowed_domains: str = ""
@@ -36,7 +40,7 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
-        return self.environment.lower() == "production"
+        return self.environment.strip().lower() == "production"
 
     @property
     def ai_allowed_domains_list(self) -> list[str]:
@@ -46,9 +50,37 @@ class Settings(BaseSettings):
             if domain.strip()
         ]
 
+    @property
+    def effective_chat_provider(self) -> str:
+        requested = self.chat_model_provider.strip().lower()
+        return (
+            self.ai_model_provider.strip().lower()
+            if requested in {"", "inherit"}
+            else requested
+        )
+
+    @property
+    def effective_chat_api_key(self) -> str:
+        requested = self.chat_model_provider.strip().lower()
+        if requested not in {"", "inherit"}:
+            return self.chat_model_api_key
+        return self.ai_model_api_key
+
+    @property
+    def effective_chat_model(self) -> str:
+        requested = self.chat_model_provider.strip().lower()
+        if requested in {"", "inherit"}:
+            return self.ai_model_name
+        return self.chat_model_name.strip() or "openai/gpt-oss-20b"
+
     def validate_runtime(self) -> None:
-        if self.ai_model_provider.lower() not in {"deterministic", "openai", "nvidia"}:
+        scanner_provider = self.ai_model_provider.strip().lower()
+        if scanner_provider not in {"deterministic", "openai", "nvidia"}:
             raise ValueError("AI_MODEL_PROVIDER must be 'deterministic', 'openai', or 'nvidia'")
+        if self.effective_chat_provider not in {"deterministic", "openai", "nvidia", "groq"}:
+            raise ValueError(
+                "CHAT_MODEL_PROVIDER must be 'inherit', 'deterministic', 'openai', 'nvidia', or 'groq'"
+            )
         if self.max_image_upload_mb <= 0:
             raise ValueError("MAX_IMAGE_UPLOAD_MB must be greater than zero")
         if self.rate_limit_requests <= 0 or self.rate_limit_window_seconds <= 0:
@@ -71,10 +103,16 @@ class Settings(BaseSettings):
         ]
         if missing:
             raise ValueError(f"Missing required production configuration: {', '.join(missing)}")
-        if self.ai_model_provider.lower() in {"openai", "nvidia"} and not self.ai_model_api_key:
+        if scanner_provider in {"openai", "nvidia"} and not self.ai_model_api_key:
             raise ValueError(
                 "AI_MODEL_API_KEY is required when AI_MODEL_PROVIDER is openai or nvidia"
             )
+        if self.effective_chat_provider in {"openai", "nvidia", "groq"} and not self.effective_chat_api_key:
+            raise ValueError(
+                "CHAT_MODEL_API_KEY or AI_MODEL_API_KEY is required for the configured chat provider"
+            )
+        if self.effective_chat_provider == "groq" and not self.groq_base_url.startswith("https://"):
+            raise ValueError("GROQ_BASE_URL must use HTTPS in production")
         if self.allowed_origins.strip() == "*":
             raise ValueError("ALLOWED_ORIGINS must not be '*' in production")
 

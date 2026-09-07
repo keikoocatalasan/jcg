@@ -19,7 +19,7 @@ class SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Text(
         '$numStr — ${title.toLowerCase()}',
-        style: GoogleFonts.jetBrainsMono(
+        style: GoogleFonts.manrope(
           fontSize: 13,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.08,

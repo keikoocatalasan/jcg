@@ -109,12 +109,13 @@ DaySummary _buildDaySummary(
   }
 
   for (final water in waterLogs) {
+    final glasses = (water.amountMl / 250).round();
     totalWaterMl += water.amountMl;
     entries.add(LogEntry(
       id: water.waterLogId,
       type: LogEntryType.water,
       title: 'Water',
-      subtitle: 'Total ${(water.amountMl / 250).round()} glasses',
+      subtitle: '$glasses glass${glasses == 1 ? '' : 'es'}',
       amount: '${water.amountMl}',
       amountUnit: 'ml',
       loggedAt: DateTime.parse(water.loggedAt).toLocal(),

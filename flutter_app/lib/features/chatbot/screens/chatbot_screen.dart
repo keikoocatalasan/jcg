@@ -35,7 +35,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
+      if (mounted && _scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
@@ -65,6 +65,18 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     final sessionId = session?.chatSessionId;
     final messagesAsync =
         sessionId != null ? ref.watch(chatMessagesProvider(sessionId)) : null;
+    if (sessionId != null) {
+      ref.listen(
+        chatMessagesProvider(sessionId),
+        (previous, next) {
+          final previousCount = previous?.valueOrNull?.length;
+          final nextCount = next.valueOrNull?.length;
+          if (nextCount != null && nextCount != previousCount) {
+            _scrollToBottom();
+          }
+        },
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

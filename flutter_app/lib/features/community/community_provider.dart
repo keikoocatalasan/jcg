@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/database/community_cache_repository.dart';
 import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/features/community/community_content_filter.dart';
@@ -12,6 +13,9 @@ const _communityPostTable = 'community_post';
 const _communityLikeTable = 'community_like';
 const _communityCommentTable = 'community_comment';
 const _communityReportTable = 'community_report';
+
+final _localTestLikedPostIds = <String>{};
+final _localTestComments = <String, List<CommunityComment>>{};
 
 Future<String> _resolveCommunityUserId(
   Ref ref,
@@ -206,9 +210,19 @@ String _reportReasonCode(String reason) {
 
 final communityFeedProvider = FutureProvider<List<CommunityPost>>((ref) async {
   final isOnline = ref.watch(isOnlineProvider);
-  final supabase = ref.read(supabaseClientProvider);
   final cacheRepo = ref.read(communityCacheRepositoryProvider);
 
+  if (AppConfig.isLocalTestMode) {
+    final cached = await cacheRepo.readAllVisible();
+    return cached.map((entry) {
+      final post = CommunityPost.fromCache(entry);
+      return post.copyWith(
+        isLikedByMe: _localTestLikedPostIds.contains(post.postId),
+      );
+    }).toList();
+  }
+
+  final supabase = ref.read(supabaseClientProvider);
   if (isOnline) {
     try {
       final response = await supabase
@@ -323,6 +337,8 @@ final communityFeedProvider = FutureProvider<List<CommunityPost>>((ref) async {
 });
 
 final communityRealtimeProvider = Provider.autoDispose<void>((ref) {
+  if (AppConfig.isLocalTestMode) return;
+
   final supabase = ref.read(supabaseClientProvider);
   final channel = supabase.channel('community-feed-live');
 
@@ -366,6 +382,22 @@ final communityRealtimeProvider = Provider.autoDispose<void>((ref) {
 final likePostProvider =
     Provider.family<Future<bool> Function(), String>((ref, postId) {
   return () async {
+    if (AppConfig.isLocalTestMode) {
+      final cacheRepo = ref.read(communityCacheRepositoryProvider);
+      final post = await cacheRepo.readById(postId);
+      if (post == null) return true;
+      final alreadyLiked = _localTestLikedPostIds.contains(postId);
+      if (alreadyLiked) {
+        _localTestLikedPostIds.remove(postId);
+      } else {
+        _localTestLikedPostIds.add(postId);
+      }
+      await cacheRepo.upsert(post.copyWith(
+        likeCount: post.likeCount + (alreadyLiked ? -1 : 1),
+      ));
+      return true;
+    }
+
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
       throw Exception('Liking posts requires an internet connection.');
@@ -408,6 +440,30 @@ final createCommentProvider =
     if (!CommunityContentFilter.check(input.bodyText).allowed) {
       throw Exception('Community content was blocked by the safety filter.');
     }
+    if (AppConfig.isLocalTestMode) {
+      final user = ref.read(authStateProvider).valueOrNull;
+      if (user == null) throw Exception('You must be logged in to comment.');
+      final now = DateTime.now().toUtc().toIso8601String();
+      final comments = _localTestComments.putIfAbsent(input.postId, () => []);
+      comments.add(
+        CommunityComment(
+          commentId: 'local-comment-${comments.length + 1}',
+          postId: input.postId,
+          userId: user.id,
+          authorNickname: 'Demo Admin',
+          bodyText: input.bodyText,
+          createdAt: now,
+        ),
+      );
+      final cacheRepo = ref.read(communityCacheRepositoryProvider);
+      final post = await cacheRepo.readById(input.postId);
+      if (post != null) {
+        await cacheRepo
+            .upsert(post.copyWith(commentCount: post.commentCount + 1));
+      }
+      return true;
+    }
+
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
       throw Exception('Adding comments requires an internet connection.');
@@ -437,6 +493,27 @@ final createPostProvider =
     if (!CommunityContentFilter.check(bodyText).allowed) {
       throw Exception('Community content was blocked by the safety filter.');
     }
+    if (AppConfig.isLocalTestMode) {
+      final user = ref.read(authStateProvider).valueOrNull;
+      if (user == null) throw Exception('You must be logged in to post.');
+      final now = DateTime.now().toUtc().toIso8601String();
+      final postId = 'local-post-${DateTime.now().microsecondsSinceEpoch}';
+      await ref.read(communityCacheRepositoryProvider).upsert(
+            CommunityCacheEntry(
+              postId: postId,
+              userId: user.id,
+              authorNickname: 'Demo Admin',
+              bodyText: bodyText.trim(),
+              likeCount: 0,
+              commentCount: 0,
+              createdAt: now,
+              updatedAt: now,
+              cachedAt: now,
+            ),
+          );
+      return true;
+    }
+
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
       throw Exception('Creating posts requires an internet connection.');
@@ -461,6 +538,15 @@ final createPostProvider =
 final deletePostProvider =
     Provider.family<Future<bool> Function(), String>((ref, postId) {
   return () async {
+    if (AppConfig.isLocalTestMode) {
+      final cacheRepo = ref.read(communityCacheRepositoryProvider);
+      final post = await cacheRepo.readById(postId);
+      if (post != null) {
+        await cacheRepo.upsert(post.copyWith(isDeleted: true));
+      }
+      return true;
+    }
+
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
       throw Exception('Deleting posts requires an internet connection.');
@@ -478,6 +564,8 @@ final deletePostProvider =
 final reportPostProvider =
     Provider.family<Future<bool> Function(), ReportPostInput>((ref, input) {
   return () async {
+    if (AppConfig.isLocalTestMode) return true;
+
     final isOnline = ref.read(isOnlineProvider);
     if (!isOnline) {
       throw Exception('Reporting posts requires an internet connection.');
@@ -508,6 +596,12 @@ final reportPostProvider =
 
 final postCommentsProvider =
     FutureProvider.family<List<CommunityComment>, String>((ref, postId) async {
+  if (AppConfig.isLocalTestMode) {
+    return List<CommunityComment>.unmodifiable(
+      _localTestComments[postId] ?? const <CommunityComment>[],
+    );
+  }
+
   final supabase = ref.read(supabaseClientProvider);
 
   final response = await supabase

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
@@ -66,6 +67,22 @@ class SyncNotifier extends StateNotifier<SyncState> {
   Future<void> startSync() async {
     if (state.isSyncing) return;
 
+    if (AppConfig.isLocalTestMode) {
+      // Local QA deliberately keeps writes in SQLite. Calling Supabase with
+      // the synthetic demo identity would create misleading auth failures.
+      final pending = await _getPendingCount();
+      if (mounted) {
+        state = state.copyWith(
+          isSyncing: false,
+          lastSyncAt: DateTime.now(),
+          pendingCount: pending,
+          lastResult: const SyncResult(skipped: 1, total: 1),
+          clearSyncing: true,
+        );
+      }
+      return;
+    }
+
     state = state.copyWith(isSyncing: true);
 
     try {
@@ -116,6 +133,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
   }
 
   Future<int> retryFailed() async {
+    if (AppConfig.isLocalTestMode) return 0;
     final service = _ref.read(syncQueueServiceProvider);
     final count = await service.retryFailed();
     if (count > 0) {

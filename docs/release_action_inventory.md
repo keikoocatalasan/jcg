@@ -10,7 +10,7 @@ This is the execution checklist for verifying every reachable, released dynamic 
 | Tracking | Add/history hydration and weight; target recalculation | SQLite transaction + queue + `water_log`, `weight_log`, target/snapshot tables |
 | Planner/recommendations | Add, skip, convert plan; generate and inspect recommendations | Local engine/repositories + queue + planner/recommendation tables |
 | AI scanner | Camera, preview, upload, candidates, correction, confirmation, feedback | Camera permission + FastAPI + local scan repositories + feedback endpoint |
-| AI chat | Send, safe/redirected/blocked reply, history | FastAPI + local chat repositories + sync queue |
+| AI chat | Send, safe/redirected/blocked reply, history; Groq or inherited NVIDIA provider | FastAPI + local chat repositories + sync queue; provider key stays server-side |
 | Community | Refresh, create/delete post, comment, like, report | RLS-protected community Supabase tables and visible error state |
 | Administration | Catalog edits, price write/history, reports, hide/dismiss actions | Admin role + RLS/grants; audit log where supported |
 | Synchronization | Retry, pending/failed inspection, reconnect, duplicate replay | Sync queue state transitions and idempotent Supabase writes |

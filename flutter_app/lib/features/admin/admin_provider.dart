@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 
 final isAdminProvider = FutureProvider<bool>((ref) async {
+  if (AppConfig.isLocalTestMode) return true;
+
   final session = ref.watch(authSessionProvider);
   if (session == null) return false;
   final row = await ref
@@ -46,6 +49,17 @@ class DashboardKpis {
 }
 
 final dashboardKpisProvider = FutureProvider<DashboardKpis>((ref) async {
+  if (AppConfig.isLocalTestMode) {
+    return const DashboardKpis(
+      totalUsers: 128,
+      activeUsers: 86,
+      totalMealLogs: 1842,
+      totalAiScans: 316,
+      reportCount: 24,
+      pendingPostReports: 3,
+    );
+  }
+
   final supabase = ref.read(supabaseClientProvider);
   final result = await supabase.rpc('admin_dashboard_kpis');
   return DashboardKpis.fromJson(result as Map<String, dynamic>);
@@ -65,6 +79,14 @@ class AdminBlockedWord {
 
 final adminBlockedWordsProvider =
     FutureProvider<List<AdminBlockedWord>>((ref) async {
+  if (AppConfig.isLocalTestMode) {
+    return const [
+      AdminBlockedWord(id: 1, word: 'spam', isActive: true),
+      AdminBlockedWord(id: 2, word: 'scam', isActive: true),
+      AdminBlockedWord(id: 3, word: 'harassment', isActive: false),
+    ];
+  }
+
   final rows = await ref
       .read(supabaseClientProvider)
       .from('community_blocked_word')
@@ -94,6 +116,13 @@ class AdminRoleOption {
 }
 
 final adminRolesProvider = FutureProvider<List<AdminRoleOption>>((ref) async {
+  if (AppConfig.isLocalTestMode) {
+    return const [
+      AdminRoleOption(id: 1, code: 'user', name: 'User'),
+      AdminRoleOption(id: 2, code: 'admin', name: 'Administrator'),
+    ];
+  }
+
   final rows = await ref
       .read(supabaseClientProvider)
       .from('role')
@@ -125,6 +154,13 @@ class AdminAccountStatusOption {
 
 final adminAccountStatusesProvider =
     FutureProvider<List<AdminAccountStatusOption>>((ref) async {
+  if (AppConfig.isLocalTestMode) {
+    return const [
+      AdminAccountStatusOption(id: 1, code: 'active', name: 'Active'),
+      AdminAccountStatusOption(id: 2, code: 'disabled', name: 'Disabled'),
+    ];
+  }
+
   final rows = await ref
       .read(supabaseClientProvider)
       .from('account_status')
@@ -169,6 +205,23 @@ class AdminUserEntry {
 }
 
 final adminUsersProvider = FutureProvider<List<AdminUserEntry>>((ref) async {
+  if (AppConfig.isLocalTestMode) {
+    return [
+      AdminUserEntry(
+        userId: AppConfig.localTestUserId,
+        authUserId: AppConfig.localTestUserId,
+        email: AppConfig.localTestUserEmail,
+        roleId: 2,
+        roleName: 'Administrator',
+        statusId: 1,
+        statusCode: 'active',
+        statusName: 'Active',
+        nickname: 'Demo Admin',
+        createdAt: DateTime(2026, 1, 1),
+      ),
+    ];
+  }
+
   final supabase = ref.read(supabaseClientProvider);
   final roles = await ref.watch(adminRolesProvider.future);
   final statuses = await ref.watch(adminAccountStatusesProvider.future);
@@ -273,6 +326,19 @@ class AdminAuditEntry {
 
 final adminAuditLogProvider =
     FutureProvider<List<AdminAuditEntry>>((ref) async {
+  if (AppConfig.isLocalTestMode) {
+    return [
+      AdminAuditEntry(
+        id: 'local-audit-1',
+        auditType: 'System',
+        action: 'local_test_session',
+        actorId: AppConfig.localTestUserId,
+        details: 'Local QA data is isolated from hosted services.',
+        createdAt: DateTime.now(),
+      ),
+    ];
+  }
+
   final supabase = ref.read(supabaseClientProvider);
   final statuses = await ref.watch(adminAccountStatusesProvider.future);
   final moderationRows = await supabase
@@ -386,6 +452,11 @@ final pagedOfficialFoodsProvider =
 /// web build where sqflite has no default database factory.
 final pagedAdminFoodsProvider =
     FutureProvider.family<List<Food>, int>((ref, pages) async {
+  if (AppConfig.isLocalTestMode) {
+    final foods = await ref.read(allOfficialFoodsProvider(0).future);
+    return foods.take(adminFoodPageSize * pages).toList(growable: false);
+  }
+
   final supabase = ref.read(supabaseClientProvider);
   const baseSelection =
       'food_id, owner_user_id, food_name, normalized_name, is_local_food, '

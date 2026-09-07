@@ -361,6 +361,7 @@ p {
 
 .hero-meta {
     display: flex;
+    flex-wrap: wrap;
     gap: 24px;
     color: var(--text-muted);
     font-size: 12px;
@@ -372,6 +373,13 @@ p {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+.download-meta {
+    margin: -4px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    letter-spacing: 0.03em;
 }
 
 .check-icon {
@@ -672,6 +680,17 @@ p {
 .cta-bottom {
     text-align: center;
     margin-top: var(--spacing-lg);
+}
+
+.download-footnote {
+    margin: 14px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.download-footnote a {
+    color: var(--accent-primary);
 }
 
 /* ==========================================================================

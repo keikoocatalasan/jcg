@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -34,6 +35,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   bool _isInitializing = false;
   bool _isTakingPhoto = false;
   bool _isLiveInferenceBusy = false;
+  static const _liveInferenceDefault = bool.fromEnvironment(
+    'JCG_LIVE_PREVIEW',
+    defaultValue: false,
+  );
+  bool _liveInferenceEnabled = _liveInferenceDefault;
+  int _liveInferenceGeneration = 0;
   DateTime? _lastLiveInferenceAt;
   String? _liveFoodName;
   double _liveConfidence = 0;
@@ -51,7 +58,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
+    unawaited(_disposeCamera(updateState: false));
     super.dispose();
   }
 
@@ -98,9 +105,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       );
       final controller = CameraController(
         selectedCamera,
-        ResolutionPreset.high,
+        // Medium keeps the preview responsive on budget phones. The final
+        // shutter image still goes through the full recognition pipeline.
+        ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.yuv420,
       );
 
       await controller.initialize();
@@ -114,8 +122,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         _isInitialized = true;
         _permissionChecked = true;
         _noCameras = false;
+        _lastLiveInferenceAt = null;
       });
-      unawaited(_startLiveInference(controller));
+      if (_liveInferenceEnabled) {
+        unawaited(_startLiveInference(controller));
+      }
     } on CameraException catch (e) {
       if (mounted) {
         final denied = e.code == 'CameraAccessDenied' ||
@@ -155,9 +166,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     }
   }
 
-  Future<void> _disposeCamera() async {
+  Future<void> _disposeCamera({bool updateState = true}) async {
     final controller = _controller;
     _controller = null;
+    _liveInferenceGeneration++;
     if (controller?.value.isStreamingImages == true) {
       try {
         await controller!.stopImageStream();
@@ -165,8 +177,22 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         // The controller may already be closing during an app lifecycle change.
       }
     }
-    if (mounted) setState(() => _isInitialized = false);
+    if (updateState && mounted) setState(() => _isInitialized = false);
     await controller?.dispose();
+  }
+
+  Future<void> _toggleLiveInference() async {
+    final controller = _controller;
+    if (controller == null || !_isInitialized) return;
+
+    if (_liveInferenceEnabled) {
+      setState(() => _liveInferenceEnabled = false);
+      await _stopLiveInference();
+      return;
+    }
+
+    setState(() => _liveInferenceEnabled = true);
+    await _startLiveInference(controller);
   }
 
   Future<void> _toggleFlash() async {
@@ -239,22 +265,26 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   Future<void> _startLiveInference(CameraController controller) async {
+    if (!_liveInferenceEnabled) return;
     if (controller.value.isStreamingImages) return;
     try {
       await controller.startImageStream(_onCameraImage);
     } on CameraException {
       // Live preview is an enhancement; the shutter still works if the device
       // cannot provide a compatible image stream.
+      if (mounted) setState(() => _liveInferenceEnabled = false);
     }
   }
 
   Future<void> _stopLiveInference() async {
     final controller = _controller;
-    if (controller == null || !controller.value.isStreamingImages) return;
-    try {
-      await controller.stopImageStream();
-    } catch (_) {
-      // Ignore a stream that was already stopped by the camera plugin.
+    _liveInferenceGeneration++;
+    if (controller != null && controller.value.isStreamingImages) {
+      try {
+        await controller.stopImageStream();
+      } catch (_) {
+        // Ignore a stream that was already stopped by the camera plugin.
+      }
     }
     if (mounted) {
       setState(() {
@@ -268,12 +298,18 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   void _onCameraImage(CameraImage image) {
-    if (_isTakingPhoto || _isLiveInferenceBusy || !mounted) return;
+    if (!_liveInferenceEnabled ||
+        _isTakingPhoto ||
+        _isLiveInferenceBusy ||
+        !mounted) {
+      return;
+    }
     final now = DateTime.now();
     final last = _lastLiveInferenceAt;
-    if (last != null && now.difference(last).inMilliseconds < 450) return;
+    if (last != null && now.difference(last).inMilliseconds < 900) return;
     _lastLiveInferenceAt = now;
     _isLiveInferenceBusy = true;
+    final generation = ++_liveInferenceGeneration;
     Future<void>(() async {
       try {
         final jpeg = _cameraImageToJpeg(image);
@@ -281,7 +317,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         final recognitions = await ref
             .read(localFoodRecognitionServiceProvider)
             .recognizeBytes(jpeg);
-        if (!mounted || recognitions.isEmpty) return;
+        if (!mounted ||
+            generation != _liveInferenceGeneration ||
+            recognitions.isEmpty) {
+          return;
+        }
         final top = recognitions.first;
         final isSame = top.foodName == _stableFoodName;
         final nextStableCount = isSame ? _stableFrameCount + 1 : 1;
@@ -295,37 +335,71 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         // Keep the preview usable; the final still scan reports actionable
         // errors and can use the online fallback.
       } finally {
-        _isLiveInferenceBusy = false;
+        if (generation == _liveInferenceGeneration) {
+          _isLiveInferenceBusy = false;
+        }
       }
     });
   }
 
   Uint8List? _cameraImageToJpeg(CameraImage image) {
-    if (image.format.group != ImageFormatGroup.yuv420 ||
-        image.planes.length < 3) {
+    final format = image.format.group;
+    if (format != ImageFormatGroup.yuv420 &&
+        format != ImageFormatGroup.bgra8888) {
       return null;
     }
     final width = image.width;
     final height = image.height;
-    final yPlane = image.planes[0];
-    final uPlane = image.planes[1];
-    final vPlane = image.planes[2];
-    final output = img.Image(width: width, height: height);
+    if (width <= 0 || height <= 0 || image.planes.isEmpty) return null;
 
-    for (var y = 0; y < height; y++) {
-      final yRow = y * yPlane.bytesPerRow;
-      final uvRow = (y ~/ 2) * uPlane.bytesPerRow;
-      for (var x = 0; x < width; x++) {
-        final yValue = yPlane.bytes[yRow + x];
-        final uvColumn = (x ~/ 2) * (uPlane.bytesPerPixel ?? 1);
-        final uValue = uPlane.bytes[uvRow + uvColumn];
-        final vValue = vPlane.bytes[uvRow + uvColumn];
-        final luminance = yValue.toDouble();
-        final red = (luminance + 1.402 * (vValue - 128)).round();
-        final green =
-            (luminance - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128))
-                .round();
-        final blue = (luminance + 1.772 * (uValue - 128)).round();
+    // Live inference is a preview hint, not a photo export. Downsample before
+    // any conversion so a 1080p camera frame never becomes a million-pixel
+    // Dart loop on the UI isolate.
+    final scale = math.min(1.0, 320 / math.max(width, height));
+    final sampledWidth = math.max(1, (width * scale).round());
+    final sampledHeight = math.max(1, (height * scale).round());
+    final output = img.Image(width: sampledWidth, height: sampledHeight);
+
+    int readByte(Plane plane, int row, int column) {
+      final bytesPerPixel = plane.bytesPerPixel ?? 1;
+      final index = row * plane.bytesPerRow + column * bytesPerPixel;
+      if (index < 0 || index >= plane.bytes.length) return 128;
+      return plane.bytes[index];
+    }
+
+    for (var y = 0; y < sampledHeight; y++) {
+      final sourceY = (y * height / sampledHeight).floor().clamp(0, height - 1);
+      for (var x = 0; x < sampledWidth; x++) {
+        final sourceX = (x * width / sampledWidth).floor().clamp(0, width - 1);
+        int red;
+        int green;
+        int blue;
+        if (format == ImageFormatGroup.bgra8888) {
+          final plane = image.planes.first;
+          final bytesPerPixel = plane.bytesPerPixel ?? 4;
+          final index = sourceY * plane.bytesPerRow + sourceX * bytesPerPixel;
+          if (index < 0 || index + 2 >= plane.bytes.length) return null;
+          blue = plane.bytes[index];
+          green = plane.bytes[index + 1];
+          red = plane.bytes[index + 2];
+        } else {
+          if (image.planes.length < 3) return null;
+          final yPlane = image.planes[0];
+          final uPlane = image.planes[1];
+          final vPlane = image.planes[2];
+          final yValue = readByte(yPlane, sourceY, sourceX);
+          final uvRow = sourceY ~/ 2;
+          final uvColumn = sourceX ~/ 2;
+          final uValue = readByte(uPlane, uvRow, uvColumn);
+          final vValue = readByte(vPlane, uvRow, uvColumn);
+          final luminance = yValue.toDouble();
+          red = (luminance + 1.402 * (vValue - 128)).round();
+          green = (luminance -
+                  0.344136 * (uValue - 128) -
+                  0.714136 * (vValue - 128))
+              .round();
+          blue = (luminance + 1.772 * (uValue - 128)).round();
+        }
         output.setPixelRgb(
           x,
           y,
@@ -335,7 +409,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         );
       }
     }
-    return Uint8List.fromList(img.encodeJpg(output, quality: 65));
+    return Uint8List.fromList(img.encodeJpg(output, quality: 60));
   }
 
   Widget _buildLiveStatus(ThemeData theme) {
@@ -361,7 +435,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           Expanded(
             child: Text(
               label == null
-                  ? 'Point the camera at one dish'
+                  ? _liveInferenceEnabled
+                      ? 'Point the camera at one dish'
+                      : 'Live analysis off • preview stays smooth'
                   : isStable
                       ? 'Preview: $label'
                       : 'Hold steady: $label',
@@ -460,6 +536,18 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           if (_isInitialized)
             IconButton(
               icon: Icon(
+                _liveInferenceEnabled
+                    ? Icons.auto_awesome
+                    : Icons.auto_awesome_outlined,
+              ),
+              onPressed: _toggleLiveInference,
+              tooltip: _liveInferenceEnabled
+                  ? 'Turn off live analysis'
+                  : 'Turn on live analysis',
+            ),
+          if (_isInitialized)
+            IconButton(
+              icon: Icon(
                 _flashMode == FlashMode.off
                     ? Icons.flash_off
                     : _flashMode == FlashMode.always
@@ -487,7 +575,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.no_photography, size: 64, color: AppColors.error),
+              const Icon(Icons.no_photography,
+                  size: 64, color: AppColors.error),
               const SizedBox(height: 16),
               Text(
                 'Camera Access Required',
@@ -630,12 +719,11 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 color: AppColors.warning,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(Icons.wifi_off,
-                      color: AppColors.textPrimary, size: 20),
-                  const SizedBox(width: 8),
-                  const Expanded(
+                  Icon(Icons.wifi_off, color: AppColors.textPrimary, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
                     child: Text(
                       'On-device Adobo/Sinigang recognition works offline. Cloud refinement is unavailable.',
                       style: TextStyle(
@@ -683,13 +771,13 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: AppColors.textMuted, width: 1),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.lightbulb_outline,
+                  Icon(Icons.lightbulb_outline,
                       color: AppColors.textPrimary, size: 18),
-                  const SizedBox(width: 6),
-                  const Text(
+                  SizedBox(width: 6),
+                  Text(
                     'Tips',
                     style: TextStyle(
                       color: AppColors.textPrimary,

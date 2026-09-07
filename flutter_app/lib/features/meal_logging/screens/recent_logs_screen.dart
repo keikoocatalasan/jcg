@@ -14,6 +14,8 @@ class RecentLogsScreen extends ConsumerStatefulWidget {
 }
 
 class _RecentLogsScreenState extends ConsumerState<RecentLogsScreen> {
+  LogFilter _filter = LogFilter.all;
+
   @override
   Widget build(BuildContext context) {
     final logsAsync = ref.watch(recentLogsProvider);
@@ -58,6 +60,7 @@ class _RecentLogsScreenState extends ConsumerState<RecentLogsScreen> {
                   ],
                 ),
               ),
+            _buildFilterBar(),
             Expanded(
               child: logsAsync.when(
                 loading: () => _buildLoadingSkeleton(),
@@ -65,12 +68,9 @@ class _RecentLogsScreenState extends ConsumerState<RecentLogsScreen> {
                 data: (data) {
                   final today = data['today'];
                   final yesterday = data['yesterday'];
-                  final hasMealEntries = [
-                    ...?today?.entries,
-                    ...?yesterday?.entries,
-                  ].any((entry) => entry.type == LogEntryType.meal);
-                  if (!hasMealEntries) return _buildEmptyState();
-                  return _buildLogList(today, yesterday);
+                  final entries = _filteredEntries(today, yesterday);
+                  if (entries.isEmpty) return _buildEmptyState();
+                  return _buildLogList(entries);
                 },
               ),
             ),
@@ -81,12 +81,48 @@ class _RecentLogsScreenState extends ConsumerState<RecentLogsScreen> {
     );
   }
 
-  Widget _buildLogList(DaySummary? today, DaySummary? yesterday) {
-    final allEntries = [
-      ...?today?.entries,
-      ...?yesterday?.entries,
-    ].where((e) => e.type == LogEntryType.meal).toList();
+  Widget _buildFilterBar() {
+    const filters = [
+      (LogFilter.all, 'All'),
+      (LogFilter.meals, 'Meals'),
+      (LogFilter.water, 'Water'),
+      (LogFilter.weight, 'Weight'),
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Row(
+        children: filters.map((filter) {
+          final selected = _filter == filter.$1;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filter.$2),
+              selected: selected,
+              onSelected: (_) => setState(() => _filter = filter.$1),
+              showCheckmark: false,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
 
+  List<LogEntry> _filteredEntries(DaySummary? today, DaySummary? yesterday) {
+    final entries = [...?today?.entries, ...?yesterday?.entries];
+    if (_filter == LogFilter.meals) {
+      return entries.where((e) => e.type == LogEntryType.meal).toList();
+    }
+    if (_filter == LogFilter.water) {
+      return entries.where((e) => e.type == LogEntryType.water).toList();
+    }
+    if (_filter == LogFilter.weight) {
+      return entries.where((e) => e.type == LogEntryType.weight).toList();
+    }
+    return entries;
+  }
+
+  Widget _buildLogList(List<LogEntry> allEntries) {
     allEntries.sort((a, b) => b.loggedAt.compareTo(a.loggedAt));
 
     final grouped = <String, List<LogEntry>>{};
@@ -105,14 +141,30 @@ class _RecentLogsScreenState extends ConsumerState<RecentLogsScreen> {
           for (final dateLabel in sortedDates) ...[
             _DayHeader(
               label: dateLabel,
-              totalCalories: grouped[dateLabel]!
-                  .fold(0, (sum, e) => sum + (int.tryParse(e.amount) ?? 0)),
+              summary: _daySummary(grouped[dateLabel]!),
             ),
             ...grouped[dateLabel]!.map((entry) => _LogEntryTile(entry: entry)),
           ],
         ],
       ),
     );
+  }
+
+  String _daySummary(List<LogEntry> entries) {
+    switch (_filter) {
+      case LogFilter.water:
+        final total =
+            entries.fold(0, (sum, e) => sum + (int.tryParse(e.amount) ?? 0));
+        return '$total ml';
+      case LogFilter.weight:
+        return '${entries.length} entr${entries.length == 1 ? 'y' : 'ies'}';
+      case LogFilter.all:
+      case LogFilter.meals:
+        final calories = entries
+            .where((e) => e.type == LogEntryType.meal)
+            .fold(0, (sum, e) => sum + (int.tryParse(e.amount) ?? 0));
+        return '$calories kcal';
+    }
   }
 
   Widget _buildLoadingSkeleton() {
@@ -296,11 +348,11 @@ class _RecentLogsScreenState extends ConsumerState<RecentLogsScreen> {
 
 class _DayHeader extends StatelessWidget {
   final String label;
-  final int totalCalories;
+  final String summary;
 
   const _DayHeader({
     required this.label,
-    required this.totalCalories,
+    required this.summary,
   });
 
   @override
@@ -326,7 +378,7 @@ class _DayHeader extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            '$totalCalories kcal',
+            summary,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.calorieColor,
@@ -349,18 +401,15 @@ class _LogEntryTile extends StatelessWidget {
       child: GlassCard(
         child: InkWell(
           onTap: () => context.push(
-            '/edit-meal-log',
-            extra: {
-              'mealLogId': entry.id,
-              'mealType': entry.mealTypeCode,
-            },
+            _editRouteFor(entry),
+            extra: _editRouteArgs(entry),
           ),
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                _mealIcon(entry.mealTypeCode),
+                _entryIcon(entry),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -372,9 +421,23 @@ class _LogEntryTile extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                       ),
-                      const SizedBox(height: 2),
+                      if (entry.subtitle != null &&
+                          entry.subtitle!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          entry.subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                        ),
+                      ],
+                      const SizedBox(height: 1),
                       Text(
-                        '${entry.subtitle ?? ''}${entry.subtitle == null ? '' : ' • '}${_formatTime(entry.loggedAt)}',
+                        _formatTime(entry.loggedAt),
+                        maxLines: 1,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -382,12 +445,17 @@ class _LogEntryTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
-                  '${entry.amount} ${entry.amountUnit}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.calorieColor,
-                      ),
+                Flexible(
+                  child: Text(
+                    '${entry.amount} ${entry.amountUnit}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.calorieColor,
+                        ),
+                  ),
                 ),
                 const SizedBox(width: 4),
                 const Icon(Icons.chevron_right,
@@ -398,6 +466,31 @@ class _LogEntryTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _editRouteFor(LogEntry entry) {
+    switch (entry.type) {
+      case LogEntryType.meal:
+        return '/edit-meal-log';
+      case LogEntryType.water:
+        return '/edit-water-log';
+      case LogEntryType.weight:
+        return '/edit-weight-log';
+    }
+  }
+
+  static Map<String, dynamic> _editRouteArgs(LogEntry entry) {
+    switch (entry.type) {
+      case LogEntryType.meal:
+        return {
+          'mealLogId': entry.id,
+          'mealType': entry.mealTypeCode,
+        };
+      case LogEntryType.water:
+        return {'waterLogId': entry.id};
+      case LogEntryType.weight:
+        return {'weightLogId': entry.id};
+    }
   }
 
   static Widget _mealIcon(String code) {
@@ -447,6 +540,28 @@ class _LogEntryTile extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Icon(iconData, color: iconColor, size: 24),
+    );
+  }
+
+  static Widget _entryIcon(LogEntry entry) {
+    if (entry.type == LogEntryType.water) {
+      return _iconBadge(Icons.water_drop_outlined);
+    }
+    if (entry.type == LogEntryType.weight) {
+      return _iconBadge(Icons.monitor_weight_outlined);
+    }
+    return _mealIcon(entry.mealTypeCode);
+  }
+
+  static Widget _iconBadge(IconData icon) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: const BoxDecoration(
+        color: AppColors.accentSoft,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: AppColors.accentPrimary, size: 24),
     );
   }
 

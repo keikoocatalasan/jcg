@@ -522,6 +522,161 @@ class LocalTransactionHelper {
     });
   }
 
+  /// Update a water entry and enqueue the same payload for cloud sync.
+  Future<void> updateWaterLog(Map<String, dynamic> waterLogData) async {
+    final db = await _dbProvider.database;
+    final userId = waterLogData['user_id'] as String;
+    final operationId = _uuid.v4();
+    final clientSequence = DateTime.now().millisecondsSinceEpoch;
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    await db.transaction((txn) async {
+      final changed = await txn.update(
+        'water_logs',
+        {
+          'amount_ml': waterLogData['amount_ml'],
+          'logged_at': waterLogData['logged_at'],
+          'sync_status': 'pending',
+          'updated_at': now,
+        },
+        where: 'water_log_id = ? AND user_id = ?',
+        whereArgs: [waterLogData['water_log_id'], userId],
+      );
+      if (changed == 0) {
+        throw StateError('Water entry was not found for this account.');
+      }
+      await _enqueueSync(
+        txn,
+        userId,
+        operationId,
+        clientSequence,
+        'water_log',
+        waterLogData['water_log_id'],
+        'update',
+        waterLogData,
+      );
+    });
+  }
+
+  /// Update a weight entry atomically. When the edited entry is the current
+  /// weight, callers can also provide a profile update and freshly calculated
+  /// target/snapshot rows so dashboard nutrition stays consistent.
+  Future<void> updateWeightLogAndRecalculate({
+    required Map<String, dynamic> weightLogData,
+    Map<String, dynamic>? profileUpdateData,
+    Map<String, dynamic>? newTargetData,
+    Map<String, dynamic>? dailySnapshotData,
+  }) async {
+    final db = await _dbProvider.database;
+    final userId = weightLogData['user_id'] as String;
+    final baseSequence = DateTime.now().millisecondsSinceEpoch;
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    await db.transaction((txn) async {
+      final changed = await txn.update(
+        'weight_logs',
+        {
+          'weight_kg': weightLogData['weight_kg'],
+          'logged_at': weightLogData['logged_at'],
+          'sync_status': 'pending',
+          'updated_at': now,
+        },
+        where: 'weight_log_id = ? AND user_id = ?',
+        whereArgs: [weightLogData['weight_log_id'], userId],
+      );
+      if (changed == 0) {
+        throw StateError('Weight entry was not found for this account.');
+      }
+
+      await _enqueueSync(
+        txn,
+        userId,
+        _uuid.v4(),
+        baseSequence,
+        'weight_log',
+        weightLogData['weight_log_id'],
+        'update',
+        weightLogData,
+      );
+
+      if (profileUpdateData != null && profileUpdateData.isNotEmpty) {
+        final profilePayload = <String, dynamic>{
+          ...profileUpdateData,
+          'user_id': userId,
+        };
+        await txn.update(
+          'profiles',
+          {
+            ...profileUpdateData,
+            'sync_status': 'pending',
+            'updated_at': now,
+          },
+          where: 'user_id = ?',
+          whereArgs: [userId],
+        );
+        await _enqueueSync(
+          txn,
+          userId,
+          _uuid.v4(),
+          baseSequence + 1,
+          'profile',
+          userId,
+          'update',
+          profilePayload,
+        );
+      }
+
+      if (newTargetData != null && dailySnapshotData != null) {
+        await txn.update(
+          'nutrition_targets',
+          {'is_active': 0, 'effective_to': now},
+          where: 'user_id = ? AND is_active = 1',
+          whereArgs: [userId],
+        );
+        await txn.insert('nutrition_targets', {
+          'target_id': newTargetData['target_id'],
+          'user_id': userId,
+          ...newTargetData,
+          'is_active': 1,
+          'sync_status': 'pending',
+          'created_at': now,
+        });
+        await txn.insert(
+          'daily_target_snapshots',
+          {
+            'snapshot_id': dailySnapshotData['snapshot_id'],
+            'user_id': userId,
+            ...dailySnapshotData,
+            'sync_status': 'pending',
+            'created_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+
+        await _enqueueSync(
+          txn,
+          userId,
+          _uuid.v4(),
+          baseSequence + 2,
+          'nutrition_target',
+          newTargetData['target_id'],
+          'create',
+          {...newTargetData, 'is_active': 1},
+        );
+        await _enqueueSync(
+          txn,
+          userId,
+          _uuid.v4(),
+          baseSequence + 3,
+          'daily_target_snapshot',
+          dailySnapshotData['snapshot_id'],
+          'create',
+          dailySnapshotData,
+        );
+      }
+    });
+  }
+
   /// Hard delete planned meal plan + sync tombstone
   Future<void> deletePlannedMeal(String mealPlanId, String userId) async {
     final db = await _dbProvider.database;

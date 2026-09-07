@@ -10,6 +10,31 @@ import 'package:jcg_fitness/core/errors/result.dart';
 import 'package:jcg_fitness/core/errors/app_error.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 
+/// Test-only identity used by the local walkthrough build. It is deliberately
+/// not written into Supabase and is only exposed when the compile-time local
+/// test flag is enabled.
+const localTestUser = User(
+  id: AppConfig.localTestUserId,
+  appMetadata: <String, dynamic>{'provider': 'local_test'},
+  userMetadata: <String, dynamic>{'full_name': 'Demo Admin'},
+  aud: 'authenticated',
+  email: AppConfig.localTestUserEmail,
+  createdAt: '2026-01-01T00:00:00Z',
+  emailConfirmedAt: '2026-01-01T00:00:00Z',
+  role: 'authenticated',
+  updatedAt: '2026-01-01T00:00:00Z',
+);
+
+final localTestSession = Session(
+  accessToken: 'local-test-token',
+  tokenType: 'bearer',
+  user: localTestUser,
+);
+
+final localTestAuthEnabledProvider = StateProvider<bool>((ref) {
+  return AppConfig.isLocalTestMode;
+});
+
 /// Checks whether Google Play Services is available on this device.
 /// Returns true if available, false if missing (e.g. Huawei, custom ROMs, China).
 Future<bool> isGooglePlayServicesAvailable() async {
@@ -34,10 +59,18 @@ Future<bool> isGooglePlayServicesAvailable() async {
 
 final authSessionProvider = Provider<Session?>((ref) {
   ref.watch(authStateProvider);
+  final localTestEnabled = ref.watch(localTestAuthEnabledProvider);
+  if (AppConfig.isLocalTestMode && localTestEnabled) {
+    return localTestSession;
+  }
   return Supabase.instance.client.auth.currentSession;
 });
 
 final authStateProvider = StreamProvider<User?>((ref) {
+  final localTestEnabled = ref.watch(localTestAuthEnabledProvider);
+  if (AppConfig.isLocalTestMode && localTestEnabled) {
+    return Stream<User?>.value(localTestUser);
+  }
   return Supabase.instance.client.auth.onAuthStateChange.map(
     (event) => event.session?.user,
   );
@@ -101,6 +134,11 @@ class AuthService {
   }
 
   Future<Result<Session>> login(String email, String password) async {
+    if (AppConfig.isLocalTestMode) {
+      _ref.read(localTestAuthEnabledProvider.notifier).state = true;
+      return Success(localTestSession);
+    }
+
     try {
       final response = await _supabase.auth.signInWithPassword(
         email: email,
@@ -127,6 +165,10 @@ class AuthService {
   }
 
   Future<Result<bool>> checkAccountStatus(String authUserId) async {
+    if (AppConfig.isLocalTestMode && authUserId == localTestUser.id) {
+      return const Success(true);
+    }
+
     try {
       final response = await _supabase
           .from('app_user')
@@ -162,6 +204,11 @@ class AuthService {
   }
 
   Future<Result<User>> signInWithGoogle() async {
+    if (AppConfig.isLocalTestMode) {
+      _ref.read(localTestAuthEnabledProvider.notifier).state = true;
+      return const Success(localTestUser);
+    }
+
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -233,6 +280,11 @@ class AuthService {
   }
 
   Future<Result<void>> logout() async {
+    if (AppConfig.isLocalTestMode) {
+      _ref.read(localTestAuthEnabledProvider.notifier).state = false;
+      return const Success(null);
+    }
+
     try {
       await _supabase.auth.signOut();
       return const Success(null);

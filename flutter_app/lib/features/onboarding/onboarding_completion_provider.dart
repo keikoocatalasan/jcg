@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/profile_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -15,6 +16,10 @@ String onboardingCompleteKey(String userId) => 'onboarding_complete_$userId';
 /// Administrators use the moderation and catalog console, so they do not need
 /// to complete the nutrition-specific onboarding flow before accessing it.
 Future<bool> loadAdminAccess(String userId) async {
+  if (AppConfig.isLocalTestMode && userId == AppConfig.localTestUserId) {
+    return true;
+  }
+
   try {
     final appUser = await Supabase.instance.client
         .from('app_user')
@@ -28,6 +33,11 @@ Future<bool> loadAdminAccess(String userId) async {
 }
 
 Future<bool> loadOnboardingComplete(String userId) async {
+  if (AppConfig.isLocalTestMode && userId == AppConfig.localTestUserId) {
+    await saveOnboardingComplete(userId, true);
+    return true;
+  }
+
   bool? localCompletion;
 
   // Admins should be able to enter the admin console even when they do not
