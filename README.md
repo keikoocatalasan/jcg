@@ -10,6 +10,10 @@ JCG Fitness is an offline-first, budget-aware nutrition tracking application bui
 - Use AI-assisted food scanning and nutrition guidance through the FastAPI service.
 - Moderate community content and manage food data, users, analytics, and audit records through a protected admin area.
 
+## Public download
+
+The current Android release is available from the [JCG Fitness landing page](https://nutrismart-ai-sce8.onrender.com/). The page uses GitHub's `latest` release redirect, so publishing a newer release automatically updates the download link without changing the site.
+
 ## Architecture
 
 | Area | Technology |
