@@ -12,6 +12,7 @@ Status: v1.0.1 is publicly downloadable; the landing page is live from the relea
 - Vercel account: Hobby, last 30 days 12.1 MB/100 GB transfer and 1.7K/1M edge requests. Only SBMS is listed as a project. Do not deploy JCG into that unrelated project.
 - Supabase dashboard currently requires MFA. Actual plan, remaining usage, and bucket limits have not been verified.
 - Public landing URL: https://nutrismart-ai-sce8.onrender.com/ . Render deployment `dep-dafactn40ujc73adjofg` succeeded from commit `902b6ad3`.
+- Public API URL: https://nutrismart-ai-backend.onrender.com/ . Render deployment `dep-dafahhtg1s2s73dnknrg` is live from commit `1271b4ce` and reports production readiness.
 
 Release asset sizes and checksums are published in `SHA256SUMS.txt`; the
 universal APK is 98,786,812 bytes (about 94.2 MiB), ARM64 is about 37.9 MiB,
@@ -58,8 +59,8 @@ The signing key must remain the same for in-place Android updates. Store the key
 The first tag workflow run correctly stopped at its signing-secret check because
 those GitHub Actions secrets are not configured yet. The release was published
 from the locally verified APKs. Until the secrets are added, repeat the same
-local build/upload steps for a new version; once added, tag pushes will publish
-the release automatically.
+local build/upload steps using `tools/publish_android_release.ps1`; once the
+secrets are added, tag pushes will publish the release automatically.
 
 ## Completion evidence
 
