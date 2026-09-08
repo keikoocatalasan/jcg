@@ -1,11 +1,11 @@
 # Global Android distribution plan
 
-Status: v1.0.1 is publicly downloadable; the landing page is live from the release commit, and the future update workflow is documented.
+Status: v1.0.1 is published, but the user reported a failed physical Android download on 2026-09-07. Earlier desktop/emulator checks do not establish physical-device acceptance. The current remediation and release goals are in [public_android_release_improvement_plan.md](public_android_release_improvement_plan.md); the evidence below is historical.
 
 ## Verified starting state
 
 - GitHub repository keikoocatalasan/jcg is public. Release `v1.0.1` is published from commit `902b6ad3fd145a262ab13007acc6d1f6a10034e5`.
-- landing_page/index.html links to releases/latest/download/app-release.apk and releases/latest. Any newly published GitHub release will automatically become the download shown by the site.
+- landing_page/index.html links to releases/latest/download/JCG-Fitness.apk and releases/latest. Any newly published GitHub release will automatically become the download shown by the site.
 - Android application ID is com.jcg.fitness; release `1.0.1` uses version code 2, minimum Android API 26 (Android 8), and the JCG Fitness release certificate.
 - The worktree contains unpublished application changes from local QA. Review these for production behavior before tagging a release.
 - Render JCG workspace: Hobby, no payment card, 3/25 services; current month 4.22/750 free instance hours, 1 MB/5 GB bandwidth, 2/500 pipeline minutes. These limits are shared with the unrelated SBMS service.
@@ -50,17 +50,18 @@ After the one-time GitHub Actions secrets are configured, each update follows th
 2. Run the tests and release build locally when possible.
 3. Commit and push the change to `main`.
 4. Create and push a matching tag, for example `v1.0.2`.
-5. The Android release workflow builds the universal and ABI-specific APKs, signs them with the same key, creates `SHA256SUMS.txt`, and publishes the GitHub Release.
-6. The unchanged landing page immediately serves the new `app-release.apk` through the `latest` redirect.
+5. Explicitly dispatch the Android release workflow on that tag (`gh workflow run android-release.yml --ref v1.0.2`). It builds a draft with branded APKs, `SHA256SUMS.txt` and `release.json`. Verify the candidate before publishing the draft. Do not run the local publisher for the same version.
+6. The unchanged landing page immediately serves the new `JCG-Fitness.apk` through the `latest` redirect.
 7. Verify the public download, checksum, release page, and clean install.
 
-The signing key must remain the same for in-place Android updates. Store the keystore and its passwords in a secure backup. The workflow pins Flutter 3.44.2 for repeatable builds. Configure these GitHub Actions secrets once: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `FASTAPI_BASE_URL`.
+The signing key must remain the same for in-place Android updates. Store the keystore and its passwords in a secure backup. The workflow pins Flutter 3.44.2 for repeatable builds. Configure these GitHub Actions secrets once: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FASTAPI_BASE_URL`, and `GOOGLE_WEB_CLIENT_ID`.
 
 The first tag workflow run correctly stopped at its signing-secret check because
 those GitHub Actions secrets are not configured yet. The release was published
 from the locally verified APKs. Until the secrets are added, repeat the same
 local build/upload steps using `tools/publish_android_release.ps1`; once the
-secrets are added, tag pushes will publish the release automatically.
+secrets are added, workflow dispatch builds the draft release. Both paths now
+require `GOOGLE_WEB_CLIENT_ID`. Tag pushes alone do not publish a release.
 
 ## Completion evidence
 

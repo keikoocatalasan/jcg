@@ -109,10 +109,18 @@ The landing page uses GitHub's `releases/latest` redirect, so it does not need
 to be edited for every app update. Increase the version and Android build
 number in `flutter_app/pubspec.yaml`, run the test suite, then push a matching
 version tag such as `v1.0.2`. The `.github/workflows/android-release.yml`
-workflow builds and publishes the APK assets and checksums. Configure the
+workflow is explicitly dispatched on that tag with
+`gh workflow run android-release.yml --ref v1.0.2`; it builds a draft release
+with branded APKs, checksums and release metadata. Verify the candidate before
+publishing the draft. Tag pushes alone do not publish. Configure the
 documented Android signing and production API secrets in GitHub Actions once;
 never commit the keystore or passwords. Until those secrets are configured,
-run `tools/publish_android_release.ps1` locally after committing the update.
+run `tools/publish_android_release.ps1` locally after committing the update;
+it also creates a draft. Choose only one publisher for a version. Include
+`GOOGLE_WEB_CLIENT_ID` in both local production configuration and CI secrets.
+The existing public download stays unchanged until the draft is published. The
+published asset name is `JCG-Fitness.apk`; the older `app-release.apk` link is
+kept as a compatibility alias during the transition.
 
 ### 3. Database migrations
 

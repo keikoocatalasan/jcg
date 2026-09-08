@@ -4,11 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JCG Fitness - Budget-Aware Nutrition & Fitness Companion</title>
-    <meta name="description" content="Download JCG Fitness, a budget-aware nutrition tracking app. Scan local food, chat with our AI coach, and plan meals that match your budget and fitness goals.">
-    <!-- Google Fonts — Monospace -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <meta name="description" content="Download JCG Fitness for Android. Track Filipino meals, water and weight, plan within your budget, and get nutrition guidance in one place.">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- Custom CSS -->
@@ -30,7 +26,7 @@
                     GitHub
                 </a>
             </nav>
-            <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/app-release.apk" id="cta-nav-download" class="btn btn-primary btn-sm">Download APK</a>
+            <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/JCG-Fitness.apk" id="cta-nav-download" class="btn btn-primary btn-sm">Download JCG Fitness</a>
         </div>
     </header>
 
@@ -38,25 +34,26 @@
     <section class="hero-section">
         <div class="hero-container">
             <div class="hero-content">
-                <div class="badge" id="hero-badge"><i data-lucide="graduation-cap"></i> Thesis Project Defense</div>
+                <div class="badge" id="hero-badge">Everyday nutrition, within your budget</div>
                 <h1 class="hero-title" id="main-title">
                     Eat Smart.<br>Stay Fit.<br><span class="gradient-text">Save Money.</span>
                 </h1>
                 <p class="hero-description">
-                    JCG Fitness is a budget-aware nutrition assistant app built to bridge health goals with economic reality. Scan local foods, manage your daily budget, and consult our AI coach offline or online.
+                    Make room for healthier habits and the Filipino food you love. Track meals, water and weight, explore meal ideas within your budget, and get AI assistance. Online features require an internet connection.
                 </p>
                 <div class="hero-actions">
-                    <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/app-release.apk" id="cta-hero-download" class="btn btn-primary btn-lg">
+                    <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/JCG-Fitness.apk" id="cta-hero-download" class="btn btn-primary btn-lg">
                         <span class="btn-icon"><i data-lucide="bot"></i></span>
-                        Download App (APK)
+                        Download JCG Fitness
                     </a>
                     <a href="#features" class="btn btn-secondary btn-lg">Learn Features</a>
                 </div>
-                <p class="download-meta" id="app-release-meta">Latest release · Android 8+ · Universal APK</p>
+                <p class="download-meta" id="app-release-meta">Latest release · Android 10+ target · Universal APK · JCG-Fitness.apk</p>
+                <p class="download-meta">Slow download? <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/JCG-Fitness-arm64-v8a.apk">Get the smaller ARM64 package (about 38 MB)</a> for compatible 64-bit Android phones. Choose the universal package if you are unsure.</p>
                 <div class="hero-meta">
                     <span><i data-lucide="check" class="check-icon"></i> Built for Android</span>
                     <span><i data-lucide="check" class="check-icon"></i> 100% Free</span>
-                    <span><i data-lucide="check" class="check-icon"></i> Local Database</span>
+                    <span><i data-lucide="check" class="check-icon"></i> Meals · Water · Weight</span>
                 </div>
             </div>
             
@@ -65,7 +62,7 @@
                     <!-- Glassmorphic shadows under phone -->
                     <div class="phone-glow"></div>
                     <div class="phone-frame">
-                        <img src="assets/jcg_session_visible.png" alt="JCG Fitness Dashboard" class="phone-screen" id="img-hero-screen">
+                        <img src="assets/jcg-preview-dashboard-clean.png" alt="JCG Fitness dashboard with calorie, macro and budget progress" class="phone-screen" id="img-hero-screen">
                     </div>
                 </div>
             </div>
@@ -75,8 +72,8 @@
     <!-- Features Section -->
     <section id="features" class="features-section">
         <div class="section-header">
-            <h2 class="section-title">01 — features</h2>
-            <p class="section-subtitle">A premium dashboard designed to provide granular tracking with AI-guided assistance.</p>
+            <h2 class="section-title">Small habits. A clearer picture.</h2>
+            <p class="section-subtitle">Keep your daily food choices, budget and progress together.</p>
         </div>
         <div class="features-grid">
             <!-- Feature Card 1 -->
@@ -85,7 +82,7 @@
                     <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M4 4h3V2H4c-1.1 0-2 .9-2 2v3h2V4zm16-2h-3v2h3v3h2V4c0-1.1-.9-2-2-2zm0 18h-3v2h3c1.1 0 2-.9 2-2v-3h-2v3zM4 17H2v3c0 1.1.9 2 2 2h3v-2H4v-3zm8-9c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 6c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
                 </div>
                 <h3 class="feature-title">AI Food Scanner</h3>
-                <p class="feature-text">Snap a photo of your meal. The on-device camera feeds our backend AI to instantly detect dishes and output precise calorie, macro, and price estimations tailored to local Filipino foods.</p>
+                <p class="feature-text">Take or upload a meal photo to get a suggested dish and nutrition estimate. Review the result and portion before saving. Recipes and serving sizes vary, so estimates may need correcting.</p>
             </div>
 
             <!-- Feature Card 2 -->
@@ -94,7 +91,7 @@
                     <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
                 </div>
                 <h3 class="feature-title">Budget-Aware Planning</h3>
-                <p class="feature-text">Achieve your fitness goals without overspending. The recommendation engine scores meals deterministically based on their nutritional density relative to their cost in the local market.</p>
+                <p class="feature-text">Explore meal suggestions that fit your nutrition goals and budget. Use estimated prices as a guide when planning your next meal.</p>
             </div>
 
             <!-- Feature Card 3 -->
@@ -103,7 +100,7 @@
                     <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
                 </div>
                 <h3 class="feature-title">AI Nutrition Coach</h3>
-                <p class="feature-text">Need advice on budget meal-prep? Talk with the embedded chatbot. It parses your profile history and gives personalized, safe advice while adhering strictly to safety guardrails.</p>
+                <p class="feature-text">Ask questions about food and everyday nutrition. AI responses can make mistakes; review suggestions for your needs. Requires internet access.</p>
             </div>
 
             <!-- Feature Card 4 -->
@@ -111,8 +108,8 @@
                 <div class="feature-icon-wrapper color-info">
                     <svg viewBox="0 0 24 24" class="feature-icon"><path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/></svg>
                 </div>
-                <h3 class="feature-title">Offline-First Design</h3>
-                <p class="feature-text">No internet connection? No problem. Track your meals, hydration, and logs locally using our SQLite database. Changes are queued and sync securely with Supabase once you're online.</p>
+                <h3 class="feature-title">Your Daily Progress</h3>
+                <p class="feature-text">Keep food, water and weight entries organised by date. Revisit your history and adjust entries as your day changes.</p>
             </div>
         </div>
     </section>
@@ -120,25 +117,23 @@
     <!-- Screenshot Showcase -->
     <section class="gallery-section">
         <div class="section-header">
-            <h2 class="section-title">02 — interface</h2>
-            <p class="section-subtitle">Sleek dark mode styling centered on biometric and budgetary visibility.</p>
+            <h2 class="section-title">A look inside JCG Fitness</h2>
+            <p class="section-subtitle">Keep your daily tracking close at hand.</p>
         </div>
         <div class="gallery-slider">
             <div class="gallery-slide">
-                <img src="assets/jcg_start_100.png" alt="Onboarding flow screen" class="gallery-img" id="img-onboarding">
-                <span class="gallery-label">Step Onboarding</span>
+                <img src="assets/jcg-preview-meal-log-clean.png" alt="JCG Fitness dated meal, water and weight log" class="gallery-img" id="img-meal-log">
+                <span class="gallery-label">Dated tracking</span>
             </div>
             <div class="gallery-slide">
-                <img src="assets/jcg_session_visible.png" alt="Authenticated dashboard screen" class="gallery-img" id="img-dashboard">
+                <img src="assets/jcg-preview-dashboard-clean.png" alt="JCG Fitness dashboard screen" class="gallery-img" id="img-dashboard">
                 <span class="gallery-label">Main Dashboard</span>
             </div>
             <div class="gallery-slide">
-                <img src="assets/jcg_session_loading.png" alt="Loading state visual screen" class="gallery-img" id="img-loading">
-                <span class="gallery-label">Session Initialization</span>
+                <img src="assets/jcg-preview-community-clean.png" alt="JCG Fitness community feed with posts and reactions" class="gallery-img" id="img-community">
+                <span class="gallery-label">Community</span>
             </div>
             <div class="gallery-slide">
-                <img src="assets/jcg_session_final.png" alt="Final summary screen" class="gallery-img" id="img-summary">
-                <span class="gallery-label">Daily Tracker Summary</span>
             </div>
         </div>
     </section>
@@ -147,7 +142,7 @@
     <section id="install" class="install-section">
         <div class="section-header">
             <h2 class="section-title">03 — installation</h2>
-            <p class="section-subtitle">How to install JCG Fitness on your Android device in less than a minute.</p>
+            <p class="section-subtitle">Download the package, review Android's installation prompt, then create your account.</p>
         </div>
         <div class="install-steps">
             <!-- Step 1 -->
@@ -165,23 +160,30 @@
             <!-- Step 3 -->
             <div class="glass-card install-step-card" id="step-3">
                 <div class="step-num">03</div>
-                <h4 class="step-title">Launch & Demo</h4>
+                <h4 class="step-title">Start your first day</h4>
                     <p class="step-desc">Open JCG Fitness, create an account, set your nutrition and budget goals, and start tracking.</p>
             </div>
         </div>
         <div class="cta-bottom">
-            <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/app-release.apk" id="cta-bottom-download" class="btn btn-primary btn-lg">Download for Android Now</a>
-            <p class="download-footnote">Android APK · Android 8.0 or newer · <a href="https://github.com/keikoocatalasan/jcg/releases/latest" id="release-notes-link">Release notes and checksums</a></p>
+            <a href="https://github.com/keikoocatalasan/jcg/releases/latest/download/JCG-Fitness.apk" id="cta-bottom-download" class="btn btn-primary btn-lg">Download for Android</a>
+            <p class="download-footnote">Android 10+ tested · Android 8.0 minimum · <a href="https://github.com/keikoocatalasan/jcg/releases/latest" id="release-notes-link">Release notes and checksums</a></p>
         </div>
     </section>
 
+    <section class="install-section" id="download-help" aria-labelledby="download-help-title">
+        <h2 class="section-title" id="download-help-title">Need help getting started?</h2>
+        <details><summary>The download did not start</summary><p>Open this page in your Android browser rather than a messaging app's built-in viewer. Check your connection and storage, then try the <a href="https://github.com/keikoocatalasan/jcg/releases/latest">release page</a> and choose the universal APK. No GitHub account is required.</p></details>
+        <details><summary>Android will not install the downloaded file</summary><p>Open the APK from Downloads. Android may ask you to allow installation from your browser or file manager. If it reports a package conflict or another error, keep the exact message. Do not uninstall your existing app just to retry. Work or school devices may restrict installation.</p></details>
+        <details><summary>Is the app free?</summary><p>JCG Fitness is free to download. Mobile data charges may apply. Login, cloud data and AI features need internet access; online services may have delays or usage limits.</p></details>
+        <details><summary>How do updates work?</summary><p>Return here for the latest published release and install it over your existing JCG Fitness app to preserve your data. Android will ask you to review the update; downloading does not install it automatically.</p></details>
+    </section>
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-container">
-            <p>© 2026 JCG Fitness. All Rights Reserved. Built for Thesis Defense.</p>
+            <p>© 2026 JCG Fitness. Make your next meal count.</p>
             <p class="footer-credit">Developed with <i data-lucide="heart" class="footer-heart"></i> by keikoocatalasan</p>
         </div>
     </footer>
-    <script>lucide.createIcons();</script>
+    <script>if (window.lucide) lucide.createIcons();</script>
 </body>
 </html>

@@ -51,5 +51,8 @@ class AppConfig {
             fastApiBaseUrl.contains('10.0.2.2'))) {
       throw StateError('Production FASTAPI_BASE_URL must use HTTPS.');
     }
+    if (isProduction && googleWebClientId.isEmpty) {
+      throw StateError('Production GOOGLE_WEB_CLIENT_ID is required for Google Sign-In.');
+    }
   }
 }

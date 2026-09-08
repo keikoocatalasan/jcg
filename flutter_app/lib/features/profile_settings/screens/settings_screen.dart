@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:jcg_fitness/app/constants.dart';
+import 'package:jcg_fitness/features/profile_settings/screens/app_update_tile.dart';
+import 'package:jcg_fitness/features/profile_settings/screens/google_connection_tile.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/features/profile_settings/screens/clear_cache_dialog.dart';
@@ -24,6 +25,7 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Edit Profile',
             onTap: () => context.push('/edit-profile'),
           ),
+          const GoogleConnectionTile(),
           const _SectionHeader(title: 'APP PREFERENCES'),
           const _SettingsTile(
             icon: Icons.straighten,
@@ -64,13 +66,7 @@ class SettingsScreen extends ConsumerWidget {
             showChevron: false,
           ),
           const _SectionHeader(title: 'ABOUT'),
-          const _SettingsTile(
-            icon: Icons.info_outline,
-            iconColor: AppColors.textSecondary,
-            title: 'App Version',
-            trailingText: AppConstants.version,
-            showChevron: false,
-          ),
+          const AppUpdateTile(),
           const SizedBox(height: 32),
         ],
       ),

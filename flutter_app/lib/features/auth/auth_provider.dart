@@ -209,6 +209,11 @@ class AuthService {
       return const Success(localTestUser);
     }
 
+    if (AppConfig.googleWebClientId.isEmpty) {
+      return Failure(AppError.unknown(
+          'Google sign-in is not configured in this app version.'));
+    }
+
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -264,6 +269,55 @@ class AuthService {
     } catch (e) {
       return Failure(
           AppError.unknown('Google sign-in failed. Please try again.'));
+    }
+  }
+
+  Future<Result<User>> connectGoogle() async {
+    final original = _supabase.auth.currentUser;
+    if (original == null) {
+      return Failure(AppError.unknown('Sign in before connecting Google.'));
+    }
+    if (AppConfig.googleWebClientId.isEmpty) {
+      return Failure(AppError.unknown(
+          'Google connection is not configured in this app version.'));
+    }
+    try {
+      final status = await checkAccountStatus(original.id);
+      if (status is Failure<bool>) return Failure(status.error);
+      final google = _googleSignIn;
+      final selected = await google.signIn();
+      if (selected == null) {
+        return Failure(AppError.unknown('Google connection was cancelled.'));
+      }
+      if (original.emailConfirmedAt == null ||
+          original.email?.trim().toLowerCase() !=
+              selected.email.trim().toLowerCase()) {
+        return Failure(AppError.unknown(
+            'Choose the Google account with the same verified email as your JCG Fitness account.'));
+      }
+      final tokens = await selected.authentication;
+      if (tokens.idToken == null ||
+          _supabase.auth.currentUser?.id != original.id) {
+        return Failure(
+            AppError.unknown('Your session changed. Please try again.'));
+      }
+      final response = await _supabase.auth.linkIdentityWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: tokens.idToken!,
+        accessToken: tokens.accessToken,
+      );
+      final linked = response.user;
+      if (linked == null || linked.id != original.id) {
+        return Failure(AppError.unknown(
+            'Could not verify the connected account. Please sign in again.'));
+      }
+      return Success(linked);
+    } on AuthException catch (_) {
+      return Failure(AppError.unknown(
+          'Could not connect Google. It may already belong to another account, or linking may not be enabled. Your existing account has not been merged.'));
+    } catch (_) {
+      return Failure(AppError.unknown(
+          'Could not connect Google. Check your connection and try again.'));
     }
   }
 

@@ -9,6 +9,7 @@ import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/widgets/macro_bar.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
+import 'package:jcg_fitness/core/widgets/app_update_banner.dart';
 import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
 import 'package:jcg_fitness/features/profile_settings/profile_provider.dart';
 import 'package:jcg_fitness/features/auth/welcome_message_provider.dart';
@@ -39,6 +40,7 @@ class DashboardScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 88),
               children: [
                 _Header(data: data),
+                const AppUpdateBanner(),
                 const _DateRow(),
                 _TodayProgressCard(data: data),
                 _BudgetCard(data: data),
