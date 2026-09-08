@@ -11,8 +11,9 @@ matching branded aliases and release metadata; the new v1.0.2 app code is not
 yet the public latest release.
 Settings now includes an explicit update check using the installed package build
 number and official release metadata, with Later/download/release-notes actions
-and recoverable errors. Four metadata tests pass. Automatic launch discovery,
-widget/device verification and a published metadata endpoint remain pending.
+and recoverable errors. Five release metadata tests and two update-banner tests
+pass. The public metadata endpoint is verified; widget/device verification and
+an installed-app update check remain pending.
 The three update-related Dart files pass static analysis. The landing page has
 local light-theme and content changes; it loads in the in-app browser at
 127.0.0.1:8765. Screenshot replacement, viewport/contrast verification and
@@ -50,11 +51,9 @@ landing site also exposes /download.html, which requests the same bytes in 4 MiB
 HTTP ranges with three attempts per range, validates Content-Range/length,
 assembles a named APK Blob and retains a direct fallback. This is intended to
 address a single large-request stall; a physical-device test is still required.
-Because the branded GitHub ARM64 GET also timed out at 20,086,651 of 39,741,584
-bytes on this laptop, the landing site now includes a same-origin Render mirror
-of the verified v1.0.1 ARM64 APK at /downloads/JCG-Fitness-arm64-v8a.apk. This
-is a deliberate fallback for the reported Chrome/Tecno failure; its binary must
-be replaced and reverified with each future release unless a better CDN is added.
+The public in-app browser completed this helper at 39,741,584/39,741,584 bytes
+and displayed “Download complete.” The physical Tecno/Chrome path remains the
+only unresolved download acceptance check.
 An attempted v1.0.1 alias upload was stopped after detecting that the local
 universal artifact had become v1.0.2 while the split artifacts were still v1.0.1.
 The partial branded asset and incomplete metadata were removed from the public
