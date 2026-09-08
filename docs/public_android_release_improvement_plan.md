@@ -43,6 +43,11 @@ returned 200 with 39,741,584 bytes in 9.7 seconds; SHA-256 matches the published
 checksum. A 1024-byte Range request returned 206 and 1024 bytes. This verifies
 server delivery and partial support, not the cause of the phone-specific stall.
 The public landing page now offers a stable branded smaller alternative.
+Because the branded GitHub ARM64 GET also timed out at 20,086,651 of 39,741,584
+bytes on this laptop, the landing site now includes a same-origin Render mirror
+of the verified v1.0.1 ARM64 APK at /downloads/JCG-Fitness-arm64-v8a.apk. This
+is a deliberate fallback for the reported Chrome/Tecno failure; its binary must
+be replaced and reverified with each future release unless a better CDN is added.
 An attempted v1.0.1 alias upload was stopped after detecting that the local
 universal artifact had become v1.0.2 while the split artifacts were still v1.0.1.
 The partial branded asset and incomplete metadata were removed from the public
