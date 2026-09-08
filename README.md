@@ -12,7 +12,7 @@ JCG Fitness is an offline-first, budget-aware nutrition tracking application bui
 
 ## Public download
 
-The current Android release is available from the [JCG Fitness landing page](https://nutrismart-ai-sce8.onrender.com/). The page uses GitHub's `latest` release redirect, so publishing a newer release automatically updates the download link without changing the site.
+The current Android release is available from the [JCG Fitness landing page](https://nutrismart-ai-sce8.onrender.com/). The universal download follows GitHub's `latest` release redirect. The page also offers a same-origin resumable ARM64 route for large-download failures; update that mirrored APK whenever the fallback release changes.
 
 ## Architecture
 

@@ -1,13 +1,13 @@
 # Global Android distribution plan
 
-Status: v1.0.1 is published, but the user reported a failed physical Android download on 2026-09-07. Earlier desktop/emulator checks do not establish physical-device acceptance. The current remediation and release goals are in [public_android_release_improvement_plan.md](public_android_release_improvement_plan.md); the evidence below is historical.
+Status: v1.0.1 is published with branded aliases and metadata, but the user reported a failed physical Android download on 2026-09-07. Earlier desktop/emulator checks do not establish physical-device acceptance. The current remediation and release goals are in [public_android_release_improvement_plan.md](public_android_release_improvement_plan.md); the evidence below is historical.
 
 ## Verified starting state
 
 - GitHub repository keikoocatalasan/jcg is public. Release `v1.0.1` is published from commit `902b6ad3fd145a262ab13007acc6d1f6a10034e5`.
-- landing_page/index.html links to releases/latest/download/JCG-Fitness.apk and releases/latest. Any newly published GitHub release will automatically become the download shown by the site.
+- landing_page/index.html links to releases/latest/download/JCG-Fitness.apk and releases/latest. It also exposes a same-origin Render ARM64 mirror and resumable /download.html helper for the reported large-download stall. The mirror must be replaced and reverified with each release.
 - Android application ID is com.jcg.fitness; release `1.0.1` uses version code 2, minimum Android API 26 (Android 8), and the JCG Fitness release certificate.
-- The worktree contains unpublished application changes from local QA. Review these for production behavior before tagging a release.
+- The current app/update source remains unpublished in an Android release; review it for production behavior before tagging v1.0.2.
 - Render JCG workspace: Hobby, no payment card, 3/25 services; current month 4.22/750 free instance hours, 1 MB/5 GB bandwidth, 2/500 pipeline minutes. These limits are shared with the unrelated SBMS service.
 - Vercel account: Hobby, last 30 days 12.1 MB/100 GB transfer and 1.7K/1M edge requests. Only SBMS is listed as a project. Do not deploy JCG into that unrelated project.
 - Supabase dashboard currently requires MFA. Actual plan, remaining usage, and bucket limits have not been verified.

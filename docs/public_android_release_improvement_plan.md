@@ -44,6 +44,13 @@ checksum. A 1024-byte Range request returned 206 and 1024 bytes. This verifies
 server delivery and partial support, not the cause of the phone-specific stall.
 The public landing page now offers a stable branded smaller alternative.
 Because the branded GitHub ARM64 GET also timed out at 20,086,651 of 39,741,584
+bytes on this laptop, the landing site includes a same-origin Render mirror of
+the verified v1.0.1 ARM64 APK at /downloads/JCG-Fitness-arm64-v8a.apk. The
+landing site also exposes /download.html, which requests the same bytes in 4 MiB
+HTTP ranges with three attempts per range, validates Content-Range/length,
+assembles a named APK Blob and retains a direct fallback. This is intended to
+address a single large-request stall; a physical-device test is still required.
+Because the branded GitHub ARM64 GET also timed out at 20,086,651 of 39,741,584
 bytes on this laptop, the landing site now includes a same-origin Render mirror
 of the verified v1.0.1 ARM64 APK at /downloads/JCG-Fitness-arm64-v8a.apk. This
 is a deliberate fallback for the reported Chrome/Tecno failure; its binary must
