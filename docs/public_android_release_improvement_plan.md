@@ -37,7 +37,7 @@ but GET /auth/v1/authorize?provider=google returns HTTP 400 with
 configuration repair. Native ID-token login still requires the missing public
 GOOGLE_WEB_CLIENT_ID and release certificate registration; do not conflate the
 browser OAuth error with proof about native token validation. GitHub release
-secret listing is empty. Full Flutter regression run: 211 pass, one skip.
+secret listing is empty. Full Flutter regression run: 212 pass, one skip.
 User clarified the failed device flow: Tecno Camon 20 Pro 5G, Chrome, download
 stalls at the end before installation. A full ARM64 v1.0.1 GET from this laptop
 returned 200 with 39,741,584 bytes in 9.7 seconds; SHA-256 matches the published
