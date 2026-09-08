@@ -96,6 +96,8 @@ Google Cloud account access was corrected by the user to keikoocatalasan@gmail.c
 The existing jcg-fitness project is visible, but its OAuth client page redirects
 to an access-blocked screen requiring account 2-step verification. User action
 requested in the in-app browser; client settings have not been changed.
+The required client, Supabase provider, CI and account-preservation test steps
+are documented in google_signin_production_setup.md.
 This supersedes the completion assumptions in global_distribution_plan.md.
 
 ## Objective and scope

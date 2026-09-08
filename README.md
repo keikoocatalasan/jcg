@@ -122,6 +122,9 @@ The existing public download stays unchanged until the draft is published. The
 published asset name is `JCG-Fitness.apk`; the older `app-release.apk` link is
 kept as a compatibility alias during the transition.
 
+For the one-time Google OAuth setup required before publishing v1.0.2, follow
+[Google Sign-In production setup](docs/google_signin_production_setup.md).
+
 Before tagging a release, build the ARM64 APK and refresh the same-origin
 fallback used by the resumable phone download. Commit that binary alongside the
 version change; the local publisher and CI both reject a mismatched fallback.
