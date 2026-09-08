@@ -14,8 +14,9 @@ widget/device verification and a published metadata endpoint remain pending.
 The three update-related Dart files pass static analysis. The landing page has
 local light-theme and content changes; it loads in the in-app browser at
 127.0.0.1:8765. Screenshot replacement, viewport/contrast verification and
-publication are still pending. No physical Android device was attached when
-checked; the available jcg_emu emulator is being prepared for further verification.
+publication were subsequently completed on the public page. No physical Android
+device was attached when checked; the available jcg_emu emulator is being used
+for further verification.
 Local QA captures from the seeded current app are now available as clean previews:
 dashboard, dated meal/water/weight log and community feed. The local-only QA
 banner and Android system bars were cropped; preview assets are not production
@@ -33,7 +34,7 @@ but GET /auth/v1/authorize?provider=google returns HTTP 400 with
 configuration repair. Native ID-token login still requires the missing public
 GOOGLE_WEB_CLIENT_ID and release certificate registration; do not conflate the
 browser OAuth error with proof about native token validation. GitHub release
-secret listing is empty. Full Flutter regression run: 209 pass, one skip.
+secret listing is empty. Full Flutter regression run: 211 pass, one skip.
 User clarified the failed device flow: Tecno Camon 20 Pro 5G, Chrome, download
 stalls at the end before installation. A full ARM64 v1.0.1 GET from this laptop
 returned 200 with 39,741,584 bytes in 9.7 seconds; SHA-256 matches the published
@@ -47,6 +48,13 @@ release. A complete matching branded v1.0.1 alias set and release.json are now
 public; anonymous HEAD responses return 200 with attachment names
 JCG-Fitness.apk and JCG-Fitness-arm64-v8a.apk. The landing page now points to
 those stable branded latest URLs.
+The light landing page was pushed in commit 9a0b72f1 and Render deployment
+dep-dafoge740ujc73c6q9n0 succeeded. Public browser inspection shows the light
+layout, branded links and three current preview images; all four image elements
+load at 1080px natural width. The current preview set is 638,482 bytes after
+removing seven obsolete splash/loading files. Production backend checks returned
+health=ok and readiness=ready/environment=production; /version reports scanner-v2
+and NVIDIA Llama vision for scan/chat.
 Dashboard automatic update discovery now shows a dismissible banner for a newer
 build, with a once-per-session fetch and silent offline fallback. Six focused
 update tests pass. Physical-device and actual upgrade verification remain pending.
@@ -55,7 +63,10 @@ build 3, using current production inputs. GOOGLE_WEB_CLIENT_ID is still absent:
 this candidate is for install/upgrade verification and must not be published as
 Google-ready. Build completion is pending. The emulator's observed unresponsive
 dialog was Android System UI, not JCG; app process remains present and activity
-manager reported no app ANR since boot. No upgrade success has been claimed.
+manager reported no app ANR since boot. The candidate completed and installed
+over v1.0.1: version code 2 -> 3 while firstInstallTime remained unchanged;
+the app reached its login screen. This proves an emulator upgrade path, not
+physical-device or production account persistence.
 Google Cloud account access was corrected by the user to keikoocatalasan@gmail.com.
 The existing jcg-fitness project is visible, but its OAuth client page redirects
 to an access-blocked screen requiring account 2-step verification. User action
