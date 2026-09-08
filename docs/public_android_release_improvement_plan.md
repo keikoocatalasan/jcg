@@ -54,6 +54,9 @@ address a single large-request stall; a physical-device test is still required.
 The public in-app browser completed this helper at 39,741,584/39,741,584 bytes
 and displayed “Download complete.” The physical Tecno/Chrome path remains the
 only unresolved download acceptance check.
+The exact public branded ARM64 artifact was hash-matched to release.json, then
+clean-installed on the Android 15 emulator as JCG Fitness v1.0.1/versionCode
+2002. It reached the login screen with no app crash markers.
 An attempted v1.0.1 alias upload was stopped after detecting that the local
 universal artifact had become v1.0.2 while the split artifacts were still v1.0.1.
 The partial branded asset and incomplete metadata were removed from the public
