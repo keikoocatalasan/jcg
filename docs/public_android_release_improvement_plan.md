@@ -98,6 +98,13 @@ to an access-blocked screen requiring account 2-step verification. User action
 requested in the in-app browser; client settings have not been changed.
 The required client, Supabase provider, CI and account-preservation test steps
 are documented in google_signin_production_setup.md.
+Two-step verification was subsequently completed and Google Cloud clients are
+now accessible. The Web client ID was added to the ignored local production
+.env and a newly built ARM64 v1.0.2/versionCode 2003 package upgraded the exact
+public ARM64 v1.0.1/versionCode 2002 install without changing firstInstallTime.
+The candidate reached the login screen with no crash markers. Google Cloud's
+Android client still has the wrong SHA-1 and Supabase still lacks the OAuth
+secret; those persistent changes await explicit approval.
 This supersedes the completion assumptions in global_distribution_plan.md.
 
 ## Objective and scope
