@@ -132,6 +132,49 @@ p {
     color: #665300;
 }
 
+.legal-page {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.legal-content {
+    width: min(760px, calc(100% - 40px));
+    margin: 0 auto;
+    padding: 64px 0 96px;
+}
+
+.legal-content h1 {
+    margin: 12px 0 8px;
+    font-size: clamp(34px, 6vw, 52px);
+}
+
+.legal-content h2 {
+    margin: 36px 0 10px;
+    font-size: 22px;
+}
+
+.legal-content p {
+    max-width: 68ch;
+}
+
+.legal-back,
+.legal-links a {
+    color: var(--accent-readable);
+    font-weight: 700;
+}
+
+.legal-kicker {
+    color: var(--accent-readable);
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.legal-date {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
 #download-help details { border-bottom: 1px solid var(--border-default); padding: 20px 0; }
 #download-help summary { cursor: pointer; font-weight: 600; min-height: 44px; }
 #download-help p { max-width: 760px; }
