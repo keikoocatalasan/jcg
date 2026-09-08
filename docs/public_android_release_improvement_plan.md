@@ -117,6 +117,9 @@ a replacement secret, and Supabase manual identity linking is enabled. The
 public Supabase Google authorization endpoint now returns HTTP 302 to
 accounts.google.com. The secret remains in provider configuration only and is
 not stored in this repository. A real same-email account test is still required.
+The public Web Client ID is also stored as the GitHub Actions
+GOOGLE_WEB_CLIENT_ID secret. Android signing and production API secrets remain
+absent from Actions, so automated release publishing is not yet ready.
 This supersedes the completion assumptions in global_distribution_plan.md.
 
 ## Objective and scope

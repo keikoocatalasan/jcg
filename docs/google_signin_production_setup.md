@@ -1,18 +1,22 @@
 # Google Sign-In production setup
 
-Status: required before publishing JCG Fitness v1.0.2. Do not copy a Google
-client secret into Flutter, GitHub source, or the landing page.
+Status: Google Cloud/Supabase configuration saved on 2026-09-09; real same-email
+account testing remains required before publishing JCG Fitness v1.0.2. Do not
+copy a Google client secret into Flutter, GitHub source, or the landing page.
 
 ## Current evidence
 
 - Google Cloud project: `jcg-fitness`.
 - Android package: `com.jcg.fitness`.
-- JCG production signing-certificate SHA-1:
+- JCG production signing-certificate SHA-1, now saved on the Android OAuth
+  client:
   `77:02:51:97:BB:BA:01:AE:81:DC:1D:3E:56:DC:5A:67:8F:C1:1E:51`.
-- Google/email are enabled in Supabase Auth settings, but the current Google
-  provider authorization endpoint reports `Unsupported provider: missing OAuth secret`.
-- Google Cloud currently requires the project-owning account to enable two-step
-  verification before OAuth clients can be inspected or changed.
+- Google/email are enabled in Supabase Auth settings. The Google provider now
+  has the Web Client ID and a replacement secret; its authorization endpoint
+  redirects to accounts.google.com.
+- Manual identity linking is enabled in Supabase Auth.
+- The ignored local `.env` and GitHub Actions now contain the public
+  `GOOGLE_WEB_CLIENT_ID`. Other Actions release secrets remain to be configured.
 
 ## One-time Google Cloud configuration
 
