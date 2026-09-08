@@ -8,10 +8,10 @@ import 'package:jcg_fitness/core/network/app_release.dart';
 final availableAppUpdateProvider = FutureProvider<AppRelease?>((ref) async {
   try {
     final info = await PackageInfo.fromPlatform();
-    final build = int.tryParse(info.buildNumber);
-    if (build == null) return null;
     final release = await AppRelease.fetch();
-    return release.versionCode > build ? release : null;
+    return AppRelease.compareVersions(release.version, info.version) > 0
+        ? release
+        : null;
   } catch (_) {
     // Automatic discovery must never block the dashboard when offline.
     return null;

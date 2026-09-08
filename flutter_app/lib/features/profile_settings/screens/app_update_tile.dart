@@ -35,13 +35,11 @@ class _AppUpdateTileState extends State<AppUpdateTile> {
     setState(() => _checking = true);
     try {
       final info = await _info;
-      final current = int.tryParse(info.buildNumber);
-      if (current == null) {
-        throw const FormatException('Unknown installed build');
-      }
       final release = await AppRelease.fetch();
       if (!mounted) return;
-      if (release.versionCode <= current) {
+      // ABI split APKs add an architecture offset to buildNumber. The semantic
+      // version is stable across universal and split packages.
+      if (AppRelease.compareVersions(release.version, info.version) <= 0) {
         _message('You have the latest published version.');
         return;
       }

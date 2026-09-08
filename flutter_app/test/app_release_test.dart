@@ -25,6 +25,11 @@ void main() {
     expect(release.version, '1.0.2');
     expect(release.downloadUrl.path, endsWith('/JCG-Fitness.apk'));
   });
+  test('compares semantic versions across ABI build-code offsets', () {
+    expect(AppRelease.compareVersions('1.0.2', '1.0.1'), greaterThan(0));
+    expect(AppRelease.compareVersions('1.0.2', '1.0.2'), 0);
+    expect(AppRelease.compareVersions('1.0.1', '1.0.2'), lessThan(0));
+  });
   test('rejects another application and unsupported schema', () {
     expect(() => AppRelease.fromJson(metadata()..['applicationId'] = 'other'),
         throwsFormatException);

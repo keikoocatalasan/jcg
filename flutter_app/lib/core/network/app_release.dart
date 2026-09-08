@@ -11,6 +11,16 @@ class AppRelease {
   const AppRelease(this.version, this.versionCode, this.bytes, this.downloadUrl,
       this.notesUrl);
 
+  static int compareVersions(String left, String right) {
+    final a = left.split('.').map(int.parse).toList();
+    final b = right.split('.').map(int.parse).toList();
+    for (var i = 0; i < 3; i++) {
+      final difference = a[i].compareTo(b[i]);
+      if (difference != 0) return difference;
+    }
+    return 0;
+  }
+
   factory AppRelease.fromJson(Map<String, dynamic> json) {
     final version = json['version'];
     final code = json['versionCode'];

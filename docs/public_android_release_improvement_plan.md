@@ -56,8 +56,11 @@ removing seven obsolete splash/loading files. Production backend checks returned
 health=ok and readiness=ready/environment=production; /version reports scanner-v2
 and NVIDIA Llama vision for scan/chat.
 Dashboard automatic update discovery now shows a dismissible banner for a newer
-build, with a once-per-session fetch and silent offline fallback. Six focused
+build, with a once-per-session fetch and silent offline fallback. Seven focused
 update tests pass. Physical-device and actual upgrade verification remain pending.
+The checker compares semantic app versions so ABI split version-code offsets do
+not hide a newer release from ARM64/ARMv7 users; this regression is covered by
+the focused tests.
 An unpublished signed candidate build was started with explicit version 1.0.2,
 build 3, using current production inputs. GOOGLE_WEB_CLIENT_ID is still absent:
 this candidate is for install/upgrade verification and must not be published as

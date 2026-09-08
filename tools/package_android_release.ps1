@@ -17,7 +17,7 @@ $mapping = [ordered]@{
     'app-armeabi-v7a-release.apk' = 'JCG-Fitness-armeabi-v7a.apk'
     'app-x86_64-release.apk' = 'JCG-Fitness-x86_64.apk'
 }
-$sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } elseif ($IsWindows -and $env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Android\Sdk' } else { $null }
+$sdkRoot = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } elseif ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Android\Sdk' } else { $null }
 $aapt = Get-Command aapt -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
 if (-not $aapt -and $sdkRoot -and (Test-Path -LiteralPath (Join-Path $sdkRoot 'build-tools'))) {
     $aapt = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'build-tools') -Recurse -File -Filter 'aapt*' |
