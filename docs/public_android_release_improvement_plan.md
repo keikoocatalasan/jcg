@@ -102,15 +102,21 @@ Two-step verification was subsequently completed and Google Cloud clients are
 now accessible. The Web client ID was added to the ignored local production
 .env and a newly built ARM64 v1.0.2/versionCode 2003 package upgraded the exact
 public ARM64 v1.0.1/versionCode 2002 install without changing firstInstallTime.
-The candidate reached the login screen with no crash markers. Google Cloud's
-Android client still has the wrong SHA-1 and Supabase still lacks the OAuth
-secret; those persistent changes await explicit approval.
+The candidate reached the login screen with no crash markers. Before OAuth
+configuration, Google Cloud used the wrong SHA-1 and Supabase lacked the OAuth
+secret; those conditions are resolved below.
 With the Web Client ID present, the v1.0.2 ARM64 candidate opened Google Play
 Services’ account picker and displayed “Choose an account to continue to JCG
 Fitness.” Cancelling returned cleanly to the app with “Google sign-in was
 cancelled.” No Google account was selected and no production identity was
 created or linked. The Android-client SHA-1 mismatch remains to be corrected
 before treating this as a successful sign-in test.
+OAuth settings were subsequently approved and saved: the Android client now
+uses the JCG release SHA-1, Supabase Google has the existing Web Client ID and
+a replacement secret, and Supabase manual identity linking is enabled. The
+public Supabase Google authorization endpoint now returns HTTP 302 to
+accounts.google.com. The secret remains in provider configuration only and is
+not stored in this repository. A real same-email account test is still required.
 This supersedes the completion assumptions in global_distribution_plan.md.
 
 ## Objective and scope
