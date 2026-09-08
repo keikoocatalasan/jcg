@@ -105,6 +105,12 @@ public ARM64 v1.0.1/versionCode 2002 install without changing firstInstallTime.
 The candidate reached the login screen with no crash markers. Google Cloud's
 Android client still has the wrong SHA-1 and Supabase still lacks the OAuth
 secret; those persistent changes await explicit approval.
+With the Web Client ID present, the v1.0.2 ARM64 candidate opened Google Play
+Services’ account picker and displayed “Choose an account to continue to JCG
+Fitness.” Cancelling returned cleanly to the app with “Google sign-in was
+cancelled.” No Google account was selected and no production identity was
+created or linked. The Android-client SHA-1 mismatch remains to be corrected
+before treating this as a successful sign-in test.
 This supersedes the completion assumptions in global_distribution_plan.md.
 
 ## Objective and scope
