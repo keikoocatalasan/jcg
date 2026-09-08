@@ -51,6 +51,9 @@ landing site also exposes /download.html, which requests the same bytes in 4 MiB
 HTTP ranges with three attempts per range, validates Content-Range/length,
 assembles a named APK Blob and retains a direct fallback. This is intended to
 address a single large-request stall; a physical-device test is still required.
+tools/sync_android_fallback.ps1 refreshes the mirror from a validated ARM64
+build; both the local publisher and GitHub Actions reject a release whose
+fallback hash differs from its ARM64 APK.
 The public in-app browser completed this helper at 39,741,584/39,741,584 bytes
 and displayed “Download complete.” The physical Tecno/Chrome path remains the
 only unresolved download acceptance check.

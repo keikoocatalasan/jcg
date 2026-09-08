@@ -122,6 +122,14 @@ The existing public download stays unchanged until the draft is published. The
 published asset name is `JCG-Fitness.apk`; the older `app-release.apk` link is
 kept as a compatibility alias during the transition.
 
+Before tagging a release, build the ARM64 APK and refresh the same-origin
+fallback used by the resumable phone download. Commit that binary alongside the
+version change; the local publisher and CI both reject a mismatched fallback.
+
+```powershell
+.\tools\sync_android_fallback.ps1 -Arm64ApkPath .\flutter_app\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
+```
+
 ### 3. Database migrations
 
 For local Supabase development, start the local stack and apply the migrations in `supabase/migrations/`. For a shared or production project, review migrations and Row Level Security policies before applying them through your approved deployment process.

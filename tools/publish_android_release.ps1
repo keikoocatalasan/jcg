@@ -64,6 +64,16 @@ foreach ($name in $apkNames) {
     }
 }
 
+$fallbackPath = Join-Path $repoRoot 'landing_page\downloads\JCG-Fitness-arm64-v8a.apk'
+if (-not (Test-Path -LiteralPath $fallbackPath)) {
+    throw 'Missing landing ARM64 fallback. Run tools/sync_android_fallback.ps1, commit the result, then publish.'
+}
+$builtArm64Hash = (Get-FileHash -LiteralPath (Join-Path $outputDir 'app-arm64-v8a-release.apk') -Algorithm SHA256).Hash
+$fallbackHash = (Get-FileHash -LiteralPath $fallbackPath -Algorithm SHA256).Hash
+if ($builtArm64Hash -ne $fallbackHash) {
+    throw 'Landing ARM64 fallback does not match this release. Run tools/sync_android_fallback.ps1, commit the result, then publish.'
+}
+
 $stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) ('jcg-release-' + [guid]::NewGuid().ToString('N'))
 & (Join-Path $PSScriptRoot 'package_android_release.ps1') -InputDirectory $outputDir -OutputDirectory $stagingDir -Version $versionName -VersionCode ([int]$versionMatch.Groups[2].Value)
 
