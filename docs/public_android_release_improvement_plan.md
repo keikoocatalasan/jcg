@@ -6,7 +6,9 @@ stage branded APKs with metadata/checksums as drafts, and use explicit CI
 dispatch to avoid a tag-triggered race with local publishing. Packaging tested
 against existing v1.0.1 artifacts: hashes and compatibility alias match; reused
 staging directories are refused. This is packaging validation, not a new build
-or device acceptance. The public release remains unchanged.
+or device acceptance. The public v1.0.1 release now also contains the complete
+matching branded aliases and release metadata; the new v1.0.2 app code is not
+yet the public latest release.
 Settings now includes an explicit update check using the installed package build
 number and official release metadata, with Later/download/release-notes actions
 and recoverable errors. Four metadata tests pass. Automatic launch discovery,
@@ -23,7 +25,7 @@ banner and Android system bars were cropped; preview assets are not production
 data. The landing gallery references these current screens. AI-scanner and
 chatbot preview captures remain unverified because the emulator went offline
 when opening Add Meal.
-The emulator is online on Android 15 with v1.0.1/build 2 installed. Production
+The emulator was online on Android 15 with v1.0.1/build 2 installed. Production
 local configuration lacks GOOGLE_WEB_CLIENT_ID. Settings now implements native
 Google linking through the installed Supabase SDK, requires the same verified
 email and checks that the user ID is preserved. Live linking/provider validation
@@ -40,7 +42,7 @@ stalls at the end before installation. A full ARM64 v1.0.1 GET from this laptop
 returned 200 with 39,741,584 bytes in 9.7 seconds; SHA-256 matches the published
 checksum. A 1024-byte Range request returned 206 and 1024 bytes. This verifies
 server delivery and partial support, not the cause of the phone-specific stall.
-Local landing page now offers that explicitly versioned smaller alternative.
+The public landing page now offers a stable branded smaller alternative.
 An attempted v1.0.1 alias upload was stopped after detecting that the local
 universal artifact had become v1.0.2 while the split artifacts were still v1.0.1.
 The partial branded asset and incomplete metadata were removed from the public
@@ -48,8 +50,8 @@ release. A complete matching branded v1.0.1 alias set and release.json are now
 public; anonymous HEAD responses return 200 with attachment names
 JCG-Fitness.apk and JCG-Fitness-arm64-v8a.apk. The landing page now points to
 those stable branded latest URLs.
-The light landing page was pushed in commit 9a0b72f1 and Render deployment
-dep-dafoge740ujc73c6q9n0 succeeded. Public browser inspection shows the light
+The light landing page was pushed in commit e079cb60 and Render deployment
+dep-dafoj9n40ujc73c77ikg succeeded. Public browser inspection shows the light
 layout, branded links and three current preview images; all four image elements
 load at 1080px natural width. The current preview set is 638,482 bytes after
 removing seven obsolete splash/loading files. Production backend checks returned
@@ -57,19 +59,22 @@ health=ok and readiness=ready/environment=production; /version reports scanner-v
 and NVIDIA Llama vision for scan/chat.
 Dashboard automatic update discovery now shows a dismissible banner for a newer
 build, with a once-per-session fetch and silent offline fallback. Seven focused
-update tests pass. Physical-device and actual upgrade verification remain pending.
+update tests pass. The emulator upgrade path is verified; physical-device
+installation and upgrade remain pending.
 The checker compares semantic app versions so ABI split version-code offsets do
 not hide a newer release from ARM64/ARMv7 users; this regression is covered by
 the focused tests.
-An unpublished signed candidate build was started with explicit version 1.0.2,
+An unpublished signed candidate build completed for explicit version 1.0.2,
 build 3, using current production inputs. GOOGLE_WEB_CLIENT_ID is still absent:
 this candidate is for install/upgrade verification and must not be published as
-Google-ready. Build completion is pending. The emulator's observed unresponsive
+Google-ready. The emulator's observed unresponsive
 dialog was Android System UI, not JCG; app process remains present and activity
 manager reported no app ANR since boot. The candidate completed and installed
 over v1.0.1: version code 2 -> 3 while firstInstallTime remained unchanged;
 the app reached its login screen. This proves an emulator upgrade path, not
-physical-device or production account persistence.
+physical-device or production account persistence. All four candidate APKs pass
+metadata and production-certificate checks; the candidate universal APK
+installed over v1.0.1 on Android 15 and reached the login screen.
 Google Cloud account access was corrected by the user to keikoocatalasan@gmail.com.
 The existing jcg-fitness project is visible, but its OAuth client page redirects
 to an access-blocked screen requiring account 2-step verification. User action
