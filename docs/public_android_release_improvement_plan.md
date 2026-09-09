@@ -1,6 +1,6 @@
 # JCG Fitness public Android release improvement plan
 
-Prepared: 2026-09-07. Status: implementation in progress; v1.0.2 is now the
+Prepared: 2026-09-07. Status: implementation in progress; v1.0.3 is now the
 published latest release and physical-device acceptance remains open.
 Implementation progress: CI run 34330561784 passed the full Flutter suite,
 signed universal/ABI builds, branded packaging, fallback metadata validation and
@@ -10,8 +10,8 @@ bytes), `JCG-Fitness-arm64-v8a.apk` (39,807,180 bytes),
 `JCG-Fitness-x86_64.apk` (43,276,914 bytes), `release.json` and
 `SHA256SUMS.txt`. The legacy `app-release.apk` alias is no longer published for
 new releases, so public downloads use the JCG Fitness name consistently.
-The landing ARM64 fallback has been synchronized to the exact v1.0.2 release
-asset and is deployed through Render deployment dep-daghuqp42hec73cea6ig.
+The landing ARM64 fallback has been synchronized to the exact v1.0.3 release
+asset and is awaiting the final Render deployment of the current main commit.
 Settings now includes an explicit update check using the installed package build
 number and official release metadata, with Later/download/release-notes actions
 and recoverable errors. Five release metadata tests and two update-banner tests
@@ -358,6 +358,17 @@ fail or not tested. Emulators cannot prove physical camera or browser behavior.
 
 Current completion record:
 
+- [x] v1.0.3 signed release published with branded packages, checksums and
+  release metadata; CI run 34337170081 passed tests, analysis, builds and
+  fallback validation.
+- [x] Universal and ABI APKs now share global Android version code 4004. The
+  v1.0.3 universal APK installed over the existing v1.0.2 ABI installation on
+  the Android 15 emulator without changing first-install time.
+- [x] Android Chrome on the emulator rendered the public landing page, showed
+  the standard unknown-app safety prompt with the branded `JCG-Fitness.apk`
+  filename, completed the 94.43 MiB download, and reached the installer.
+  The installer correctly required Chrome's per-source permission before
+  offering the update.
 - [x] v1.0.2 signed release published with branded packages, checksums and
   release metadata; CI run 34330561784 passed.
 - [x] The exact published universal APK installed on the Android 15 emulator

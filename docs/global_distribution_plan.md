@@ -1,6 +1,6 @@
 # Global Android distribution plan
 
-Status: v1.0.2 is published with branded packages, checksums and release metadata.
+Status: v1.0.3 is published with branded packages, checksums and release metadata.
 The user reported a failed physical Android download on 2026-09-07; the physical
 Tecno/Chrome acceptance check is still open. The current remediation and release
 goals are in [public_android_release_improvement_plan.md](public_android_release_improvement_plan.md).
@@ -10,8 +10,9 @@ goals are in [public_android_release_improvement_plan.md](public_android_release
 - GitHub repository keikoocatalasan/jcg is public. Release `v1.0.1` is published from commit `902b6ad3fd145a262ab13007acc6d1f6a10034e5`.
 - landing_page/index.html links to releases/latest/download/JCG-Fitness.apk and releases/latest. It also exposes a same-origin Render ARM64 mirror and resumable /download.html helper for the reported large-download stall. The mirror must be replaced and reverified with each release.
 - Android application ID is com.jcg.fitness; release `1.0.1` uses version code 2, minimum Android API 26 (Android 8), and the JCG Fitness release certificate.
-- v1.0.2 is published from the tested tagged source; the next source change must
-  use a higher semantic version and Android build number.
+- v1.0.3 is published from the tested tagged source. Universal and ABI APKs
+  share global Android version code 4004 so the universal package can update
+  previous ABI-offset installs.
 - Render JCG workspace: Hobby, no payment card, 3/25 services; current month 4.22/750 free instance hours, 1 MB/5 GB bandwidth, 2/500 pipeline minutes. These limits are shared with the unrelated SBMS service.
 - Vercel account: Hobby, last 30 days 12.1 MB/100 GB transfer and 1.7K/1M edge requests. Only SBMS is listed as a project. Do not deploy JCG into that unrelated project.
 - Supabase dashboard currently requires MFA. Actual plan, remaining usage, and bucket limits have not been verified.
@@ -45,7 +46,7 @@ Sources:
    signing certificate, supported ABIs, and minimum Android version. Do not
    publish a debug/profile APK or the training dataset.
 5. Verify clean installation and launch, normal auth, API connectivity, capture/upload/manual food confirmation, date-scoped log edits, and restart persistence. Test the actual release artifact; prior debug tests alone are insufficient.
-6. [x] Create a published GitHub Release at a reviewed commit. `v1.0.2`
+6. [x] Create a published GitHub Release at a reviewed commit. `v1.0.3`
    contains the branded universal APK, three ABI-specific APKs, checksums,
    release metadata and release notes. New releases no longer publish the
    confusing `app-release.apk` alias.
@@ -60,8 +61,9 @@ After the one-time GitHub Actions secrets are configured, each update follows th
 1. Update `flutter_app/pubspec.yaml` with a higher semantic version and Android build number.
 2. Run the tests and release build locally when possible.
 3. Commit and push the change to `main`.
-4. Create and push a matching tag, for example `v1.0.2`.
-5. Explicitly dispatch the Android release workflow on that tag (`gh workflow run android-release.yml --ref v1.0.2`). It builds a draft with branded APKs, `SHA256SUMS.txt` and `release.json`. Verify the candidate before publishing the draft. Do not run the local publisher for the same version.
+4. Create and push a matching tag, for example `v1.0.3`. Keep Android build
+   numbers globally monotonic; do not reuse the old ABI-offset scheme.
+5. Explicitly dispatch the Android release workflow on that tag (`gh workflow run android-release.yml --ref v1.0.3`). It builds a draft with branded APKs, `SHA256SUMS.txt` and `release.json`. Verify the candidate before publishing the draft. Do not run the local publisher for the same version.
 6. The unchanged landing page immediately serves the new `JCG-Fitness.apk` through the `latest` redirect; deploy the synchronized ARM64 fallback when the source changes.
 7. Verify the public download, checksum, release page, and clean install.
 

@@ -1,7 +1,7 @@
 # Google Sign-In production setup
 
 Status: Google Cloud/Supabase configuration saved on 2026-09-09; real same-email
-account testing remains required before publishing JCG Fitness v1.0.2. Do not
+account testing was completed before publishing JCG Fitness v1.0.3. Do not
 copy a Google client secret into Flutter, GitHub source, or the landing page.
 
 ## Current evidence
