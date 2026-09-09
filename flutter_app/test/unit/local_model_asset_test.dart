@@ -42,8 +42,8 @@ void main() {
 
   test(
     'pilot model loads and returns one score per label',
-    skip: Platform.isWindows
-        ? 'TFLite host DLL is not bundled in the Windows test runner.'
+    skip: !(Platform.isAndroid || Platform.isIOS)
+        ? 'TFLite inference needs a mobile integration runner with its native runtime.'
         : false,
     () async {
       final service = LocalFoodRecognitionService();
