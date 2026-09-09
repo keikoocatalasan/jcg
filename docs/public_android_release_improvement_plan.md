@@ -365,6 +365,9 @@ Current completion record:
   release metadata; CI run 34372781647 passed all release gates.
 - [x] The exact published v1.0.4 universal APK installed on the Android 15
   emulator as `com.jcg.fitness` version 1.0.4/build 4005 after QA validation.
+- [x] The exact public v1.0.4 Google flow opened the account picker, accepted
+  the already-authorized existing test account, and reached the live Admin
+  Dashboard with production counts without an auth or app crash.
 - [x] Local QA debug build verified the scanner fix: no provider-build
   exception on scanner entry, camera permission prompt, initialized preview,
   live analysis toggle with a confidence hint, and shutter capture to preview.
