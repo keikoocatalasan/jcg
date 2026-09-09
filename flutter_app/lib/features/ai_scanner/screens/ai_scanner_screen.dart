@@ -48,7 +48,12 @@ class _AiScannerContentState extends ConsumerState<_AiScannerContent> {
   @override
   void initState() {
     super.initState();
-    ref.read(scanResultProvider.notifier).reset();
+    // Riverpod rejects synchronous state changes while this widget is being
+    // mounted. Reset after the first frame so reopening the scanner starts
+    // cleanly without producing an unhandled build-time exception.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(scanResultProvider.notifier).reset();
+    });
   }
 
   void _startScan() {

@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appName = 'JCG Fitness';
-  static const String version = '1.0.3';
+  static const String version = '1.0.4';
 
   // Validation
   static const int minNicknameLength = 2;
