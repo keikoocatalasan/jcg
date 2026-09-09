@@ -1,7 +1,10 @@
 # JCG Fitness public Android release improvement plan
 
-Prepared: 2026-09-07. Status: implementation in progress; v1.0.3 is now the
+Prepared: 2026-09-07. Status: implementation in progress; v1.0.4 is now the
 published latest release and physical-device acceptance remains open.
+The v1.0.4 CI run 34372781647 passed tests, analysis, signed universal/ABI
+builds, branded packaging and fallback validation. It includes the scanner
+provider-lifecycle fix and uses global Android build code 4005.
 Implementation progress: CI run 34330561784 passed the full Flutter suite,
 signed universal/ABI builds, branded packaging, fallback metadata validation and
 release publication. The v1.0.2 assets are `JCG-Fitness.apk` (99,016,248
@@ -10,8 +13,8 @@ bytes), `JCG-Fitness-arm64-v8a.apk` (39,807,180 bytes),
 `JCG-Fitness-x86_64.apk` (43,276,914 bytes), `release.json` and
 `SHA256SUMS.txt`. The legacy `app-release.apk` alias is no longer published for
 new releases, so public downloads use the JCG Fitness name consistently.
-The landing ARM64 fallback has been synchronized to the exact v1.0.3 release
-asset and is deployed through Render deployment dep-dagj0g2d0e5s73cmvh20.
+The landing ARM64 fallback has been synchronized to the exact v1.0.4 release
+asset and is deployed through Render deployment dep-dago6op42hec73d6d73g.
 Settings now includes an explicit update check using the installed package build
 number and official release metadata, with Later/download/release-notes actions
 and recoverable errors. Five release metadata tests and two update-banner tests
@@ -138,7 +141,7 @@ managed device, region, future Android version, or device configuration.
 
 - The user reports a failed download on a physical Android phone. Root cause is
   not established; desktop accessibility and emulator installation do not resolve it.
-- GitHub latest is public v1.0.2. The release uses branded assets
+- GitHub latest is public v1.0.4. The release uses branded assets
   `JCG-Fitness.apk`, `JCG-Fitness-arm64-v8a.apk`,
   `JCG-Fitness-armeabi-v7a.apk` and `JCG-Fitness-x86_64.apk`, with
   `release.json` and `SHA256SUMS.txt`.
@@ -358,6 +361,14 @@ fail or not tested. Emulators cannot prove physical camera or browser behavior.
 
 Current completion record:
 
+- [x] v1.0.4 signed release published with branded packages, checksums and
+  release metadata; CI run 34372781647 passed all release gates.
+- [x] Local QA debug build verified the scanner fix: no provider-build
+  exception on scanner entry, camera permission prompt, initialized preview,
+  live analysis toggle with a confidence hint, and shutter capture to preview.
+- [x] Local QA seeded flows verified meal quantity, water amount and weight
+  editing with updated local rows and pending sync records; the AI sample image
+  flow reached prediction results and portion confirmation.
 - [x] v1.0.3 signed release published with branded packages, checksums and
   release metadata; CI run 34337170081 passed tests, analysis, builds and
   fallback validation.
