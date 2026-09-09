@@ -46,7 +46,7 @@ Sources:
    signing certificate, supported ABIs, and minimum Android version. Do not
    publish a debug/profile APK or the training dataset.
 5. Verify clean installation and launch, normal auth, API connectivity, capture/upload/manual food confirmation, date-scoped log edits, and restart persistence. Test the actual release artifact; prior debug tests alone are insufficient.
-6. [x] Create a published GitHub Release at a reviewed commit. `v1.0.3`
+6. [x] Create a published GitHub Release at a reviewed commit. `v1.0.4`
    contains the branded universal APK, three ABI-specific APKs, checksums,
    release metadata and release notes. New releases no longer publish the
    confusing `app-release.apk` alias.
@@ -61,9 +61,9 @@ After the one-time GitHub Actions secrets are configured, each update follows th
 1. Update `flutter_app/pubspec.yaml` with a higher semantic version and Android build number.
 2. Run the tests and release build locally when possible.
 3. Commit and push the change to `main`.
-4. Create and push a matching tag, for example `v1.0.3`. Keep Android build
+4. Create and push a matching tag, for example `v1.0.4`. Keep Android build
    numbers globally monotonic; do not reuse the old ABI-offset scheme.
-5. Explicitly dispatch the Android release workflow on that tag (`gh workflow run android-release.yml --ref v1.0.3`). It builds a draft with branded APKs, `SHA256SUMS.txt` and `release.json`. Verify the candidate before publishing the draft. Do not run the local publisher for the same version.
+5. Explicitly dispatch the Android release workflow on that tag (`gh workflow run android-release.yml --ref v1.0.4`). It builds a draft with branded APKs, `SHA256SUMS.txt` and `release.json`. Verify the candidate before publishing the draft. Do not run the local publisher for the same version.
 6. The unchanged landing page immediately serves the new `JCG-Fitness.apk` through the `latest` redirect; deploy the synchronized ARM64 fallback when the source changes.
 7. Verify the public download, checksum, release page, and clean install.
 
