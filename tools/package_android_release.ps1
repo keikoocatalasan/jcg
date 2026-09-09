@@ -53,10 +53,7 @@ foreach ($source in $mapping.Keys) {
         url = "https://github.com/keikoocatalasan/jcg/releases/download/v$Version/$name"
     }
 }
-# Preserve the old public URL during the branded-name transition.
-Copy-Item -LiteralPath (Join-Path $OutputDirectory 'JCG-Fitness.apk') -Destination (Join-Path $OutputDirectory 'app-release.apk')
 $checksums = @($assets | ForEach-Object { "$($_.sha256)  $($_.name)" })
-$checksums += "$($assets[0].sha256)  app-release.apk"
 $checksums | Set-Content -LiteralPath (Join-Path $OutputDirectory 'SHA256SUMS.txt') -Encoding ascii
 [ordered]@{
     schemaVersion = 1

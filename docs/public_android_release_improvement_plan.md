@@ -1,19 +1,22 @@
 # JCG Fitness public Android release improvement plan
 
-Prepared: 2026-09-07. Status: planned; implementation and release acceptance pending.
-Implementation progress: release paths now require the Google web client ID,
-stage branded APKs with metadata/checksums as drafts, and use explicit CI
-dispatch to avoid a tag-triggered race with local publishing. Packaging tested
-against existing v1.0.1 artifacts: hashes and compatibility alias match; reused
-staging directories are refused. This is packaging validation, not a new build
-or device acceptance. The public v1.0.1 release now also contains the complete
-matching branded aliases and release metadata; the new v1.0.2 app code is not
-yet the public latest release.
+Prepared: 2026-09-07. Status: implementation in progress; v1.0.2 is now the
+published latest release and physical-device acceptance remains open.
+Implementation progress: CI run 34330561784 passed the full Flutter suite,
+signed universal/ABI builds, branded packaging, fallback metadata validation and
+release publication. The v1.0.2 assets are `JCG-Fitness.apk` (99,016,248
+bytes), `JCG-Fitness-arm64-v8a.apk` (39,807,180 bytes),
+`JCG-Fitness-armeabi-v7a.apk` (35,437,900 bytes),
+`JCG-Fitness-x86_64.apk` (43,276,914 bytes), `release.json` and
+`SHA256SUMS.txt`. The legacy `app-release.apk` alias is no longer published for
+new releases, so public downloads use the JCG Fitness name consistently.
+The landing ARM64 fallback has been synchronized to the exact v1.0.2 release
+asset and is awaiting the final source commit/Render deployment.
 Settings now includes an explicit update check using the installed package build
 number and official release metadata, with Later/download/release-notes actions
 and recoverable errors. Five release metadata tests and two update-banner tests
-pass. The public metadata endpoint is verified; widget/device verification and
-an installed-app update check remain pending.
+pass; the CI Flutter suite passes. The public metadata endpoint is verified and
+the emulator upgrade path has been exercised.
 The three update-related Dart files pass static analysis. The landing page has
 local light-theme and content changes; it loads in the in-app browser at
 127.0.0.1:8765. Screenshot replacement, viewport/contrast verification and
@@ -26,18 +29,15 @@ banner and Android system bars were cropped; preview assets are not production
 data. The landing gallery references these current screens. AI-scanner and
 chatbot preview captures remain unverified because the emulator went offline
 when opening Add Meal.
-The emulator was online on Android 15 with v1.0.1/build 2 installed. Production
-local configuration lacks GOOGLE_WEB_CLIENT_ID. Settings now implements native
-Google linking through the installed Supabase SDK, requires the same verified
-email and checks that the user ID is preserved. Live linking/provider validation
-remains pending; implementation alone does not prove account preservation.
-Latest live audit: Supabase auth settings enable Google/email and permit signup,
-but GET /auth/v1/authorize?provider=google returns HTTP 400 with
-`Unsupported provider: missing OAuth secret`. Browser OAuth requires provider
-configuration repair. Native ID-token login still requires the missing public
-GOOGLE_WEB_CLIENT_ID and release certificate registration; do not conflate the
-browser OAuth error with proof about native token validation. GitHub release
-secret listing is empty. Full Flutter regression run: 212 pass, one skip.
+The Android 15 emulator upgraded from the exact public v1.0.1 ARM64 package to
+v1.0.2 without changing first-install time. Production configuration now
+includes GOOGLE_WEB_CLIENT_ID. Supabase Google provider settings, the release
+SHA-1, and manual identity linking were saved. The native same-email test linked
+Google to the existing email account and preserved the original user ID; the
+Supabase user showed both Email and Google providers with no duplicate account.
+The public Supabase authorization endpoint now redirects to Google. Required
+GitHub Actions secrets are present. Full Flutter regression run: 212 pass, one
+skip on desktop because native TFLite inference requires a mobile runner.
 User clarified the failed device flow: Tecno Camon 20 Pro 5G, Chrome, download
 stalls at the end before installation. A full ARM64 v1.0.1 GET from this laptop
 returned 200 with 39,741,584 bytes in 9.7 seconds; SHA-256 matches the published
@@ -138,21 +138,24 @@ managed device, region, future Android version, or device configuration.
 
 - The user reports a failed download on a physical Android phone. Root cause is
   not established; desktop accessibility and emulator installation do not resolve it.
-- GitHub latest is public v1.0.1. Assets are named app-release.apk and app-<ABI>-release.apk.
-  The universal file is 98,786,812 bytes; ARM64 is 39,741,584 bytes.
+- GitHub latest is public v1.0.2. The release uses branded assets
+  `JCG-Fitness.apk`, `JCG-Fitness-arm64-v8a.apk`,
+  `JCG-Fitness-armeabi-v7a.apk` and `JCG-Fitness-x86_64.apk`, with
+  `release.json` and `SHA256SUMS.txt`.
 - The Android label is already JCG Fitness and package ID is com.jcg.fitness.
   minSdk is 26; targetSdk is 35; release builds require production signing.
 - The landing page now uses stable branded APK names and current local QA
   dashboard/community/log previews. Runtime production behavior still needs
   its separate acceptance tests.
-- Google login uses native GoogleSignIn followed by Supabase signInWithIdToken.
-  GOOGLE_WEB_CLIENT_ID is read by app config but not supplied by the release workflow.
-- Auth errors refer to linking Google in Settings, but the source search found
-  no linkIdentity implementation. Provider configuration is not yet verified live.
-- The local publisher does not explicitly stop on every native-command failure.
-  Local publishing and tag-triggered CI can race to create the same release.
-- Prior documentation says CI signing secrets are missing. Current account
-  configuration and quota headroom must be rechecked before implementation.
+- Google login uses native GoogleSignIn followed by Supabase signInWithIdToken;
+  Settings also supports linking Google to the current verified email account.
+- Supabase Google provider settings, the release SHA-1, manual identity linking,
+  and the public Google redirect have been verified. The emulator same-email
+  test preserved the existing user ID and added Google without a duplicate.
+- CI uses explicit dispatch, pinned tool versions and fail-fast validation. The
+  v1.0.2 workflow passed and published the signed release.
+- GitHub Actions secrets for signing, production Supabase/API inputs and the
+  Google web client ID are configured; secret values remain outside the repo.
 
 ## Goal 1 — diagnose and repair phone download (P0)
 
@@ -189,8 +192,8 @@ If no physical device is available, leave this acceptance item pending.
   package requiring a separate installer. Universal is the safe default when
   architecture is unknown; label smaller alternatives clearly.
 - Preserve com.jcg.fitness, launcher identity, and the current production signing
-  key. Increment version/build number. Keep older generic asset links working
-  during transition by publishing a verified compatibility alias where needed.
+  key. Increment version/build number. Older v1.0.1 generic links remain in that
+  historical release, while new releases use branded asset names only.
 - Android 10+ is the supported test target. Retain minSdk 26 unless a dependency
   requires otherwise; raising it alone does not improve compatibility. Advertise
   the tested baseline. Audit native libraries including TFLite for ABI support
@@ -336,7 +339,9 @@ developer verification/account prerequisites are documented.
 
 Acceptance: rehearse a second version from commit to release and perform an
 in-place update from the previous public APK. Verify latest metadata, correct
-filename, preserved data and recovery behavior. Document the short maintainer runbook.
+filename, preserved data and recovery behavior. The v1.0.2 CI run and emulator
+upgrade pass these checks; the physical-device download/install check remains.
+Document the short maintainer runbook.
 
 ## Execution sequence and completion record
 
@@ -350,9 +355,20 @@ filename, preserved data and recovery behavior. Document the short maintainer ru
 For every acceptance item record commit, artifact hash/version, environment,
 device/browser/OS, expected and actual result, and evidence path. Mark pass,
 fail or not tested. Emulators cannot prove physical camera or browser behavior.
-Release remains pending if download/install, identity preservation or production
-data persistence fail. This planning turn does not change production or claim
-the reported phone failure is resolved.
+
+Current completion record:
+
+- [x] v1.0.2 signed release published with branded packages, checksums and
+  release metadata; CI run 34330561784 passed.
+- [x] Google OAuth provider, release SHA-1, web client, manual linking and
+  GitHub Actions production secrets configured; same-email identity preserved
+  in the Android emulator test.
+- [x] Landing page light theme, current previews, privacy/terms pages and
+  resumable download helper are deployed in source and ready for Render sync.
+- [x] v1.0.2 ARM64 fallback copied from the exact published release asset.
+- [x] Backend health/readiness and production API metadata verified.
+- [ ] Physical Tecno Camon 20 Pro 5G + Chrome full download, installer and
+  camera/data acceptance; this still requires the user’s phone/network.
 
 ## References checked for planning
 
