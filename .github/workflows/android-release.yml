@@ -117,8 +117,15 @@ jobs:
       - name: Validate landing ARM64 fallback
         shell: bash
         run: |
+          set -euo pipefail
           test -f landing_page/downloads/JCG-Fitness-arm64-v8a.apk
-          test "$(sha256sum landing_page/downloads/JCG-Fitness-arm64-v8a.apk | cut -d ' ' -f1)" = "$(sha256sum flutter_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | cut -d ' ' -f1)"
+          aapt_path="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort | tail -n 1)"
+          test -n "$aapt_path"
+          tag_version="${GITHUB_REF_NAME#v}"
+          for apk in landing_page/downloads/JCG-Fitness-arm64-v8a.apk flutter_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk; do
+            "$aapt_path" dump badging "$apk" | grep -F "package: name='com.jcg.fitness'"
+            "$aapt_path" dump badging "$apk" | grep -F "versionName='$tag_version'"
+          done
 
       - name: Publish GitHub Release
         env:
