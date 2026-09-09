@@ -11,7 +11,7 @@ bytes), `JCG-Fitness-arm64-v8a.apk` (39,807,180 bytes),
 `SHA256SUMS.txt`. The legacy `app-release.apk` alias is no longer published for
 new releases, so public downloads use the JCG Fitness name consistently.
 The landing ARM64 fallback has been synchronized to the exact v1.0.2 release
-asset and is awaiting the final source commit/Render deployment.
+asset and is deployed through Render deployment dep-daghuqp42hec73cea6ig.
 Settings now includes an explicit update check using the installed package build
 number and official release metadata, with Later/download/release-notes actions
 and recoverable errors. Five release metadata tests and two update-banner tests
@@ -364,7 +364,8 @@ Current completion record:
   GitHub Actions production secrets configured; same-email identity preserved
   in the Android emulator test.
 - [x] Landing page light theme, current previews, privacy/terms pages and
-  resumable download helper are deployed in source and ready for Render sync.
+  resumable download helper are deployed in Render deployment
+  dep-daghuqp42hec73cea6ig.
 - [x] v1.0.2 ARM64 fallback copied from the exact published release asset.
 - [x] Backend health/readiness and production API metadata verified.
 - [ ] Physical Tecno Camon 20 Pro 5G + Chrome full download, installer and
