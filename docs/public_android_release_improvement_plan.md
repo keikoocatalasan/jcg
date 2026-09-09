@@ -362,8 +362,8 @@ Current completion record:
   release metadata; CI run 34337170081 passed tests, analysis, builds and
   fallback validation.
 - [x] Universal and ABI APKs now share global Android version code 4004. The
-  v1.0.3 universal APK installed over the existing v1.0.2 ABI installation on
-  the Android 15 emulator without changing first-install time.
+  exact published v1.0.3 universal APK installed over the existing v1.0.2 ABI
+  installation on the Android 15 emulator without changing first-install time.
 - [x] Android Chrome on the emulator rendered the public landing page, showed
   the standard unknown-app safety prompt with the branded `JCG-Fitness.apk`
   filename, completed the 94.43 MiB download, and reached the installer.
