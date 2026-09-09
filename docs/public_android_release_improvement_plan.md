@@ -360,6 +360,11 @@ Current completion record:
 
 - [x] v1.0.2 signed release published with branded packages, checksums and
   release metadata; CI run 34330561784 passed.
+- [x] The exact published universal APK installed on the Android 15 emulator
+  as `com.jcg.fitness` version 1.0.2/build 2003 and reached the live Admin
+  Dashboard with production KPI data. No JCG fatal-exception or app-ANR marker
+  was observed; Android System UI briefly reported its own ANR during emulator
+  startup and recovered.
 - [x] Google OAuth provider, release SHA-1, web client, manual linking and
   GitHub Actions production secrets configured; same-email identity preserved
   in the Android emulator test.
@@ -368,6 +373,9 @@ Current completion record:
   dep-daghuqp42hec73cea6ig.
 - [x] v1.0.2 ARM64 fallback copied from the exact published release asset.
 - [x] Backend health/readiness and production API metadata verified.
+- [ ] Camera capture/live-preview, upload recognition and date-scoped edit
+  persistence still require a signed-in user flow on a usable mobile runner;
+  the current emulator session is an admin dashboard session.
 - [ ] Physical Tecno Camon 20 Pro 5G + Chrome full download, installer and
   camera/data acceptance; this still requires the user’s phone/network.
 
