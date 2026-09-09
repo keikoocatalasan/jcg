@@ -69,6 +69,22 @@ android {
     }
 }
 
+// Flutter normally adds ABI-specific offsets to split APK version codes
+// (1000/2000/4000). That makes a newer universal APK look older than an
+// already-installed ABI APK. Override Flutter's value after its split logic
+// so every public APK shares one monotonically increasing code.
+val publicVersionCode = flutter.versionCode
+@Suppress("DEPRECATION")
+extensions.getByType<com.android.build.gradle.AppExtension>().applicationVariants.all {
+    if (buildType.name == "release") {
+        outputs.forEach { output ->
+            @Suppress("DEPRECATION")
+            (output as com.android.build.gradle.api.ApkVariantOutput).versionCodeOverride =
+                versionCode ?: publicVersionCode
+        }
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
