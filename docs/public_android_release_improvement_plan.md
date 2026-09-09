@@ -363,6 +363,8 @@ Current completion record:
 
 - [x] v1.0.4 signed release published with branded packages, checksums and
   release metadata; CI run 34372781647 passed all release gates.
+- [x] The exact published v1.0.4 universal APK installed on the Android 15
+  emulator as `com.jcg.fitness` version 1.0.4/build 4005 after QA validation.
 - [x] Local QA debug build verified the scanner fix: no provider-build
   exception on scanner entry, camera permission prompt, initialized preview,
   live analysis toggle with a confidence hint, and shutter capture to preview.
