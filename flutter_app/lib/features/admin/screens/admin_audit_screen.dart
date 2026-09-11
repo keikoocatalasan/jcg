@@ -79,37 +79,40 @@ class _AuditCard extends StatelessWidget {
     final date = DateFormat.yMMMd().add_jm().format(entry.createdAt.toLocal());
     return GlassCard(
       margin: EdgeInsets.zero,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppColors.surfaceAlt,
-          child: Icon(
-            isRoleChange ? Icons.manage_accounts : Icons.gavel_outlined,
-            color: AppColors.textPrimary,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppColors.surfaceAlt,
+            child: Icon(
+              isRoleChange ? Icons.manage_accounts : Icons.gavel_outlined,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        title: Text(
-          entry.action.replaceAll('_', ' ').toUpperCase(),
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${entry.auditType} · $date'),
-              const SizedBox(height: 4),
-              Text('Actor: ${entry.actorId}'),
-              if (entry.targetId != null) Text('Target: ${entry.targetId}'),
-              if (entry.reportId != null) Text('Report: ${entry.reportId}'),
-              if (entry.postId != null) Text('Post: ${entry.postId}'),
-              if (entry.details != null) ...[
+          title: Text(
+            entry.action.replaceAll('_', ' ').toUpperCase(),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${entry.auditType} · $date'),
                 const SizedBox(height: 4),
-                Text(entry.details!),
+                Text('Actor: ${entry.actorId}'),
+                if (entry.targetId != null) Text('Target: ${entry.targetId}'),
+                if (entry.reportId != null) Text('Report: ${entry.reportId}'),
+                if (entry.postId != null) Text('Post: ${entry.postId}'),
+                if (entry.details != null) ...[
+                  const SizedBox(height: 4),
+                  Text(entry.details!),
+                ],
               ],
-            ],
+            ),
           ),
+          isThreeLine: true,
         ),
-        isThreeLine: true,
       ),
     );
   }

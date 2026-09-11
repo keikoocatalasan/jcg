@@ -528,8 +528,10 @@ class _EditMealLogScreenState extends ConsumerState<EditMealLogScreen> {
                           showModalBottomSheet(
                             context: context,
                             isScrollControlled: true,
-                            builder: (_) =>
-                                FoodSearchSheet(onFoodSelected: _addFood),
+                            builder: (_) => FoodSearchSheet(
+                              mealType: _mealType,
+                              onFoodSelected: _addFood,
+                            ),
                           );
                         },
                         onUpdateQuantity: _updateQuantity,
@@ -716,6 +718,7 @@ class _MealDetailsSection extends StatelessWidget {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: mealType,
+                isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Meal Type',
                   prefixIcon: Icon(Icons.restaurant_menu),
@@ -728,42 +731,55 @@ class _MealDetailsSection extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: onDateTap,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Date',
-                          prefixIcon: Icon(Icons.calendar_today),
-                        ),
-                        child: Text(
-                          _shortDate(loggedAt),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final dateSelector = GestureDetector(
+                    onTap: onDateTap,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Date',
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      child: Text(
+                        _shortDate(loggedAt),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: onTimeTap,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Time',
-                          prefixIcon: Icon(Icons.access_time),
-                        ),
-                        child: Text(
-                          TimeOfDay.fromDateTime(loggedAt).format(context),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
+                  );
+                  final timeSelector = GestureDetector(
+                    onTap: onTimeTap,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Time',
+                        prefixIcon: Icon(Icons.access_time),
+                      ),
+                      child: Text(
+                        TimeOfDay.fromDateTime(loggedAt).format(context),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                  ),
-                ],
+                  );
+                  if (constraints.maxWidth < 520) {
+                    return Column(
+                      children: [
+                        dateSelector,
+                        const SizedBox(height: 12),
+                        timeSelector,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: dateSelector),
+                      const SizedBox(width: 12),
+                      Expanded(child: timeSelector),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
               TextFormField(

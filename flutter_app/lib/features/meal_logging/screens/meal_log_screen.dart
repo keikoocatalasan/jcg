@@ -80,7 +80,10 @@ class _MealLogScreenState extends ConsumerState<MealLogScreen> {
     }
     try {
       final repo = FoodRepository(DatabaseProvider());
-      final results = await repo.searchByName(query.trim());
+      final results = await repo.searchByName(
+        query.trim(),
+        mealTypeCode: _mealType,
+      );
       if (mounted) setState(() => _searchResults = results);
     } catch (_) {}
   }
@@ -315,12 +318,18 @@ class _MealLogScreenState extends ConsumerState<MealLogScreen> {
                 mealType: _mealType,
                 loggedAt: _loggedAt,
                 notesController: _notesController,
-                onMealTypeChanged: (v) => setState(() => _mealType = v),
+                onMealTypeChanged: (v) {
+                  setState(() => _mealType = v);
+                  if (_searchQuery.trim().length >= 2) {
+                    _searchFoods(_searchQuery);
+                  }
+                },
                 onDateTimeTap: _pickDateTime,
               ),
               const _SectionHeader(number: '2', title: 'Add Food Items'),
               _AddFoodSection(
                 searchMode: _searchMode,
+                mealType: _mealType,
                 searchQuery: _searchQuery,
                 searchResults: _searchResults,
                 foodItems: _foodItems,
@@ -335,6 +344,7 @@ class _MealLogScreenState extends ConsumerState<MealLogScreen> {
                     context: context,
                     isScrollControlled: true,
                     builder: (_) => FoodSearchSheet(
+                      mealType: _mealType,
                       onFoodSelected: _addFood,
                     ),
                   );
@@ -458,44 +468,58 @@ class _MealDetailsSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: mealType,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final mealSelector = DropdownButtonFormField<String>(
+                    initialValue: mealType,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Meal Type',
+                      prefixIcon: Icon(Icons.restaurant_menu),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                    items: _mealTypes.map((m) {
+                      return DropdownMenuItem(value: m.$1, child: Text(m.$2));
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) onMealTypeChanged(v);
+                    },
+                  );
+                  final dateSelector = GestureDetector(
+                    onTap: onDateTimeTap,
+                    child: InputDecorator(
                       decoration: const InputDecoration(
-                        labelText: 'Meal Type',
-                        prefixIcon: Icon(Icons.restaurant_menu),
+                        labelText: 'Date & Time',
+                        prefixIcon: Icon(Icons.calendar_today),
                         contentPadding:
                             EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                       ),
-                      items: _mealTypes.map((m) {
-                        return DropdownMenuItem(value: m.$1, child: Text(m.$2));
-                      }).toList(),
-                      onChanged: (v) {
-                        if (v != null) onMealTypeChanged(v);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: onDateTimeTap,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Date & Time',
-                          prefixIcon: Icon(Icons.calendar_today),
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 14),
-                        ),
-                        child: Text(
-                          '${loggedAt.month.toString().padLeft(2, '0')}/${loggedAt.day.toString().padLeft(2, '0')}/${loggedAt.year}  ·  ${TimeOfDay.fromDateTime(loggedAt).format(context)}',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
+                      child: Text(
+                        '${loggedAt.month.toString().padLeft(2, '0')}/${loggedAt.day.toString().padLeft(2, '0')}/${loggedAt.year}  ·  ${TimeOfDay.fromDateTime(loggedAt).format(context)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                  ),
-                ],
+                  );
+                  if (constraints.maxWidth < 520) {
+                    return Column(
+                      children: [
+                        mealSelector,
+                        const SizedBox(height: 12),
+                        dateSelector,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: mealSelector),
+                      const SizedBox(width: 12),
+                      Expanded(child: dateSelector),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -517,6 +541,7 @@ class _MealDetailsSection extends StatelessWidget {
 
 class _AddFoodSection extends StatefulWidget {
   final bool searchMode;
+  final String mealType;
   final String searchQuery;
   final List<Food> searchResults;
   final List<_FoodItem> foodItems;
@@ -529,6 +554,7 @@ class _AddFoodSection extends StatefulWidget {
 
   const _AddFoodSection({
     required this.searchMode,
+    required this.mealType,
     required this.searchQuery,
     required this.searchResults,
     required this.foodItems,
@@ -628,6 +654,16 @@ class _AddFoodSectionState extends State<_AddFoodSection> {
             ),
             onChanged: widget.onSearchChanged,
           ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Search is filtered to ${_mealTypeLabel(widget.mealType)} foods.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+          ),
           if (widget.searchQuery.length >= 2) ...[
             const SizedBox(height: 12),
             ...widget.searchResults.map((food) => _SearchResultTile(
@@ -664,6 +700,21 @@ class _AddFoodSectionState extends State<_AddFoodSection> {
       ),
     );
   }
+
+  String _mealTypeLabel(String code) {
+    switch (code) {
+      case 'breakfast':
+        return 'Breakfast';
+      case 'lunch':
+        return 'Lunch';
+      case 'dinner':
+        return 'Dinner';
+      case 'snack':
+        return 'Snack';
+      default:
+        return 'this meal';
+    }
+  }
 }
 
 class _SearchResultTile extends StatelessWidget {
@@ -676,57 +727,60 @@ class _SearchResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.restaurant, color: AppColors.textSecondary),
           ),
-          child: const Icon(Icons.restaurant, color: AppColors.textSecondary),
-        ),
-        title: Text(
-          food.foodName,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          '${food.servingLabel ?? '1 serving'} (${food.servingGrams?.round() ?? 0} g) · ${Formatters.formatCalories(food.calories)}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.textSecondary,
+          title: Text(
+            food.foodName,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            '${food.servingLabel ?? '1 serving'} (${food.servingGrams?.round() ?? 0} g) · ${Formatters.formatCalories(food.calories)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'P ${food.proteinG.round()}g',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppColors.proteinColor),
               ),
+              const SizedBox(width: 6),
+              Text(
+                'C ${food.carbsG.round()}g',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppColors.carbsColor),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'F ${food.fatG.round()}g',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppColors.fatColor),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.add_circle, color: AppColors.primary, size: 20),
+            ],
+          ),
+          onTap: onTap,
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'P ${food.proteinG.round()}g',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.proteinColor),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'C ${food.carbsG.round()}g',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.carbsColor),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'F ${food.fatG.round()}g',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.fatColor),
-            ),
-            const SizedBox(width: 4),
-            const Icon(Icons.add_circle, color: AppColors.primary, size: 20),
-          ],
-        ),
-        onTap: onTap,
       ),
     );
   }

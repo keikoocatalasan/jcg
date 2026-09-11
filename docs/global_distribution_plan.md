@@ -1,6 +1,6 @@
 # Global Android distribution plan
 
-Status: v1.0.4 is published with branded packages, checksums and release metadata.
+Status: v1.0.5 is being prepared with branded packages, checksums and release metadata.
 The user reported a failed physical Android download on 2026-09-07; the physical
 Tecno/Chrome acceptance check is still open. The current remediation and release
 goals are in [public_android_release_improvement_plan.md](public_android_release_improvement_plan.md).
@@ -10,8 +10,8 @@ goals are in [public_android_release_improvement_plan.md](public_android_release
 - GitHub repository keikoocatalasan/jcg is public. Release `v1.0.1` is published from commit `902b6ad3fd145a262ab13007acc6d1f6a10034e5`.
 - landing_page/index.html links to releases/latest/download/JCG-Fitness.apk and releases/latest. It also exposes a same-origin Render ARM64 mirror and resumable /download.html helper for the reported large-download stall. The mirror must be replaced and reverified with each release.
 - Android application ID is com.jcg.fitness; release `1.0.1` uses version code 2, minimum Android API 26 (Android 8), and the JCG Fitness release certificate.
-- v1.0.4 is published from the tested tagged source. Universal and ABI APKs
-  share global Android version code 4005 so the universal package can update
+- v1.0.5 is the next release from the tested source. Universal and ABI APKs
+  share global Android version code 4006 so the universal package can update
   previous ABI-offset installs.
 - Render JCG workspace: Hobby, no payment card, 3/25 services; current month 4.22/750 free instance hours, 1 MB/5 GB bandwidth, 2/500 pipeline minutes. These limits are shared with the unrelated SBMS service.
 - Vercel account: Hobby, last 30 days 12.1 MB/100 GB transfer and 1.7K/1M edge requests. Only SBMS is listed as a project. Do not deploy JCG into that unrelated project.

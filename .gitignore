@@ -88,6 +88,10 @@ Desktop.ini
 *.log
 *.tmp
 *.temp
+flutter_app/qa_*.png
+flutter_app/local_qa_*.png
+flutter_app/baseline_*.png
+flutter_app/chatbot_*.png
 
 # Large local SDKs and tool caches
 flutter_sdk/

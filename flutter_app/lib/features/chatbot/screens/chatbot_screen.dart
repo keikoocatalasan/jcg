@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
+import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/chatbot/chatbot_provider.dart';
 import 'package:jcg_fitness/features/chatbot/suggested_prompts.dart';
@@ -35,139 +36,149 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOut,
+      );
     });
   }
 
   Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
     _messageController.clear();
-    await ref.read(chatSessionProvider.notifier).sendMessage(text.trim());
+    await ref.read(chatSessionProvider.notifier).sendMessage(trimmed);
     _scrollToBottom();
   }
 
-  void _onPromptTap(String prompt) {
-    _sendMessage(prompt);
-  }
+  void _onPromptTap(String prompt) => _sendMessage(prompt);
 
   @override
   Widget build(BuildContext context) {
     final isOnline = ref.watch(isOnlineProvider);
     final session = ref.watch(chatSessionProvider);
-    final theme = Theme.of(context);
-
+    final colors = context.colors;
     final sessionId = session?.chatSessionId;
     final messagesAsync =
-        sessionId != null ? ref.watch(chatMessagesProvider(sessionId)) : null;
+        sessionId == null ? null : ref.watch(chatMessagesProvider(sessionId));
+
     if (sessionId != null) {
-      ref.listen(
-        chatMessagesProvider(sessionId),
-        (previous, next) {
-          final previousCount = previous?.valueOrNull?.length;
-          final nextCount = next.valueOrNull?.length;
-          if (nextCount != null && nextCount != previousCount) {
-            _scrollToBottom();
-          }
-        },
-      );
+      ref.listen(chatMessagesProvider(sessionId), (previous, next) {
+        final previousCount = previous?.valueOrNull?.length;
+        final nextCount = next.valueOrNull?.length;
+        if (nextCount != null && nextCount != previousCount) {
+          _scrollToBottom();
+        }
+      });
     }
 
     return Scaffold(
+      backgroundColor: colors.background,
       appBar: AppBar(
+        titleSpacing: 16,
         title: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.eco, size: 24),
-            const SizedBox(width: 8),
-            const Text('JCG Fitness'),
-            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(3),
+                color: colors.accentSoft,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colors.border),
               ),
-              child: const Text(
-                'BETA',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
+              child: Icon(Icons.auto_awesome_rounded,
+                  color: colors.primary, size: 20),
             ),
-          ],
-        ),
-        actions: [
-          if (!isOnline)
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.wifi_off, color: AppColors.textSecondary),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (!_dismissedDisclaimer)
-            _DisclaimerBanner(onDismiss: () {
-              setState(() => _dismissedDisclaimer = true);
-            }),
-          if (!isOnline)
-            Container(
-              width: double.infinity,
-              color: AppColors.surfaceAlt,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.wifi_off,
-                      size: 16, color: AppColors.textPrimary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'You\'re offline. New messages will be sent when reconnected.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
+                  Text('Nutrition Coach'),
+                  Text(
+                    'Practical guidance for your next choice',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
                   ),
                 ],
               ),
             ),
-          Expanded(
-            child: messagesAsync?.when(
-                  data: (messages) {
-                    if (messages.isEmpty) {
-                      return _EmptyChatView(onPromptTap: _onPromptTap);
-                    }
-                    return _MessageList(
-                      messages: messages,
-                      scrollController: _scrollController,
-                      onRetry: (msg) {
-                        ref
+            _ConnectionPill(isOnline: isOnline),
+          ],
+        ),
+      ),
+      body: GlassBackground(
+        child: Column(
+          children: [
+            if (!_dismissedDisclaimer)
+              _DisclaimerBanner(
+                onDismiss: () => setState(() => _dismissedDisclaimer = true),
+              ),
+            if (!isOnline) const _OfflineChatNotice(),
+            Expanded(
+              child: messagesAsync?.when(
+                    data: (messages) {
+                      if (messages.isEmpty) {
+                        return _EmptyChatView(onPromptTap: _onPromptTap);
+                      }
+                      return _MessageList(
+                        messages: messages,
+                        scrollController: _scrollController,
+                        onRetry: (message) => ref
                             .read(chatSessionProvider.notifier)
-                            .retryFailed(msg.id);
-                      },
-                    );
-                  },
-                  error: (err, _) => Center(child: Text('Error: $err')),
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                ) ??
-                const Center(child: CircularProgressIndicator()),
+                            .retryFailed(message.id),
+                      );
+                    },
+                    error: (error, _) => _ChatError(message: '$error'),
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ) ??
+                  const Center(child: CircularProgressIndicator()),
+            ),
+            _ChatInput(
+              controller: _messageController,
+              isOnline: isOnline,
+              onSend: _sendMessage,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConnectionPill extends StatelessWidget {
+  final bool isOnline;
+
+  const _ConnectionPill({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.accentSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isOnline ? Icons.circle : Icons.cloud_off_rounded,
+            size: isOnline ? 8 : 14,
+            color: isOnline ? colors.success : colors.textMuted,
           ),
-          _ChatInput(
-            controller: _messageController,
-            isOnline: isOnline,
-            onSend: (text) => _sendMessage(text),
-            showPrompts: messagesAsync != null,
-            onPromptTap: _onPromptTap,
+          const SizedBox(width: 5),
+          Text(
+            isOnline ? 'Ready' : 'Offline',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
         ],
       ),
@@ -177,168 +188,235 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
 class _DisclaimerBanner extends StatelessWidget {
   final VoidCallback onDismiss;
+
   const _DisclaimerBanner({required this.onDismiss});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialBanner(
-      backgroundColor: AppColors.surfaceAlt,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      content: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: GlassContainer(
+        level: GlassSurfaceLevel.panel,
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        borderRadius: BorderRadius.circular(14),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 18, color: colors.primary),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                'General nutrition guidance, not medical advice.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textSecondary,
+                    ),
+              ),
+            ),
+            IconButton(
+              onPressed: onDismiss,
+              tooltip: 'Dismiss notice',
+              icon: const Icon(Icons.close_rounded, size: 18),
+              color: colors.textMuted,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OfflineChatNotice extends StatelessWidget {
+  const _OfflineChatNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
         children: [
-          const Icon(Icons.info_outline,
-              size: 18, color: AppColors.textPrimary),
+          Icon(Icons.cloud_off_rounded, size: 16, color: colors.textMuted),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'This AI assistant provides general nutrition information only, not medical advice. Always consult a healthcare professional.',
+              'You are offline. Messages will wait until you reconnect.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
+                    color: colors.textSecondary,
                   ),
             ),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: onDismiss,
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: const Text('Got it', style: TextStyle(fontSize: 12)),
-        ),
-      ],
     );
   }
 }
 
 class _EmptyChatView extends StatelessWidget {
-  final void Function(String) onPromptTap;
+  final ValueChanged<String> onPromptTap;
+
   const _EmptyChatView({required this.onPromptTap});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
+    final quickStarts = <(String, String)>[
+      ('Breakfast ideas', suggestedPrompts[0]),
+      ('More protein', suggestedPrompts[1]),
+      ('Budget meals', suggestedPrompts[2]),
+    ];
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppColors.border, width: 1.5),
-            ),
-            child: Text(
-              "Hi! I'm your JCG Fitness coach. Ask me about nutrition, healthy eating, or your goals.",
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Try asking',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...suggestedPrompts.take(5).map((prompt) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: SizedBox(
-                width: double.infinity,
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
-                  child: InkWell(
-                    onTap: () => onPromptTap(prompt),
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.chat_bubble_outline,
-                            size: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              prompt,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          const Icon(
-                            Icons.arrow_forward_ios,
-                            size: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ],
-                      ),
-                    ),
+          GlassContainer(
+            level: GlassSurfaceLevel.panel,
+            padding: const EdgeInsets.all(20),
+            borderRadius: BorderRadius.circular(22),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: BorderRadius.circular(14),
                   ),
+                  child:
+                      Icon(Icons.auto_awesome_rounded, color: colors.onPrimary),
                 ),
-              ),
-            );
-          }),
-          const SizedBox(height: 8),
-          Center(
-            child: TextButton(
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                showDragHandle: true,
-                builder: (sheetContext) => SafeArea(
-                  child: ListView(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Suggested prompts',
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      for (final prompt in suggestedPrompts)
-                        ListTile(
-                          leading: const Icon(Icons.chat_bubble_outline),
-                          title: Text(prompt),
-                          onTap: () {
-                            Navigator.pop(sheetContext);
-                            onPromptTap(prompt);
-                          },
-                        ),
+                      Text(
+                        'Let’s make your next meal easier.',
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Ask one question about food, portions, goals, or your budget.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colors.textSecondary,
+                              height: 1.4,
+                            ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-              child: const Text(
-                'See more prompts >',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              ],
             ),
           ),
+          const SizedBox(height: 22),
+          Text(
+            'Quick starts',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(right: 4),
+            child: Row(
+              children: [
+                for (var index = 0; index < quickStarts.length; index++) ...[
+                  _PromptChip(
+                    label: quickStarts[index].$1,
+                    onTap: () => onPromptTap(quickStarts[index].$2),
+                  ),
+                  if (index != quickStarts.length - 1) const SizedBox(width: 8),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Or type your own question below.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.textMuted,
+                ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _PromptChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _PromptChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: colors.surfaceGlassStrong,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: colors.border),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatError extends StatelessWidget {
+  final String message;
+
+  const _ChatError({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: GlassContainer(
+          level: GlassSurfaceLevel.card,
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: colors.error),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'The conversation could not be loaded. $message',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -347,7 +425,7 @@ class _EmptyChatView extends StatelessWidget {
 class _MessageList extends StatelessWidget {
   final List<ChatMessage> messages;
   final ScrollController scrollController;
-  final void Function(ChatMessage) onRetry;
+  final ValueChanged<ChatMessage> onRetry;
 
   const _MessageList({
     required this.messages,
@@ -359,107 +437,84 @@ class _MessageList extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.builder(
       controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       itemCount: messages.length,
       itemBuilder: (context, index) {
-        final msg = messages[index];
-        final isUser = msg.roleCode == 'user';
-        final isFailed = msg.deliveryStatus == 'failed';
-        final isBlocked = msg.safetyStatus == 'blocked';
-        final isRedirected = msg.safetyStatus == 'redirected';
+        final message = messages[index];
+        final isUser = message.roleCode == 'user';
+        final colors = context.colors;
+        final isFailed = message.deliveryStatus == 'failed';
+        final isBlocked = message.safetyStatus == 'blocked';
+        final isRedirected = message.safetyStatus == 'redirected';
 
         return Padding(
           padding: EdgeInsets.only(
-            bottom: 12,
-            left: isUser ? 48 : 0,
-            right: isUser ? 0 : 48,
+            bottom: 14,
+            left: isUser ? 42 : 0,
+            right: isUser ? 0 : 42,
           ),
           child: Column(
             crossAxisAlignment:
                 isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isUser ? AppColors.textPrimary : AppColors.surface,
-                  borderRadius: BorderRadius.circular(6),
-                  border: isUser
-                      ? null
-                      : Border.all(color: AppColors.border, width: 1.5),
+              Padding(
+                padding: const EdgeInsets.only(left: 4, right: 4, bottom: 5),
+                child: Text(
+                  isUser ? 'You' : 'JCG Coach',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colors.textMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
+              ),
+              GlassContainer(
+                level:
+                    isUser ? GlassSurfaceLevel.panel : GlassSurfaceLevel.card,
+                padding: const EdgeInsets.all(14),
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isUser ? 18 : 5),
+                  bottomRight: Radius.circular(isUser ? 5 : 18),
+                ),
+                fillOpacity: isUser ? 0.28 : null,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (isBlocked)
-                      const Row(
-                        children: [
-                          StatusTag.over(label: 'Blocked'),
-                        ],
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 6),
+                        child: StatusTag.over(label: 'Blocked'),
                       ),
                     if (isRedirected)
-                      const Row(
-                        children: [
-                          StatusTag.neutral(label: 'Redirected'),
-                        ],
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 6),
+                        child: StatusTag.neutral(label: 'Redirected'),
                       ),
                     Text(
-                      msg.messageText,
-                      style: TextStyle(
-                        color:
-                            isUser ? AppColors.surface : AppColors.textPrimary,
-                        fontSize: 14,
-                        height: 1.5,
-                      ),
+                      message.messageText,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: isUser
+                                ? colors.textPrimary
+                                : colors.textPrimary,
+                            height: 1.45,
+                          ),
                     ),
                   ],
                 ),
               ),
               if (isFailed)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: GestureDetector(
-                    onTap: () => onRetry(msg),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.error_outline,
-                            size: 14, color: AppColors.error),
-                        SizedBox(width: 4),
-                        Text(
-                          'Failed to send. Tap to retry.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.error,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                _MessageStatus(
+                  icon: Icons.error_outline_rounded,
+                  label: 'Failed to send. Tap to retry.',
+                  color: colors.error,
+                  onTap: () => onRetry(message),
                 ),
-              if (msg.deliveryStatus == 'local_saved' && !isFailed)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Sending...',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
+              if (message.deliveryStatus == 'local_saved' && !isFailed)
+                _MessageStatus(
+                  icon: Icons.schedule_rounded,
+                  label: 'Sending…',
+                  color: colors.textMuted,
                 ),
             ],
           ),
@@ -469,19 +524,48 @@ class _MessageList extends StatelessWidget {
   }
 }
 
+class _MessageStatus extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _MessageStatus({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
+        ),
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 5, left: 4, right: 4),
+      child: onTap == null ? content : InkWell(onTap: onTap, child: content),
+    );
+  }
+}
+
 class _ChatInput extends StatefulWidget {
   final TextEditingController controller;
   final bool isOnline;
-  final void Function(String) onSend;
-  final bool showPrompts;
-  final void Function(String) onPromptTap;
+  final ValueChanged<String> onSend;
 
   const _ChatInput({
     required this.controller,
     required this.isOnline,
     required this.onSend,
-    this.showPrompts = false,
-    required this.onPromptTap,
   });
 
   @override
@@ -505,118 +589,78 @@ class _ChatInputState extends State<_ChatInput> {
 
   void _onTextChanged() {
     final hasText = widget.controller.text.trim().isNotEmpty;
-    if (hasText != _hasText) {
-      setState(() => _hasText = hasText);
-    }
+    if (hasText != _hasText && mounted) setState(() => _hasText = hasText);
   }
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final canSend = _hasText && widget.isOnline;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(color: AppColors.border),
-        ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        12,
+        8,
+        12,
+        MediaQuery.of(context).padding.bottom + 8,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.showPrompts)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.only(left: 12, right: 12, top: 8),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: suggestedPrompts.take(4).map((prompt) {
-                  return Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(4),
-                    child: InkWell(
-                      onTap: () => widget.onPromptTap(prompt),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.border),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          prompt,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+      child: GlassContainer(
+        level: GlassSurfaceLevel.chrome,
+        liveBlur: false,
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        borderRadius: BorderRadius.circular(22),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                maxLines: 4,
+                minLines: 1,
+                textInputAction: TextInputAction.send,
+                enabled: widget.isOnline,
+                decoration: InputDecoration(
+                  hintText: widget.isOnline
+                      ? 'Ask one question…'
+                      : 'Reconnect to continue chatting',
+                  filled: true,
+                  fillColor: colors.surfaceGlassStrong,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.primary, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
+                ),
+                onSubmitted: canSend ? widget.onSend : null,
               ),
             ),
-          Padding(
-            padding: EdgeInsets.only(
-              left: 12,
-              right: 8,
-              top: 8,
-              bottom: MediaQuery.of(context).padding.bottom + 8,
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed:
+                  canSend ? () => widget.onSend(widget.controller.text) : null,
+              tooltip: 'Send message',
+              icon: const Icon(Icons.arrow_upward_rounded),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                backgroundColor: colors.primary,
+                foregroundColor: colors.onPrimary,
+                disabledBackgroundColor: colors.border,
+                disabledForegroundColor: colors.textMuted,
+              ),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: widget.controller,
-                    maxLines: 4,
-                    minLines: 1,
-                    textInputAction: TextInputAction.send,
-                    enabled: widget.isOnline,
-                    decoration: InputDecoration(
-                      hintText: widget.isOnline
-                          ? 'Ask a question...'
-                          : 'Connect to internet to chat',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withAlpha(128),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                    onSubmitted: canSend ? (v) => widget.onSend(v) : null,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: canSend ? AppColors.textPrimary : AppColors.border,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    onPressed: canSend
-                        ? () => widget.onSend(widget.controller.text)
-                        : null,
-                    icon: const Icon(Icons.send_rounded),
-                    color: AppColors.surface,
-                    splashRadius: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

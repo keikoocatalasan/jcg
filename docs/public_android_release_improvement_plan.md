@@ -1,6 +1,6 @@
 # JCG Fitness public Android release improvement plan
 
-Prepared: 2026-09-07. Status: implementation in progress; v1.0.4 is now the
+Prepared: 2026-09-07. Status: implementation in progress; v1.0.5 is now the
 published latest release and physical-device acceptance remains open.
 The v1.0.4 CI run 34372781647 passed tests, analysis, signed universal/ABI
 builds, branded packaging and fallback validation. It includes the scanner

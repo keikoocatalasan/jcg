@@ -200,48 +200,51 @@ class _FoodManagementScreenState extends ConsumerState<FoodManagementScreen> {
                         return GlassCard(
                           margin: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 4),
-                          child: ListTile(
-                            leading: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceAlt,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Icon(
-                                _foodIcon(food),
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            title: Text(
-                              food.foodName,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              food.categoryName,
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary),
-                            ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '${Formatters.formatPhp(food.estimatedPricePhp)} / 100g',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
-                                    fontSize: 13,
-                                  ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: ListTile(
+                              leading: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceAlt,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.border),
                                 ),
-                                const SizedBox(height: 4),
-                                _statusTag(food),
-                              ],
+                                child: Icon(
+                                  _foodIcon(food),
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              title: Text(
+                                food.foodName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                food.categoryName,
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary),
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${Formatters.formatPhp(food.estimatedPricePhp)} / 100g',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  _statusTag(food),
+                                ],
+                              ),
+                              onTap: () => context.push('/admin/foods/edit',
+                                  extra: food),
                             ),
-                            onTap: () =>
-                                context.push('/admin/foods/edit', extra: food),
                           ),
                         );
                       },

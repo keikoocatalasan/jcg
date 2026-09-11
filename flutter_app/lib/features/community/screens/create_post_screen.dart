@@ -28,7 +28,21 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onDraftChanged);
+  }
+
+  void _onDraftChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (_error != null) _error = null;
+    });
+  }
+
+  @override
   void dispose() {
+    _controller.removeListener(_onDraftChanged);
     _controller.dispose();
     _topicController.dispose();
     super.dispose();
@@ -51,6 +65,11 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   void _addCustomTopic() {
     final topic = _topicController.text.trim();
     if (topic.isNotEmpty && !_selectedTopics.contains(topic)) {
+      if (!CommunityContentFilter.check(topic).allowed) {
+        setState(() => _error =
+            'That topic cannot be used. Please choose respectful language.');
+        return;
+      }
       setState(() {
         _selectedTopics.add(topic);
         _topicController.clear();
@@ -61,7 +80,9 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   Future<void> _submit() async {
     if (!_isValid || _isSubmitting) return;
 
-    final contentCheck = CommunityContentFilter.check(_controller.text);
+    final contentCheck = CommunityContentFilter.check(
+      [_controller.text, ..._selectedTopics].join(' '),
+    );
     if (!contentCheck.allowed) {
       setState(() => _error =
           'Please remove disrespectful or unsafe language before posting.');
@@ -128,6 +149,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   @override
   Widget build(BuildContext context) {
     final isOnline = ref.watch(isOnlineProvider);
+    final contentCheck = CommunityContentFilter.check(_controller.text);
+    final canPost = _isValid && contentCheck.allowed && !_isSubmitting;
 
     if (!isOnline) {
       return Scaffold(
@@ -150,7 +173,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton(
-              onPressed: _isValid && !_isSubmitting ? _submit : null,
+              onPressed: canPost ? _submit : null,
               child: _isSubmitting
                   ? const SizedBox(
                       width: 16,
@@ -170,14 +193,21 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             children: [
               TextField(
                 controller: _controller,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: "What's on your mind?",
                   border: OutlineInputBorder(),
+                  helperText: contentCheck.allowed
+                      ? 'Keep it useful, kind, and focused on health or fitness.'
+                      : 'Please remove disrespectful or unsafe language before posting.',
+                  helperStyle: TextStyle(
+                    color: contentCheck.allowed
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : Theme.of(context).colorScheme.error,
+                  ),
                 ),
                 maxLines: 8,
                 maxLength: _maxCharacters,
                 textCapitalization: TextCapitalization.sentences,
-                onChanged: (_) => setState(() {}),
                 enabled: !_isSubmitting,
               ),
               const SizedBox(height: 16),

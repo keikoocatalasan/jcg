@@ -128,6 +128,7 @@ class FoodRepository extends BaseRepository<Food> {
     String query, {
     String? category,
     bool? localOnly,
+    String? mealTypeCode,
   }) async {
     final db = await database;
     final conditions = <String>[
@@ -152,7 +153,24 @@ class FoodRepository extends BaseRepository<Food> {
       where: where,
       whereArgs: args,
     );
-    return results.map(fromMap).toList();
+    final foods = results.map(fromMap).toList();
+    final normalizedMealType = mealTypeCode?.trim().toLowerCase();
+    if (normalizedMealType == null || normalizedMealType.isEmpty) {
+      return foods;
+    }
+
+    // `other` intentionally means an unclassified manual period. For the
+    // canonical periods, reuse explicit tags and the category fallbacks so
+    // older local rows remain searchable without a destructive data rewrite.
+    if (!FoodTaxonomy.mealTypeCodes.contains(normalizedMealType)) {
+      return foods;
+    }
+    return foods
+        .where((food) => FoodTaxonomy.suitableMealTypes(
+              categoryName: food.categoryName,
+              explicitCodes: food.mealTypeCodes,
+            ).contains(normalizedMealType))
+        .toList();
   }
 
   Future<List<Food>> readActiveOfficial() async {

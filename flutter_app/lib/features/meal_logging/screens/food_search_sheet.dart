@@ -10,8 +10,13 @@ import 'package:jcg_fitness/core/widgets/glass_container.dart';
 
 class FoodSearchSheet extends ConsumerStatefulWidget {
   final ValueChanged<Food> onFoodSelected;
+  final String mealType;
 
-  const FoodSearchSheet({super.key, required this.onFoodSelected});
+  const FoodSearchSheet({
+    super.key,
+    required this.onFoodSelected,
+    this.mealType = 'lunch',
+  });
 
   @override
   ConsumerState<FoodSearchSheet> createState() => _FoodSearchSheetState();
@@ -56,7 +61,10 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
 
     try {
       final repo = FoodRepository(DatabaseProvider());
-      final results = await repo.searchByName(query.trim());
+      final results = await repo.searchByName(
+        query.trim(),
+        mealTypeCode: widget.mealType,
+      );
       if (mounted) {
         setState(() {
           _searchResults = results;
@@ -113,11 +121,21 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              'Search our database to add foods to your meal.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.filter_alt_outlined,
+                    size: 17, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Showing foods suitable for ${_mealTypeLabel(widget.mealType)}.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                   ),
+                ),
+              ],
             ),
           ),
           Padding(
@@ -165,6 +183,21 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
         ],
       ),
     );
+  }
+
+  String _mealTypeLabel(String code) {
+    switch (code) {
+      case 'breakfast':
+        return 'Breakfast';
+      case 'lunch':
+        return 'Lunch';
+      case 'dinner':
+        return 'Dinner';
+      case 'snack':
+        return 'Snack';
+      default:
+        return 'this meal';
+    }
   }
 
   Widget _buildBrowseSections() {

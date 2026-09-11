@@ -412,30 +412,33 @@ class _ReportCard extends ConsumerWidget {
 
     return GlassCard(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: ListTile(
-        leading: const CircleAvatar(
-          backgroundColor: AppColors.surfaceAlt,
-          child: Icon(
-            Icons.flag,
-            color: AppColors.textPrimary,
-            size: 20,
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          leading: const CircleAvatar(
+            backgroundColor: AppColors.surfaceAlt,
+            child: Icon(
+              Icons.flag,
+              color: AppColors.textPrimary,
+              size: 20,
+            ),
           ),
+          title: Text(
+            report.reason,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            'by ${report.authorNickname ?? 'unknown'} \u2022 ${_formatDate(report.createdAt)}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: isPending
+              ? const StatusTag.neutral(label: 'Pending')
+              : StatusTag.neutral(label: report.status.toUpperCase()),
+          onTap: () => context.push('/admin/reports/detail', extra: report),
         ),
-        title: Text(
-          report.reason,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          'by ${report.authorNickname ?? 'unknown'} \u2022 ${_formatDate(report.createdAt)}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: isPending
-            ? const StatusTag.neutral(label: 'Pending')
-            : StatusTag.neutral(label: report.status.toUpperCase()),
-        onTap: () => context.push('/admin/reports/detail', extra: report),
       ),
     );
   }
