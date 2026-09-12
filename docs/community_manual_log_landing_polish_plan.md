@@ -111,6 +111,8 @@ added to the Flutter client.
 - `flutter test --no-pub` passes: 216 passed, 1 expected mobile-runtime skip.
 - `flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings` exits 0;
   remaining findings are existing info-level style/deprecation suggestions.
-- The Supabase migration file is prepared but intentionally not applied to a
-  remote project in this pass. Apply it through the normal reviewed migration
-  workflow before production Community writes rely on the expanded dictionary.
+- The Supabase migration was applied to the remote database and verified with
+  a clean public-schema lint plus an up-to-date migration dry run.
+- Source was pushed to GitHub and v1.0.5 was published. The Render landing
+  service still needs confirmation from the JCG Render workspace because the
+  current logged-in Render workspace reports access denied for that project.

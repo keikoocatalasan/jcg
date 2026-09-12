@@ -85,5 +85,6 @@ not equally composed:
 
 The Chatbot redesign and glass/ListTile interaction repairs are implemented and
 visually verified in the local emulator. Full Flutter tests pass (216 passed, 1
-expected mobile-runtime skip), and analysis exits 0. The working tree remains
-local and unpushed.
+expected mobile-runtime skip), and analysis exits 0. The source is pushed and
+included in the published v1.0.5 release; Render landing redeploy confirmation
+remains dependent on access to the JCG Render workspace.
