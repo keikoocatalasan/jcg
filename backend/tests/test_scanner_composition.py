@@ -28,3 +28,9 @@ def test_confidence_parser_accepts_percentages_and_rejects_invalid_values() -> N
     assert ScannerService._parse_confidence("0.86") == 0.86
     assert ScannerService._parse_confidence("certain") is None
     assert ScannerService._parse_confidence("101%") is None
+
+
+def test_generic_dish_labels_are_marked_ambiguous() -> None:
+    assert ScannerService._is_ambiguous_nvidia_label("adobo") is True
+    assert ScannerService._is_ambiguous_nvidia_label("Sinigang") is True
+    assert ScannerService._is_ambiguous_nvidia_label("Chicken Adobo") is False

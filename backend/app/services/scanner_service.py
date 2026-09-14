@@ -1,3 +1,4 @@
+import re
 import uuid
 from dataclasses import dataclass, field
 
@@ -17,6 +18,12 @@ class ScanResult:
 
 
 class ScannerService:
+    _AMBIGUOUS_NVIDIA_LABELS = {
+        "adobo",
+        "sinigang",
+        "kare kare",
+    }
+
     def __init__(self) -> None:
         self._openai = OpenAIResponsesService()
         self._nvidia = NvidiaChatService()
@@ -186,6 +193,17 @@ class ScannerService:
                 quality_flags=["unknown_or_unsupported", "manual_confirmation_required"],
             )
         model_confidence = confidence if confidence is not None else 0.0
+        quality_flags = ["portion_required", "manual_confirmation_required"]
+        if confidence is None:
+            quality_flags.append("confidence_not_provided")
+        if self._is_ambiguous_nvidia_label(food_name):
+            # A broad label such as "adobo" cannot distinguish catalog foods
+            # like Chicken Adobo from Pork Adobo. Never let a high provider
+            # self-score turn that unresolved label into an auto-accepted log.
+            model_confidence = min(model_confidence, 0.59)
+            quality_flags.append("ambiguous_label")
+        if model_confidence < 0.80:
+            quality_flags.append("low_confidence")
         candidate = ScanCandidate(
             food_id=None,
             food_name=food_name,
@@ -223,18 +241,13 @@ class ScannerService:
                     confidence=model_confidence,
                 )
             )
-        quality_flags = ["portion_required", "manual_confirmation_required"]
-        if confidence is None:
-            quality_flags.append("confidence_not_provided")
-        elif confidence < 0.80:
-            quality_flags.append("low_confidence")
         if rice_present is None:
             quality_flags.append("rice_presence_uncertain")
         return ScanResult(
             client_scan_id=scan_id,
             candidates=[candidate],
             components=components,
-            composition_confidence=confidence,
+            composition_confidence=model_confidence,
             quality_flags=quality_flags,
         )
 
@@ -288,6 +301,11 @@ class ScannerService:
         if parsed < 0.0 or parsed > 1.0:
             return None
         return parsed
+
+    @classmethod
+    def _is_ambiguous_nvidia_label(cls, food_name: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9]+", " ", food_name.casefold()).strip()
+        return normalized in cls._AMBIGUOUS_NVIDIA_LABELS
 
     @staticmethod
     def _component_from_candidate(
