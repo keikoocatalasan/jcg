@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth.jwt_verifier import verify_token
 from app.schemas.chatbot import ChatRequest, ChatResponse
 from app.services.chatbot_service import ChatbotService
-from app.services.safety_service import EMERGENCY_TOPICS, check_safety
+from app.services.safety_service import EMERGENCY_TOPICS, check_safety, contains_profanity
 from app.services.rate_limit_service import enforce_ai_rate_limit
 
 router = APIRouter()
@@ -33,6 +33,12 @@ async def chat(
         )
 
     if safety.status == "redirected":
+        if 'profanity' in safety.matched_topics:
+            return ChatResponse(
+                assistant_message_id=str(uuid.uuid4()),
+                reply="Let's keep it respectful. Rephrase your question and I'll help. / Pakisabi ulit nang walang mura para matulungan kita.",
+                safety_status='redirected',
+            )
         reply = (
             "It sounds like you're asking about something I can't help with directly. "
             "I can assist with healthy eating habits, nutrition facts, and meal planning instead. "
@@ -45,7 +51,10 @@ async def chat(
         )
 
     try:
-        result = await chatbot_service.get_response(request.message, request.context)
+        if request.history:
+            result = await chatbot_service.get_response(request.message, request.context, request.history)
+        else:
+            result = await chatbot_service.get_response(request.message, request.context)
     except httpx.TimeoutException as exc:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
@@ -72,6 +81,12 @@ async def chat(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"code": "AI_UNAVAILABLE", "message": str(exc)},
         ) from exc
+    if contains_profanity(result.reply):
+        return ChatResponse(
+            assistant_message_id=str(uuid.uuid4()),
+            reply="I couldn't provide a suitable reply. Please rephrase your question and try again.",
+            safety_status='redirected',
+        )
     return ChatResponse(
         assistant_message_id=str(uuid.uuid4()),
         reply=result.reply,

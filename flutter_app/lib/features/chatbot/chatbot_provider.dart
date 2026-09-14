@@ -16,6 +16,8 @@ import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 
 const _fastApiBaseUrl = AppConfig.fastApiBaseUrl;
+final chatProcessingProvider =
+    StateProvider.family<bool, String>((ref, id) => false);
 
 class ChatMessage {
   final String id;
@@ -192,6 +194,18 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
 
   Future<void> _sendToApiAndRespond(
       String userMsgId, String text, ChatSession session) async {
+    final processing = chatProcessingProvider(session.chatSessionId);
+    if (_ref.read(processing)) return;
+    _ref.read(processing.notifier).state = true;
+    try {
+      await _processReply(userMsgId, text, session);
+    } finally {
+      _ref.read(processing.notifier).state = false;
+    }
+  }
+
+  Future<void> _processReply(
+      String userMsgId, String text, ChatSession session) async {
     if (AppConfig.isLocalTestMode) {
       await chatMsgRepo.updateDeliveryStatus(userMsgId, 'sent_to_api');
       final assistantNow = DateTime.now().toUtc().toIso8601String();
@@ -277,11 +291,27 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     Map<String, dynamic> context,
   ) async {
     final apiClient = _apiClientProvider();
+    final rows = await chatMsgRepo.queryBySession(sessionId);
+    final previous = rows
+        .takeWhile((row) => row.chatMessageId != messageId)
+        .where((row) =>
+            row.deliveryStatusCode != 'failed' &&
+            (row.roleCode == 'user' || row.roleCode == 'assistant'))
+        .toList();
     return apiClient.post('/ai/chat', body: {
       'message': message,
       'chat_session_id': sessionId,
       'client_message_id': messageId,
       'context': context,
+      'history': previous
+          .skip(previous.length > 12 ? previous.length - 12 : 0)
+          .map((row) => {
+                'role': row.roleCode,
+                'content': row.messageText.length > 4000
+                    ? row.messageText.substring(0, 4000)
+                    : row.messageText
+              })
+          .toList(),
     });
   }
 

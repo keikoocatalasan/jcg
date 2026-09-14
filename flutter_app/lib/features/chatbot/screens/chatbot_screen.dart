@@ -48,6 +48,8 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   Future<void> _sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+    final id = ref.read(chatSessionProvider)?.chatSessionId;
+    if (id != null && ref.read(chatProcessingProvider(id))) return;
     _messageController.clear();
     await ref.read(chatSessionProvider.notifier).sendMessage(trimmed);
     _scrollToBottom();
@@ -61,6 +63,8 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     final session = ref.watch(chatSessionProvider);
     final colors = context.colors;
     final sessionId = session?.chatSessionId;
+    final processing =
+        sessionId != null && ref.watch(chatProcessingProvider(sessionId));
     final messagesAsync =
         sessionId == null ? null : ref.watch(chatMessagesProvider(sessionId));
 
@@ -137,9 +141,26 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                   ) ??
                   const Center(child: CircularProgressIndicator()),
             ),
+            if (processing)
+              Semantics(
+                liveRegion: true,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Row(children: [
+                    SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                    SizedBox(width: 12),
+                    Expanded(
+                        child: Text('Preparing your reply…',
+                            style: TextStyle(fontSize: 13))),
+                  ]),
+                ),
+              ),
             _ChatInput(
               controller: _messageController,
-              isOnline: isOnline,
+              isOnline: isOnline && !processing,
               onSend: _sendMessage,
             ),
           ],

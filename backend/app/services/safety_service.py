@@ -1,4 +1,18 @@
 from dataclasses import dataclass, field
+import re
+import unicodedata
+
+
+def contains_profanity(message: str) -> bool:
+    text = unicodedata.normalize('NFKC', message).casefold()
+    text = ''.join(c for c in text if unicodedata.category(c) != 'Cf')
+    text = text.translate(str.maketrans({'0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's'}))
+    # Word boundaries avoid blocking ordinary words such as assistant or putative.
+    for word in ('fuck', 'shit', 'bitch', 'putangina', 'tangina', 'puta', 'gago', 'tanga', 'ulol', 'pakyu', 'tarantado', 'burat', 'kantot'):
+        pattern = r'(?<![a-z])' + r'[\W_]*'.join(re.escape(c) + '+' for c in word) + r'(?![a-z])'
+        if re.search(pattern, text):
+            return True
+    return False
 
 
 @dataclass
@@ -47,6 +61,9 @@ def check_safety(message: str) -> SafetyCheck:
 
     if matched_emergency:
         return SafetyCheck(status="blocked", matched_topics=matched_emergency)
+
+    if contains_profanity(message):
+        return SafetyCheck(status="redirected", matched_topics=['profanity'])
 
     if matched_blocked:
         return SafetyCheck(status="blocked", matched_topics=matched_blocked)
