@@ -44,6 +44,12 @@ class _ManualCorrectionScreenState
   String _selectedMealType = 'breakfast';
 
   @override
+  void initState() {
+    super.initState();
+    _selectedMealType = widget.mealType;
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _foodNameController.dispose();

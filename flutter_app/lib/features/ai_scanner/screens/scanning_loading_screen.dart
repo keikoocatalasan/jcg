@@ -105,19 +105,10 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
 
     try {
       if (mounted) setState(() => _currentStep = 1);
-      localResult = await _recognizeLocally(clientScanId);
+      final localOutcome = await _recognizeLocally(clientScanId);
+      localResult = localOutcome.result;
       if (_isCancelled) return;
-      final topConfidence = localResult.predictions.isEmpty
-          ? 0.0
-          : localResult.predictions.first.confidence;
-      final runnerUpConfidence = localResult.predictions.length > 1
-          ? localResult.predictions[1].confidence
-          : 0.0;
-      final localIsConfident =
-          topConfidence >= LocalFoodRecognitionService.confidentThreshold &&
-              topConfidence - runnerUpConfidence >=
-                  LocalFoodRecognitionService.confidentMarginThreshold;
-      if (localIsConfident) {
+      if (localOutcome.isConfident) {
         await _completeScan(
           localResult,
           rawResponse: _localResponseJson(localResult),
@@ -168,11 +159,14 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
     _showError(reason);
   }
 
-  Future<ScanResult> _recognizeLocally(String clientScanId) async {
+  Future<_LocalRecognitionOutcome> _recognizeLocally(
+    String clientScanId,
+  ) async {
     final recognitions = await ref
         .read(localFoodRecognitionServiceProvider)
         .recognizeFile(widget.imagePath);
-    return ScanResult(
+    final isConfident = LocalFoodRecognitionService.isConfident(recognitions);
+    final result = ScanResult(
       scanId: clientScanId,
       clientScanId: clientScanId,
       predictions: [
@@ -207,9 +201,17 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
             ],
       pipelineVersion: LocalFoodRecognitionService.modelVersion,
       needsPortionInput: recognitions.isNotEmpty,
-      qualityFlags:
-          recognitions.isNotEmpty ? const ['portion_required'] : const [],
+      status: isConfident ? 'completed' : 'low_confidence',
+      qualityFlags: recognitions.isEmpty
+          ? const []
+          : [
+              'portion_required',
+              if (!isConfident) 'low_confidence',
+              if (recognitions.first.modelLabel == 'unknown_or_unsupported')
+                'unknown_or_unsupported',
+            ],
     );
+    return _LocalRecognitionOutcome(result: result, isConfident: isConfident);
   }
 
   Future<(ScanResult, String)> _requestCloudScan(
@@ -339,8 +341,6 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
     if (profiles.isEmpty) return;
     final userId = profiles.first['user_id'] as String;
     final now = DateTime.now().toUtc().toIso8601String();
-    final topConfidence =
-        result.predictions.isEmpty ? 0.0 : result.predictions.first.confidence;
     await db.transaction((txn) async {
       await txn.insert(
         'ai_scans',
@@ -348,9 +348,7 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
           'scan_id': result.scanId,
           'user_id': userId,
           'scan_status_code':
-              topConfidence >= LocalFoodRecognitionService.confidentThreshold
-                  ? 'completed'
-                  : 'low_confidence',
+              result.status == 'completed' ? 'completed' : 'low_confidence',
           'client_scan_id': result.clientScanId,
           'image_path': widget.imagePath,
           'raw_response_json': rawResponse,
@@ -433,9 +431,7 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
           'scan_id': result.scanId,
           'user_id': userId,
           'scan_status_code':
-              topConfidence >= LocalFoodRecognitionService.confidentThreshold
-                  ? 'completed'
-                  : 'low_confidence',
+              result.status == 'completed' ? 'completed' : 'low_confidence',
           'client_scan_id': result.clientScanId,
           'image_path': widget.imagePath,
           'raw_response_json': rawResponse,
@@ -839,4 +835,14 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
       ),
     );
   }
+}
+
+class _LocalRecognitionOutcome {
+  final ScanResult result;
+  final bool isConfident;
+
+  const _LocalRecognitionOutcome({
+    required this.result,
+    required this.isConfident,
+  });
 }

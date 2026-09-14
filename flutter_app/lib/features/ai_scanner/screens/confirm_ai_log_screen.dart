@@ -17,6 +17,7 @@ import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
+import 'package:jcg_fitness/features/ai_scanner/screens/manual_correction_screen.dart';
 import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
 
 class ConfirmAiLogScreen extends ConsumerStatefulWidget {
@@ -515,6 +516,18 @@ class _ConfirmAiLogScreenState extends ConsumerState<ConfirmAiLogScreen> {
     }
   }
 
+  void _openManualCorrection() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ManualCorrectionScreen(
+          mealType: widget.mealType,
+          clientScanId: widget.clientScanId,
+          scanId: widget.scanId,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -952,9 +965,9 @@ class _ConfirmAiLogScreenState extends ConsumerState<ConfirmAiLogScreen> {
 
   Widget _buildEditDetailsButton(ThemeData theme) {
     return OutlinedButton.icon(
-      onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+      onPressed: _isSaving ? null : _openManualCorrection,
       icon: const Icon(Icons.edit_outlined),
-      label: const Text('Edit Details'),
+      label: const Text('Choose Food / Edit Details'),
     );
   }
 
@@ -975,9 +988,18 @@ class _ConfirmAiLogScreenState extends ConsumerState<ConfirmAiLogScreen> {
               style: const TextStyle(color: AppColors.error, fontSize: 13),
             ),
           ),
-          TextButton(
-            onPressed: _handleSave,
-            child: const Text('Retry'),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                onPressed: _openManualCorrection,
+                child: const Text('Edit food'),
+              ),
+              TextButton(
+                onPressed: _handleSave,
+                child: const Text('Retry'),
+              ),
+            ],
           ),
         ],
       ),

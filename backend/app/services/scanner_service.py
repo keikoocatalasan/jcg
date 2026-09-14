@@ -162,10 +162,12 @@ class ScannerService:
         text = await self._nvidia.create_text(
             instructions=(
                 "Analyze this Filipino meal photo. Return exactly one line in this format: "
-                "dish=<one short canonical dish name>; rice=<yes|no|unknown>; "
+                "dish=<one short canonical dish name>; confidence=<0.00 to 1.00>; "
+                "rice=<yes|no|unknown>; "
                 "extras=<none or comma-separated visible side names>. Do not add markdown "
                 "or explanations. If the image is not food or you are unsure, set dish=unknown. "
-                "Do not estimate grams or nutrition."
+                "Use a lower confidence for generic or ambiguous labels. Do not estimate grams "
+                "or nutrition."
             ),
             input_content=[
                 {"type": "text", "text": f"Meal type: {meal_type or 'unknown'}"},
@@ -173,7 +175,9 @@ class ScannerService:
             ],
             max_output_tokens=900,
         )
-        food_name, rice_present, extras = self._parse_nvidia_scan_text(text.text)
+        food_name, rice_present, extras, confidence = self._parse_nvidia_scan_text(
+            text.text
+        )
         if not food_name or food_name.lower() == "unknown":
             return ScanResult(
                 client_scan_id=scan_id,
@@ -181,10 +185,11 @@ class ScannerService:
                 components=[],
                 quality_flags=["unknown_or_unsupported", "manual_confirmation_required"],
             )
+        model_confidence = confidence if confidence is not None else 0.0
         candidate = ScanCandidate(
             food_id=None,
             food_name=food_name,
-            confidence=0.59,
+            confidence=model_confidence,
             rank_number=1,
             calories=None,
             protein_g=None,
@@ -197,7 +202,7 @@ class ScannerService:
                 component_id=self._component_id(scan_id, "ulam"),
                 role="ulam",
                 food_name=food_name,
-                confidence=0.59,
+                confidence=model_confidence,
             )
         ]
         if rice_present is True:
@@ -206,7 +211,7 @@ class ScannerService:
                     component_id=self._component_id(scan_id, "rice"),
                     role="rice",
                     food_name="Cooked White Rice",
-                    confidence=0.59,
+                    confidence=model_confidence,
                 )
             )
         for index, extra in enumerate(extras, start=1):
@@ -215,22 +220,28 @@ class ScannerService:
                     component_id=self._component_id(scan_id, f"extra-{index}"),
                     role="side",
                     food_name=extra,
-                    confidence=0.50,
+                    confidence=model_confidence,
                 )
             )
         quality_flags = ["portion_required", "manual_confirmation_required"]
+        if confidence is None:
+            quality_flags.append("confidence_not_provided")
+        elif confidence < 0.80:
+            quality_flags.append("low_confidence")
         if rice_present is None:
             quality_flags.append("rice_presence_uncertain")
         return ScanResult(
             client_scan_id=scan_id,
             candidates=[candidate],
             components=components,
-            composition_confidence=0.59,
+            composition_confidence=confidence,
             quality_flags=quality_flags,
         )
 
     @classmethod
-    def _parse_nvidia_scan_text(cls, text: str) -> tuple[str, bool | None, list[str]]:
+    def _parse_nvidia_scan_text(
+        cls, text: str
+    ) -> tuple[str, bool | None, list[str], float | None]:
         """Parse the compact non-JSON contract used by the NVIDIA VLM.
 
         Structured output is not assumed for this provider. Plain dish-name output
@@ -246,6 +257,7 @@ class ScannerService:
                 key, value = part.split("=", 1)
                 fields[key.strip().lower()] = value.strip()
         food_name = cls._clean_nvidia_food_name(fields.get("dish", line))
+        confidence = cls._parse_confidence(fields.get("confidence"))
         rice_value = fields.get("rice", "").lower()
         rice_present: bool | None
         if rice_value in {"yes", "true", "present"}:
@@ -260,7 +272,22 @@ class ScannerService:
             for value in extras_value.split(",")
             if value.strip() and value.strip().lower() not in {"none", "unknown"}
         ][:3]
-        return food_name, rice_present, extras
+        return food_name, rice_present, extras, confidence
+
+    @staticmethod
+    def _parse_confidence(value: str | None) -> float | None:
+        if not value:
+            return None
+        cleaned = value.strip().rstrip("%").strip()
+        try:
+            parsed = float(cleaned)
+        except ValueError:
+            return None
+        if parsed > 1.0 and parsed <= 100.0:
+            parsed /= 100.0
+        if parsed < 0.0 or parsed > 1.0:
+            return None
+        return parsed
 
     @staticmethod
     def _component_from_candidate(

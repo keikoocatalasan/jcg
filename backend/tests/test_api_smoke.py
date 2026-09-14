@@ -372,7 +372,7 @@ def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> Non
         )
         if is_image_request:
             return NvidiaChatResult(
-                text="dish=Chicken Adobo; rice=yes; extras=atchara",
+                text="dish=Chicken Adobo; confidence=0.86; rice=yes; extras=atchara",
                 model="meta/llama-3.2-11b-vision-instruct",
             )
         return NvidiaChatResult(
@@ -410,6 +410,8 @@ def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> Non
     assert scan_response.json()["components"][0]["role"] == "ulam"
     assert scan_response.json()["components"][1]["role"] == "rice"
     assert scan_response.json()["components"][2]["food_name"] == "atchara"
+    assert scan_response.json()["candidates"][0]["confidence"] == 0.86
+    assert scan_response.json()["status"] == "completed"
     assert scan_response.json()["needs_portion_input"] is True
     assert chat_response.status_code == 200
     assert "adobo" in chat_response.json()["reply"].lower()

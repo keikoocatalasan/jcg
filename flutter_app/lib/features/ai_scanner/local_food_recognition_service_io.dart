@@ -55,9 +55,10 @@ class LocalFoodRecognitionService {
   static const inputSize = 224;
   static const modelName = 'jcg_filifood5_pilot';
   static const modelVersion = 'filifood5-pilot-v1';
-  // The pilot contains an unknown class, but keep a conservative auto-accept
-  // gate until it is validated on fresh phone-camera captures.
-  static const confidentThreshold = 0.95;
+  // The pilot is not a 100-dish production model. Keep a conservative gate,
+  // require a clear margin, and reject the explicit unknown class before
+  // accepting a result on-device.
+  static const confidentThreshold = 0.80;
   static const confidentMarginThreshold = 0.20;
 
   static const _dishProfiles = <String, LocalDishRecognition>{
@@ -90,7 +91,9 @@ class LocalFoodRecognitionService {
   Map<String, String> _displayNames = const {};
 
   static bool isConfident(List<LocalDishRecognition> results) {
-    if (results.isEmpty || results.first.confidence < confidentThreshold) {
+    if (results.isEmpty ||
+        results.first.modelLabel == 'unknown_or_unsupported' ||
+        results.first.confidence < confidentThreshold) {
       return false;
     }
     final runnerUp = results.length > 1 ? results[1].confidence : 0.0;

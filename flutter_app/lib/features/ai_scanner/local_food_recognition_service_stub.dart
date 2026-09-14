@@ -27,11 +27,13 @@ class LocalDishRecognition {
 class LocalFoodRecognitionService {
   static const modelName = 'jcg_filifood5_pilot';
   static const modelVersion = 'filifood5-pilot-v1';
-  static const confidentThreshold = 0.95;
+  static const confidentThreshold = 0.80;
   static const confidentMarginThreshold = 0.20;
 
   static bool isConfident(List<LocalDishRecognition> results) {
-    if (results.isEmpty || results.first.confidence < confidentThreshold) {
+    if (results.isEmpty ||
+        results.first.modelLabel == 'unknown_or_unsupported' ||
+        results.first.confidence < confidentThreshold) {
       return false;
     }
     final runnerUp = results.length > 1 ? results[1].confidence : 0.0;
