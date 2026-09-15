@@ -14,6 +14,7 @@ import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
+import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
 
 const _fastApiBaseUrl = AppConfig.fastApiBaseUrl;
 final chatProcessingProvider =
@@ -322,14 +323,33 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     try {
       final profile = await profileRepo.readByUserId(authUserId);
       if (profile == null) return {};
+      final dashboard = await _ref.read(dashboardDataProvider.future);
+      final splitValues = (String? value) => (value ?? '')
+          .split(',')
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+      final remainingBudget = (dashboard.dailyBudget - dashboard.spentBudget)
+          .clamp(0.0, double.infinity);
+      final remainingCalories =
+          (dashboard.targetCalories - dashboard.consumedCalories)
+              .clamp(0, 2147483647);
+      final remainingProtein =
+          (dashboard.targetProtein - dashboard.consumedProtein)
+              .clamp(0.0, double.infinity);
+      final remainingCarbs = (dashboard.targetCarbs - dashboard.consumedCarbs)
+          .clamp(0.0, double.infinity);
+      final remainingFat = (dashboard.targetFat - dashboard.consumedFat)
+          .clamp(0.0, double.infinity);
       return {
         'fitness_goal': profile.fitnessGoalCode,
-        'remaining_budget_php': profile.dailyBudgetPhp,
-        'allergies': (profile.allergies ?? '')
-            .split(',')
-            .map((value) => value.trim())
-            .where((value) => value.isNotEmpty)
-            .toList(),
+        'remaining_budget_php': remainingBudget,
+        'remaining_calories': remainingCalories,
+        'remaining_protein_g': remainingProtein,
+        'remaining_carbs_g': remainingCarbs,
+        'remaining_fat_g': remainingFat,
+        'allergies': splitValues(profile.allergies),
+        'dietary_restrictions': splitValues(profile.dietaryRestrictions),
       }..removeWhere((_, v) => v == null);
     } catch (_) {
       return {};

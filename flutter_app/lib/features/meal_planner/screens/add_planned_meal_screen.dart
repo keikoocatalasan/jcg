@@ -850,20 +850,21 @@ class _AddPlannedMealScreenState extends ConsumerState<AddPlannedMealScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          Row(
             children: [
               const Icon(Icons.preview, size: 18, color: AppColors.primary),
               const SizedBox(width: 8),
-              Text(
-                'Planned Meal Preview',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+              Expanded(
+                child: Text(
+                  'Planned Meal Preview',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
               IconButton(
                 icon: const Icon(Icons.close, size: 18),
                 onPressed: _deselectFood,

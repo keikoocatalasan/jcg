@@ -134,9 +134,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _error = e.toString());
+        final raw = e.toString();
+        final message = raw.contains('COMMUNITY_CONTENT_BLOCKED')
+            ? 'Please remove disrespectful or unsafe language before posting.'
+            : raw.contains('COMMUNITY_CONTENT_TOO_LONG')
+                ? 'Your post is too long. Keep it under 500 characters.'
+                : 'We could not create the post right now. Please try again.';
+        setState(() => _error = message);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
+          SnackBar(content: Text(message)),
         );
       }
     } finally {
