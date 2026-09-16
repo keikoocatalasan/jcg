@@ -97,8 +97,24 @@ class ChatbotService:
             )
             return ChatResult(reply=result.text)
 
-        return ChatResult(
-            reply=f"Here's what I found about your meal:{context_hint}\n\n"
-            f"Based on your query, I recommend balanced options. "
-            f"Would you like more specific nutritional advice?"
-        )
+        return ChatResult(reply=self._deterministic_reply(message, context_hint))
+
+    @staticmethod
+    def _deterministic_reply(message: str, context_hint: str) -> str:
+        """Useful input-aware fallback for local development and tests."""
+        lowered = message.casefold()
+        if any(word in lowered for word in ("breakfast", "almusal")):
+            reply = "For breakfast, try pandesal with boiled or scrambled egg and a fruit."
+        elif any(word in lowered for word in ("lunch", "tanghalian")):
+            reply = "For lunch, chicken adobo with rice and vegetables is a practical budget-friendly choice."
+        elif any(word in lowered for word in ("dinner", "hapunan")):
+            reply = "For dinner, choose a measured portion of ulam, rice, and vegetables, then adjust to your remaining targets."
+        elif any(word in lowered for word in ("budget", "cheap", "affordable", "mura")):
+            reply = "For a lower-cost meal, combine rice, egg, vegetables, and one modest serving of ulam."
+        elif any(word in lowered for word in ("protein", "protina")):
+            reply = "To increase protein, add egg, fish, chicken, tofu, or beans while keeping the portion measurable."
+        elif any(word in lowered for word in ("water", "hydration", "tubig")):
+            reply = "For hydration, log each glass and spread water across the day instead of waiting until one meal."
+        else:
+            reply = f"I understood your question as: {message.strip()}. Please share the food, goal, or budget you want me to help with."
+        return f"{reply}{context_hint}"

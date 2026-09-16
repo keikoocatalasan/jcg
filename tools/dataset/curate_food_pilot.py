@@ -48,6 +48,17 @@ PENDING_APPROVED_INDEXES = {
         0, 1, 2, 3, 4, 5, 10, 11, 12, 14, 15, 16, 17,
         21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
     },
+    # Explicitly provisional inclusions for the experimental requested-dishes
+    # model. These five candidates per class are not release-grade evidence.
+    "pork_menudo": {0, 1, 2, 3, 4},
+    "beef_kaldereta": {0, 1, 2, 3, 4},
+    "bicol_express": {0, 1, 2, 3, 4},
+    "dinuguan": set(range(25)),
+    "chicken_afritada": {0, 1, 2, 3, 4},
+    "pochero": {0, 1, 2, 3, 4},
+    "nilagang_baka": {0, 1, 2, 3, 4},
+    "tinolang_manok": {0, 1, 2, 3, 4},
+    "papaitan": {0, 1, 2, 3, 4},
 }
 
 RESCUED_STEMS = {

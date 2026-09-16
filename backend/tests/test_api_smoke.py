@@ -108,7 +108,27 @@ def test_chat_route_returns_safe_response(monkeypatch) -> None:
     body = response.json()
     assert body["safety_status"] == "safe"
     assert body["assistant_message_id"]
-    assert "balanced options" in body["reply"]
+    assert "breakfast" in body["reply"].lower()
+
+
+def test_deterministic_chat_fallback_responds_to_the_input(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "ai_model_provider", "deterministic")
+    headers = auth_headers("chat-input-aware")
+    breakfast = client.post(
+        "/ai/chat",
+        headers=headers,
+        json={"chat_session_id": "chat-2", "client_message_id": "m-1", "message": "Give me breakfast ideas"},
+    )
+    water = client.post(
+        "/ai/chat",
+        headers=headers,
+        json={"chat_session_id": "chat-2", "client_message_id": "m-2", "message": "How much water should I log?"},
+    )
+    assert breakfast.status_code == 200
+    assert water.status_code == 200
+    assert "breakfast" in breakfast.json()["reply"].lower()
+    assert "water" in water.json()["reply"].lower()
+    assert breakfast.json()["reply"] != water.json()["reply"]
 
 
 def test_chat_route_blocks_unsafe_topics() -> None:

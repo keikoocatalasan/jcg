@@ -210,14 +210,24 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     if (AppConfig.isLocalTestMode) {
       await chatMsgRepo.updateDeliveryStatus(userMsgId, 'sent_to_api');
       final assistantNow = DateTime.now().toUtc().toIso8601String();
+      final lower = text.toLowerCase();
+      final reply = lower.contains('breakfast') || lower.contains('almusal')
+          ? 'For breakfast, try pandesal with boiled or scrambled egg and a fruit.'
+          : lower.contains('lunch') || lower.contains('tanghalian')
+              ? 'For lunch, chicken adobo with rice and vegetables is a practical budget-friendly choice.'
+              : lower.contains('protein') || lower.contains('protina')
+                  ? 'To increase protein, add egg, fish, chicken, tofu, or beans while keeping the portion measurable.'
+                  : lower.contains('budget') ||
+                          lower.contains('cheap') ||
+                          lower.contains('mura')
+                      ? 'For a lower-cost meal, combine rice, egg, vegetables, and one modest serving of ulam.'
+                      : 'I understood your question as: ${text.trim()}. Please share the food, goal, or budget you want me to help with.';
       await chatMsgRepo.insert(
         db.ChatMessage(
           chatMessageId: UuidHelper.generateUuid(),
           chatSessionId: session.chatSessionId,
           roleCode: 'assistant',
-          messageText:
-              'Local QA reply: keep portions measurable, stay within your budget, '
-              'and pair your ulam with a sensible amount of rice and water.',
+          messageText: reply,
           safetyStatusCode: 'safe',
           deliveryStatusCode: 'sent_to_api',
           createdAt: assistantNow,

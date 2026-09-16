@@ -14,5 +14,14 @@
     {"id":"scrambled_egg","display_name":"Scrambled Egg","region":"nationwide","aliases":["scrambled egg","scrambled eggs","scrambled itlog","scrambled eggs breakfast","scrambled eggs plate","scrambled egg curds"]},
     {"id":"sunny_side_up_egg","display_name":"Sunny-Side-Up Egg","region":"nationwide","aliases":["sunny side up egg","sunny side up eggs","pritong itlog sunny side up","fried egg sunny side up","sunny-side-up egg plate"]},
     {"id":"boiled_egg","display_name":"Boiled Egg","region":"nationwide","aliases":["boiled egg","boiled eggs","itlog na nilaga","hard boiled egg","hard boiled eggs","hard boiled egg plate","boiled egg cut"]}
+    ,{"id":"pork_menudo","display_name":"Pork Menudo","region":"nationwide","aliases":["pork menudo","menudong baboy","filipino menudo"]}
+    ,{"id":"beef_kaldereta","display_name":"Beef Kaldereta","region":"nationwide","aliases":["beef kaldereta","kalderetang baka","filipino beef caldereta"]}
+    ,{"id":"bicol_express","display_name":"Bicol Express","region":"Bicol","aliases":["bicol express","bicol express filipino","spicy pork coconut stew"]}
+    ,{"id":"dinuguan","display_name":"Dinuguan","region":"nationwide","aliases":["dinuguan","filipino blood stew"]}
+    ,{"id":"chicken_afritada","display_name":"Chicken Afritada","region":"nationwide","aliases":["chicken afritada","afritadang manok"]}
+    ,{"id":"pochero","display_name":"Pochero","region":"nationwide","aliases":["pochero filipino","puchero filipino"]}
+    ,{"id":"nilagang_baka","display_name":"Nilagang Baka","region":"nationwide","aliases":["nilagang baka","filipino boiled beef soup"]}
+    ,{"id":"tinolang_manok","display_name":"Tinolang Manok","region":"nationwide","aliases":["tinolang manok","chicken tinola"]}
+    ,{"id":"papaitan","display_name":"Papaitan","region":"Ilocos","aliases":["papaitan","papaitang baka"]}
   ]
 }
