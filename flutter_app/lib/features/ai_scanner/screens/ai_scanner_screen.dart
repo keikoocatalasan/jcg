@@ -124,7 +124,7 @@ class _AiScannerContentState extends ConsumerState<_AiScannerContent> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Take a photo or upload an image. The free on-device model recognizes Chicken Adobo and Sinigang.',
+                'Take a photo or upload an image. Food recognition runs online and requires an internet connection.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
