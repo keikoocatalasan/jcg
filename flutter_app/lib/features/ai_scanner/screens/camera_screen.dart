@@ -12,7 +12,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/image_preview_screen.dart';
-import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
 
 class CameraScreen extends ConsumerStatefulWidget {
   final String mealType;
@@ -298,48 +297,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   void _onCameraImage(CameraImage image) {
-    if (!_liveInferenceEnabled ||
-        _isTakingPhoto ||
-        _isLiveInferenceBusy ||
-        !mounted) {
-      return;
-    }
-    final now = DateTime.now();
-    final last = _lastLiveInferenceAt;
-    if (last != null && now.difference(last).inMilliseconds < 900) return;
-    _lastLiveInferenceAt = now;
-    _isLiveInferenceBusy = true;
-    final generation = ++_liveInferenceGeneration;
-    Future<void>(() async {
-      try {
-        final jpeg = _cameraImageToJpeg(image);
-        if (jpeg == null || !mounted) return;
-        final recognitions = await ref
-            .read(localFoodRecognitionServiceProvider)
-            .recognizeBytes(jpeg);
-        if (!mounted ||
-            generation != _liveInferenceGeneration ||
-            recognitions.isEmpty) {
-          return;
-        }
-        final top = recognitions.first;
-        final isSame = top.foodName == _stableFoodName;
-        final nextStableCount = isSame ? _stableFrameCount + 1 : 1;
-        setState(() {
-          _liveFoodName = top.foodName;
-          _liveConfidence = top.confidence;
-          _stableFoodName = top.foodName;
-          _stableFrameCount = nextStableCount;
-        });
-      } catch (_) {
-        // Keep the preview usable; the final still scan reports actionable
-        // errors and can use the online fallback.
-      } finally {
-        if (generation == _liveInferenceGeneration) {
-          _isLiveInferenceBusy = false;
-        }
-      }
-    });
+    // Food recognition is performed only by the authenticated online scan.
   }
 
   Uint8List? _cameraImageToJpeg(CameraImage image) {
@@ -413,45 +371,32 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   }
 
   Widget _buildLiveStatus(ThemeData theme) {
-    final label = _liveFoodName;
-    final isStable = _stableFrameCount >= 3;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.62),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isStable ? AppColors.success : Colors.white24,
+          color: Colors.white24,
         ),
       ),
       child: Row(
         children: [
           Icon(
-            isStable ? Icons.check_circle : Icons.center_focus_strong,
-            color: isStable ? AppColors.success : Colors.white,
+            Icons.cloud_outlined,
+            color: Colors.white,
             size: 20,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              label == null
-                  ? _liveInferenceEnabled
-                      ? 'Point the camera at one dish'
-                      : 'Live analysis off • preview stays smooth'
-                  : isStable
-                      ? 'Preview: $label'
-                      : 'Hold steady: $label',
+              'Take a photo to analyze food online',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          if (label != null)
-            Text(
-              '${(_liveConfidence * 100).toStringAsFixed(0)}%',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-            ),
         ],
       ),
     );
@@ -533,18 +478,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       appBar: AppBar(
         title: const Text('Take Photo'),
         actions: [
-          if (_isInitialized)
-            IconButton(
-              icon: Icon(
-                _liveInferenceEnabled
-                    ? Icons.auto_awesome
-                    : Icons.auto_awesome_outlined,
-              ),
-              onPressed: _toggleLiveInference,
-              tooltip: _liveInferenceEnabled
-                  ? 'Turn off live analysis'
-                  : 'Turn on live analysis',
-            ),
           if (_isInitialized)
             IconButton(
               icon: Icon(
@@ -725,7 +658,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'On-device Adobo/Sinigang recognition works offline. Cloud refinement is unavailable.',
+                      'Food recognition runs online after you take a photo.',
                       style: TextStyle(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w500,

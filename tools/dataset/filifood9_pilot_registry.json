@@ -1,0 +1,18 @@
+{
+  "dataset_id": "filipino_food_9_pilot",
+  "version": "0.2.0",
+  "target_images_per_class": 100,
+  "minimum_real_images_per_class": 80,
+  "maximum_synthetic_fraction": 0.2,
+  "classes": [
+    {"id":"chicken_adobo","display_name":"Chicken Adobo","region":"nationwide","aliases":["chicken adobo","adobong manok","filipino chicken adobo"]},
+    {"id":"pork_adobo","display_name":"Pork Adobo","region":"nationwide","aliases":["pork adobo","adobong baboy","filipino pork adobo"]},
+    {"id":"sinigang_na_baboy","display_name":"Sinigang na Baboy","region":"nationwide","aliases":["sinigang na baboy","pork sinigang","filipino pork sinigang"]},
+    {"id":"sinigang_na_hipon","display_name":"Sinigang na Hipon","region":"nationwide","aliases":["sinigang na hipon","shrimp sinigang","filipino shrimp sinigang"]},
+    {"id":"kare_kare","display_name":"Kare-kare","region":"nationwide","aliases":["kare kare","kare-kare filipino","filipino peanut stew"]},
+    {"id":"pandesal","display_name":"Pandesal","region":"nationwide","aliases":["pandesal","filipino bread roll","pan de sal philippines","pandesal bread roll plate","filipino dinner roll"]},
+    {"id":"scrambled_egg","display_name":"Scrambled Egg","region":"nationwide","aliases":["scrambled egg","scrambled eggs","scrambled itlog","scrambled eggs breakfast","scrambled eggs plate","scrambled egg curds"]},
+    {"id":"sunny_side_up_egg","display_name":"Sunny-Side-Up Egg","region":"nationwide","aliases":["sunny side up egg","sunny side up eggs","pritong itlog sunny side up","fried egg sunny side up","sunny-side-up egg plate"]},
+    {"id":"boiled_egg","display_name":"Boiled Egg","region":"nationwide","aliases":["boiled egg","boiled eggs","itlog na nilaga","hard boiled egg","hard boiled eggs","hard boiled egg plate","boiled egg cut"]}
+  ]
+}

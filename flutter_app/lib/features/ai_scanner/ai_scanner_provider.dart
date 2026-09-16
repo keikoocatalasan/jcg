@@ -2,14 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:jcg_fitness/core/database/ai_scan_feedback_repository.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
-import 'package:jcg_fitness/features/ai_scanner/local_food_recognition_service.dart';
-
-final localFoodRecognitionServiceProvider =
-    Provider<LocalFoodRecognitionService>((ref) {
-  final service = LocalFoodRecognitionService();
-  ref.onDispose(service.close);
-  return service;
-});
 
 class ScanPrediction {
   final String? foodId;

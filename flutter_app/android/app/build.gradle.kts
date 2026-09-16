@@ -40,7 +40,6 @@ android {
         applicationId = "com.jcg.fitness"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // tflite_flutter 0.12.x requires Android API 26 or newer.
         minSdk = 26
         targetSdk = 35
         versionCode = flutter.versionCode

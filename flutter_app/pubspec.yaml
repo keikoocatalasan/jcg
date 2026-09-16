@@ -1,7 +1,7 @@
 name: jcg_fitness
 description: JCG Fitness - Budget-aware nutrition tracking
 publish_to: 'none'
-version: 1.0.8+4009
+version: 1.0.9+4010
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -46,9 +46,8 @@ dependencies:
 
   # Camera / image (AI scanner)
   camera: ^0.10.5
-  image_picker: ^1.0.7
   image: ^4.9.2
-  tflite_flutter: ^0.12.1
+  image_picker: ^1.0.7
 
   # Secure storage for tokens
   flutter_secure_storage: ^9.0.0
@@ -80,4 +79,3 @@ flutter:
     - assets/images/
     - assets/images/dishes/
     - assets/icons/
-    - assets/models/

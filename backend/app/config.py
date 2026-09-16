@@ -93,6 +93,10 @@ class Settings(BaseSettings):
             )
         if not self.is_production:
             return
+        if scanner_provider == "deterministic":
+            raise ValueError(
+                "AI_MODEL_PROVIDER=deterministic is not allowed in production"
+            )
         missing = [
             name for name, value in {
                 "SUPABASE_URL": self.supabase_url,

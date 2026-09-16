@@ -10,7 +10,7 @@ from app.main import app
 from app.routes.auth import _otp_store, _store_otp, _verify_otp
 from app.routes.chat import chatbot_service
 from app.routes.scan_food import scanner_service
-from app.schemas.scan_food import ScanCandidate
+from app.schemas.scan_food import ScanCandidate, ScanComponent
 from app.services.nvidia_chat_service import NvidiaChatResult
 from app.services.scanner_service import ScanResult
 
@@ -185,7 +185,33 @@ def test_chat_provider_network_error_uses_unavailable_error(monkeypatch) -> None
 
 
 def test_scan_food_route_accepts_valid_image(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "ai_model_provider", "deterministic")
+    async def fake_scan_image(*_args, **_kwargs) -> ScanResult:
+        return ScanResult(
+            client_scan_id="11111111-1111-4111-8111-111111111111",
+            candidates=[
+                ScanCandidate(
+                    food_id=None,
+                    food_name="White Rice (cooked)",
+                    confidence=0.87,
+                    rank_number=1,
+                    calories=206.0,
+                    protein_g=4.2,
+                    carbs_g=45.0,
+                    fat_g=0.4,
+                    estimated_cost_php=15.0,
+                )
+            ],
+            components=[
+                ScanComponent(
+                    component_id="component-1",
+                    role="rice",
+                    food_name="White Rice (cooked)",
+                    confidence=0.87,
+                )
+            ],
+        )
+
+    monkeypatch.setattr(scanner_service, "scan_image", fake_scan_image)
     image = Image.new("RGB", (224, 224), color="white")
     buffer = BytesIO()
     image.save(buffer, format="PNG")
@@ -203,7 +229,7 @@ def test_scan_food_route_accepts_valid_image(monkeypatch) -> None:
     assert body["status"] == "completed"
     assert body["client_scan_id"] == "11111111-1111-4111-8111-111111111111"
     assert body["manual_search_recommended"] is False
-    assert len(body["candidates"]) == 3
+    assert len(body["candidates"]) == 1
     assert body["components"][0]["role"] == "rice"
     assert body["needs_portion_input"] is True
 

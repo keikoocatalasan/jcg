@@ -46,49 +46,8 @@ class ScannerService:
                 scan_id, image_bytes, media_type, meal_type
             )
 
-        # Stable local mode for offline demos and automated tests.
-        mock_candidates = [
-            ScanCandidate(
-                food_id=None,
-                food_name="White Rice (cooked)",
-                confidence=0.87,
-                rank_number=1,
-                calories=206.0,
-                protein_g=4.2,
-                carbs_g=45.0,
-                fat_g=0.4,
-                estimated_cost_php=15.0,
-            ),
-            ScanCandidate(
-                food_id=None,
-                food_name="Fried Rice",
-                confidence=0.65,
-                rank_number=2,
-                calories=333.0,
-                protein_g=7.0,
-                carbs_g=55.0,
-                fat_g=9.0,
-                estimated_cost_php=35.0,
-            ),
-            ScanCandidate(
-                food_id=None,
-                food_name="Steamed Rice",
-                confidence=0.45,
-                rank_number=3,
-                calories=170.0,
-                protein_g=3.5,
-                carbs_g=37.0,
-                fat_g=0.3,
-                estimated_cost_php=12.0,
-            ),
-        ]
-
-        return ScanResult(
-            client_scan_id=scan_id,
-            candidates=mock_candidates,
-            components=[self._component_from_candidate(mock_candidates[0], scan_id)],
-            composition_confidence=0.70,
-            quality_flags=["portion_required"],
+        raise RuntimeError(
+            "Online AI provider is required for food image recognition."
         )
 
     async def _scan_with_openai(

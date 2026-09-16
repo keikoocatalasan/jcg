@@ -8,7 +8,7 @@ key-free demonstration path. It recognizes two labels:
 
 The model is a MobileNetV2 transfer-learning classifier trained on 34
 Wikimedia Commons photographs. The generated training report and full source
-manifest are bundled beside the model in `flutter_app/assets/models/`.
+manifest are kept as training artifacts outside the mobile release bundle.
 
 This is intentionally a two-dish prototype. A high score means the image looks
 similar to one of the curated classes; it does not prove ingredients, serving

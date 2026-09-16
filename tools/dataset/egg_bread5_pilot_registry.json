@@ -1,0 +1,13 @@
+{
+  "dataset_id": "filipino_food_egg_bread_5_pilot",
+  "version": "0.1.0",
+  "target_images_per_class": 25,
+  "minimum_real_images_per_class": 20,
+  "maximum_synthetic_fraction": 0.2,
+  "classes": [
+    {"id":"pandesal","display_name":"Pandesal","region":"nationwide","aliases":["pandesal","filipino bread roll","pan de sal philippines"]},
+    {"id":"scrambled_egg","display_name":"Scrambled Egg","region":"nationwide","aliases":["scrambled egg","scrambled eggs","scrambled itlog"]},
+    {"id":"sunny_side_up_egg","display_name":"Sunny-Side-Up Egg","region":"nationwide","aliases":["sunny side up egg","sunny side up eggs","pritong itlog sunny side up"]},
+    {"id":"boiled_egg","display_name":"Boiled Egg","region":"nationwide","aliases":["boiled egg","boiled eggs","itlog na nilaga"]}
+  ]
+}

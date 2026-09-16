@@ -3,7 +3,8 @@
 This pipeline is the source-of-truth workflow for expanding the two-dish
 scanner to the 100-class Filipino food registry. Raw images stay outside the
 Git repository. Only reviewed metadata, split files and the final compact
-TFLite model should be copied into the Flutter app.
+Model exports are for server-side evaluation or training artifacts; do not copy
+TFLite models into the Flutter app because food image recognition is online-only.
 
 ## Current registry
 

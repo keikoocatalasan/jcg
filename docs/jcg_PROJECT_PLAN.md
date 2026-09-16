@@ -227,7 +227,7 @@
 | **OpenAI Vision API** | High accuracy, easy integration, supports food recognition | Cost per image, requires internet |
 | **Google Cloud Vision** | Good food detection, PHP-friendly pricing | Setup complexity |
 | **Hugging Face Inference** | Free tier available, open models | Lower accuracy for food |
-| **Custom TFLite model** | Offline capable, no per-call cost | Training data needed, large model size |
+| **Cloud food image recognition** | Centralized model updates and broader food coverage | Requires internet, provider cost and backend availability |
 
 **Recommended**: Keep the configured NVIDIA NIM path for production scanner traffic, with OpenAI as a compatible alternative and deterministic mode only for local QA.
 

@@ -16,7 +16,6 @@ import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
-import 'package:jcg_fitness/features/ai_scanner/local_food_recognition_service.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/prediction_result_screen.dart';
 import 'package:jcg_fitness/app/theme.dart';
@@ -99,119 +98,31 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
       return;
     }
 
-    final clientScanId = UuidHelper.generateUuid();
-    ScanResult? localResult;
-    Object? localFailure;
-
-    try {
-      if (mounted) setState(() => _currentStep = 1);
-      final localOutcome = await _recognizeLocally(clientScanId);
-      localResult = localOutcome.result;
-      if (_isCancelled) return;
-      if (localOutcome.isConfident) {
-        await _completeScan(
-          localResult,
-          rawResponse: _localResponseJson(localResult),
-          syncStatus: 'pending',
-        );
-        return;
-      }
-    } catch (e) {
-      localFailure = e;
-    }
-
     final online = ref.read(isOnlineProvider);
-    // Local QA deliberately has no Supabase session. Keep the fallback
-    // entirely on-device instead of touching the uninitialized hosted client.
+    if (!online) {
+      _showError('Internet connection is required for food recognition.');
+      return;
+    }
     final token = AppConfig.isLocalTestMode
         ? null
         : Supabase.instance.client.auth.currentSession?.accessToken;
-    if (online && token != null && !_isCancelled) {
-      try {
-        if (mounted) setState(() => _currentStep = 2);
-        final cloud = await _requestCloudScan(token, clientScanId);
-        await _completeScan(
-          cloud.$1,
-          rawResponse: cloud.$2,
-          syncStatus: 'pending',
-        );
-        return;
-      } catch (cloudError) {
-        if (localResult == null) {
-          _showError('Cloud scan failed: $cloudError');
-          return;
-        }
-      }
-    }
-
-    if (localResult != null && !_isCancelled) {
-      await _completeScan(
-        localResult,
-        rawResponse: _localResponseJson(localResult),
-        syncStatus: 'pending',
-      );
+    if (token == null) {
+      _showError('Please sign in before using food recognition.');
       return;
     }
 
-    final reason = localFailure == null
-        ? 'The on-device model could not analyze this image.'
-        : 'On-device recognition failed: $localFailure';
-    _showError(reason);
-  }
-
-  Future<_LocalRecognitionOutcome> _recognizeLocally(
-    String clientScanId,
-  ) async {
-    final recognitions = await ref
-        .read(localFoodRecognitionServiceProvider)
-        .recognizeFile(widget.imagePath);
-    final isConfident = LocalFoodRecognitionService.isConfident(recognitions);
-    final result = ScanResult(
-      scanId: clientScanId,
-      clientScanId: clientScanId,
-      predictions: [
-        for (var index = 0; index < recognitions.length; index++)
-          ScanPrediction(
-            foodName: recognitions[index].foodName,
-            confidence: recognitions[index].confidence,
-            rankNumber: index + 1,
-            calories: recognitions[index].calories,
-            proteinG: recognitions[index].proteinG,
-            carbsG: recognitions[index].carbsG,
-            fatG: recognitions[index].fatG,
-            estimatedCostPhp: recognitions[index].estimatedCostPhp,
-            servingGrams: recognitions[index].servingGrams,
-          ),
-      ],
-      components: recognitions.isEmpty
-          ? const []
-          : [
-              ScanComponent(
-                componentId: UuidHelper.generateUuid(),
-                roleCode: 'ulam',
-                foodName: recognitions.first.foodName,
-                confidence: recognitions.first.confidence,
-                calories: recognitions.first.calories,
-                proteinG: recognitions.first.proteinG,
-                carbsG: recognitions.first.carbsG,
-                fatG: recognitions.first.fatG,
-                estimatedCostPhp: recognitions.first.estimatedCostPhp,
-                referenceGrams: recognitions.first.servingGrams,
-              ),
-            ],
-      pipelineVersion: LocalFoodRecognitionService.modelVersion,
-      needsPortionInput: recognitions.isNotEmpty,
-      status: isConfident ? 'completed' : 'low_confidence',
-      qualityFlags: recognitions.isEmpty
-          ? const []
-          : [
-              'portion_required',
-              if (!isConfident) 'low_confidence',
-              if (recognitions.first.modelLabel == 'unknown_or_unsupported')
-                'unknown_or_unsupported',
-            ],
-    );
-    return _LocalRecognitionOutcome(result: result, isConfident: isConfident);
+    final clientScanId = UuidHelper.generateUuid();
+    try {
+      if (mounted) setState(() => _currentStep = 2);
+      final cloud = await _requestCloudScan(token, clientScanId);
+      await _completeScan(
+        cloud.$1,
+        rawResponse: cloud.$2,
+        syncStatus: 'pending',
+      );
+    } catch (cloudError) {
+      _showError('Cloud scan failed: $cloudError');
+    }
   }
 
   Future<(ScanResult, String)> _requestCloudScan(
@@ -267,33 +178,6 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
       return 'Scan failed with status ${response.statusCode}';
     }
   }
-
-  String _localResponseJson(ScanResult result) => jsonEncode({
-        'provider': 'tflite_on_device',
-        'model': LocalFoodRecognitionService.modelName,
-        'model_version': LocalFoodRecognitionService.modelVersion,
-        'supported_foods': result.predictions
-            .map((prediction) => prediction.foodName)
-            .toList(growable: false),
-        'client_scan_id': result.clientScanId,
-        'predictions': [
-          for (final prediction in result.predictions)
-            {
-              'food_name': prediction.foodName,
-              'confidence': prediction.confidence,
-              'rank_number': prediction.rankNumber,
-            },
-        ],
-        'components': [
-          for (final component in result.components)
-            {
-              'component_id': component.componentId,
-              'role': component.roleCode,
-              'food_name': component.foodName,
-              'confidence': component.confidence,
-            },
-        ],
-      });
 
   Future<void> _completeScan(
     ScanResult result, {
@@ -835,14 +719,4 @@ class _ScanningLoadingScreenState extends ConsumerState<ScanningLoadingScreen> {
       ),
     );
   }
-}
-
-class _LocalRecognitionOutcome {
-  final ScanResult result;
-  final bool isConfident;
-
-  const _LocalRecognitionOutcome({
-    required this.result,
-    required this.isConfident,
-  });
 }
