@@ -30,6 +30,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _agreedToTerms = false;
+  String _accountType = 'user';
   String? _errorMessage;
 
   @override
@@ -68,6 +69,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _passwordController.text,
       fullName: _fullNameController.text.trim(),
       username: _usernameController.text.trim(),
+      accountType: _accountType,
     );
 
     switch (result) {
@@ -76,6 +78,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ref.read(registrationDataProvider.notifier).state = RegistrationData(
           fullName: _fullNameController.text.trim(),
           username: _usernameController.text.trim(),
+          accountType: _accountType,
         );
         ref
             .read(onboardingControllerProvider.notifier)
@@ -323,6 +326,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ),
             ],
+            _buildAccountTypeChoice(),
+            const SizedBox(height: 20),
             _buildLabel('Full Name'),
             const SizedBox(height: 8),
             TextFormField(
@@ -613,6 +618,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAccountTypeChoice() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel('Account type'),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment<String>(
+              value: 'user',
+              icon: Icon(Icons.person_outline),
+              label: Text('User'),
+            ),
+            ButtonSegment<String>(
+              value: 'nutritionist',
+              icon: Icon(Icons.verified_user_outlined),
+              label: Text('Nutritionist'),
+            ),
+          ],
+          selected: {_accountType},
+          onSelectionChanged: (selection) {
+            setState(() => _accountType = selection.first);
+          },
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _accountType == 'nutritionist'
+              ? 'Nutritionist applicants upload a valid credential after email confirmation. An administrator must approve it before reviewer access is enabled.'
+              : 'Track meals, water, weight, and fitness goals with a standard user account.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+      ],
     );
   }
 

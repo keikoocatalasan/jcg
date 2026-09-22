@@ -130,12 +130,19 @@ class AuthService {
     String password, {
     required String fullName,
     required String username,
+    String accountType = 'user',
   }) async {
     try {
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
-        data: {'full_name': fullName, 'username': username},
+        data: {
+          'full_name': fullName,
+          'username': username,
+          // This is a request for reviewer access, not an authorization claim.
+          // Approval remains controlled by the nutritionist application flow.
+          'requested_account_type': accountType,
+        },
       );
       final user = response.user;
       if (user == null) {
