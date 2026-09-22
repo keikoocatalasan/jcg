@@ -39,7 +39,7 @@ services:
       - key: MAX_IMAGE_UPLOAD_MB
         sync: false
       - key: ALLOWED_ORIGINS
-        value: https://nutrismart-ai.onrender.com
+        value: https://jcgfit.vercel.app
       - key: ENVIRONMENT
         value: production
       - key: RATE_LIMIT_REQUESTS
