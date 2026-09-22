@@ -96,6 +96,27 @@ class AuthService {
 
   SupabaseClient get _supabase => _ref.read(supabaseClientProvider);
 
+  /// Supabase intentionally avoids confirming whether an email exists. When
+  /// sign-up returns no user, the account may already be registered and the
+  /// old generic error left users with no useful next step.
+  static AppError registrationError([String? providerMessage]) {
+    final normalized = providerMessage?.trim().toLowerCase() ?? '';
+    if (normalized.contains('already registered') ||
+        normalized.contains('already exists') ||
+        normalized.contains('user already')) {
+      return const AppError(
+        code: 'ACCOUNT_EXISTS',
+        message:
+            'This email may already be registered. Try logging in or use Forgot password.',
+      );
+    }
+    return const AppError(
+      code: 'REGISTRATION_FAILED',
+      message:
+          'We could not create the account. The email may already be registered, or the service may be temporarily unavailable. Try logging in or use Forgot password.',
+    );
+  }
+
   GoogleSignIn get _googleSignIn {
     final serverClientId = AppConfig.googleWebClientId;
     return GoogleSignIn(
@@ -118,18 +139,15 @@ class AuthService {
       );
       final user = response.user;
       if (user == null) {
-        return Failure(
-            AppError.unknown('Registration failed. Please try again.'));
+        return Failure(registrationError());
       }
       return Success(RegistrationResult(user: user, session: response.session));
     } on AuthException catch (e) {
       return Failure<RegistrationResult>(
-        AppError(code: 'AUTH_ERROR', message: e.message),
+        registrationError(e.message),
       );
     } catch (e) {
-      return Failure<RegistrationResult>(
-        AppError.unknown('Registration failed. Please try again.'),
-      );
+      return Failure<RegistrationResult>(registrationError());
     }
   }
 
