@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/constants.dart';
 import 'package:jcg_fitness/app/theme.dart';
+import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
+import 'package:jcg_fitness/core/sync/official_foods_refresh.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
-import 'package:jcg_fitness/core/widgets/status_tag.dart';
+import 'package:jcg_fitness/core/widgets/nutrition_verification_badge.dart';
+import 'package:jcg_fitness/features/food_database/food_provider.dart';
 import 'package:jcg_fitness/features/nutritionist/widgets/nutritionist_food_review_section.dart';
 
 class FoodDetailScreen extends ConsumerStatefulWidget {
@@ -22,14 +27,31 @@ class _FoodDetailScreenState extends ConsumerState<FoodDetailScreen> {
   int _quantity = 1;
   DateTime _loggedAt = DateTime.now();
   String _servingSize = '';
+  Food? _freshFood;
 
   @override
   void initState() {
     super.initState();
     _servingSize = widget.food.servingLabel ?? '1 serving';
+    unawaited(_refreshVerification());
   }
 
-  Food get _food => widget.food;
+  Food get _food => _freshFood ?? widget.food;
+
+  /// Re-syncs this food's verification metadata so a nutritionist's review is
+  /// visible without restarting the app.
+  Future<void> _refreshVerification() async {
+    await OfficialFoodsRefresh.maybeRefresh();
+    try {
+      final fresh = await FoodRepository(DatabaseProvider())
+          .readById(widget.food.foodId);
+      if (!mounted || fresh == null) return;
+      setState(() => _freshFood = fresh);
+      ref.invalidate(verifiedFoodIdsProvider);
+    } catch (_) {
+      // Keep showing the cached food when the refresh fails.
+    }
+  }
 
   double get _totalCalories => _food.calories * _quantity;
 
@@ -131,7 +153,10 @@ class _FoodHeader extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 6),
-                const StatusTag.ok(label: 'Common'),
+                NutritionVerificationBadge(
+                  status: food.verificationStatus,
+                  verbose: true,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   '${food.servingLabel ?? '1 serving'} (${food.servingGrams?.round() ?? 0} g)',

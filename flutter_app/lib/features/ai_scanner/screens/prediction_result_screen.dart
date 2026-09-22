@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
+import 'package:jcg_fitness/core/widgets/nutrition_verification_badge.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/ai_scanner/ai_scanner_provider.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/confirm_ai_log_screen.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/manual_correction_screen.dart';
+import 'package:jcg_fitness/features/food_database/food_provider.dart';
 
 class PredictionResultScreen extends StatelessWidget {
   final ScanResult scanResult;
@@ -174,6 +177,22 @@ class PredictionResultScreen extends StatelessWidget {
                     : StatusTag.over(
                         label:
                             '${(prediction.confidence * 100).toStringAsFixed(0)}% match'),
+            Consumer(
+              builder: (context, ref, _) {
+                final food = ref
+                    .watch(
+                      officialFoodVerificationProvider(prediction.foodName),
+                    )
+                    .valueOrNull;
+                if (food == null || !food.isNutritionVerified) {
+                  return const SizedBox.shrink();
+                }
+                return const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: NutritionVerificationBadge(status: 'verified'),
+                );
+              },
+            ),
           ],
         ),
       ),

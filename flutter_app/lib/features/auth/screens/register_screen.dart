@@ -75,6 +75,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     switch (result) {
       case Success(data: final registration):
         final user = registration.user;
+        final isNutritionist = _accountType == 'nutritionist';
         ref.read(registrationDataProvider.notifier).state = RegistrationData(
           fullName: _fullNameController.text.trim(),
           username: _usernameController.text.trim(),
@@ -88,8 +89,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         if (!mounted) return;
         if (registration.requiresEmailConfirmation) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Account created. Check your email, then sign in.'),
+            SnackBar(
+              content: Text(isNutritionist
+                  ? 'Account created. Confirm your email, then sign in to upload your PRC credential.'
+                  : 'Account created. Check your email, then sign in.'),
               backgroundColor: AppColors.success,
             ),
           );
@@ -101,7 +104,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               backgroundColor: AppColors.success,
             ),
           );
-          context.go('/onboarding');
+          // Session checking resolves the account flow: nutritionist intent
+          // goes to the PRC verification step instead of consumer onboarding.
+          context.go('/session-loading');
         }
       case Failure(error: final error):
         setState(() {
@@ -123,13 +128,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (!mounted) return;
 
     switch (result) {
-      case Success(data: final user):
-        final onboardingComplete = await loadOnboardingComplete(user.id);
-        ref.read(onboardingCompleteProvider.notifier).state =
-            onboardingComplete;
-        if (mounted) {
-          context.go(onboardingComplete ? '/dashboard' : '/onboarding');
-        }
+      case Success():
+        context.go('/session-loading');
       case Failure(error: final error):
         setState(() {
           _errorMessage = error.message;
@@ -180,16 +180,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Widget _buildStepIndicator() {
+    final labels = _accountType == 'nutritionist'
+        ? const ['Account', 'Verification']
+        : const ['Account', 'Profile', 'Health', 'Review'];
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildStep(1, 'Account', true),
-        _buildStepDivider(true),
-        _buildStep(2, 'Profile', false),
-        _buildStepDivider(false),
-        _buildStep(3, 'Health', false),
-        _buildStepDivider(false),
-        _buildStep(4, 'Review', false),
+        for (var index = 0; index < labels.length; index++) ...[
+          if (index > 0) _buildStepDivider(index == 1),
+          _buildStep(index + 1, labels[index], index == 0),
+        ],
       ],
     );
   }
@@ -627,28 +627,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       children: [
         _buildLabel('Account type'),
         const SizedBox(height: 8),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment<String>(
-              value: 'user',
-              icon: Icon(Icons.person_outline),
-              label: Text('User'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              avatar: const Icon(Icons.person_outline, size: 18),
+              label: const Text('User'),
+              selected: _accountType == 'user',
+              onSelected: (_) => setState(() => _accountType = 'user'),
             ),
-            ButtonSegment<String>(
-              value: 'nutritionist',
-              icon: Icon(Icons.verified_user_outlined),
-              label: Text('Nutritionist'),
+            ChoiceChip(
+              avatar: const Icon(Icons.verified_user_outlined, size: 18),
+              label: const Text('Nutritionist'),
+              selected: _accountType == 'nutritionist',
+              onSelected: (_) => setState(() => _accountType = 'nutritionist'),
             ),
           ],
-          selected: {_accountType},
-          onSelectionChanged: (selection) {
-            setState(() => _accountType = selection.first);
-          },
         ),
         const SizedBox(height: 8),
         Text(
           _accountType == 'nutritionist'
-              ? 'Nutritionist applicants upload a valid credential after email confirmation. An administrator must approve it before reviewer access is enabled.'
+              ? 'Create your reviewer account with email, password, and username. You will upload your PRC ID/license next for manual admin verification. Nutritionist accounts skip the personal nutrition setup.'
               : 'Track meals, water, weight, and fitness goals with a standard user account.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
+import 'package:jcg_fitness/features/food_database/widgets/verified_food_tick.dart';
 import 'package:jcg_fitness/features/meal_logging/recent_logs_provider.dart';
 
 class RecentLogsScreen extends ConsumerStatefulWidget {
@@ -424,14 +425,23 @@ class _LogEntryTile extends StatelessWidget {
                       if (entry.subtitle != null &&
                           entry.subtitle!.isNotEmpty) ...[
                         const SizedBox(height: 2),
-                        Text(
-                          entry.subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                entry.subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                              ),
+                            ),
+                            VerifiedFoodTick(foodId: entry.foodId),
+                          ],
                         ),
                       ],
                       const SizedBox(height: 1),

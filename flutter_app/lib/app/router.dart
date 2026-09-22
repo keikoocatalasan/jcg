@@ -25,6 +25,7 @@ import 'package:jcg_fitness/features/auth/screens/privacy_screen.dart';
 import 'package:jcg_fitness/features/auth/screens/register_screen.dart';
 import 'package:jcg_fitness/features/auth/screens/session_loading_screen.dart';
 import 'package:jcg_fitness/features/auth/screens/terms_screen.dart';
+import 'package:jcg_fitness/features/auth/account_flow_provider.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/auth/session_loading_provider.dart';
 import 'package:jcg_fitness/features/chatbot/screens/chatbot_screen.dart';
@@ -62,7 +63,11 @@ import 'package:jcg_fitness/features/weight_tracking/screens/weight_screen.dart'
 import 'package:jcg_fitness/features/weight_tracking/screens/weight_history_screen.dart';
 import 'package:jcg_fitness/features/weight_tracking/screens/edit_weight_log_screen.dart';
 import 'package:jcg_fitness/features/nutrition/screens/nutrition_target_screen.dart';
+import 'package:jcg_fitness/features/nutritionist/nutritionist_provider.dart';
 import 'package:jcg_fitness/features/nutritionist/screens/nutritionist_application_screen.dart';
+import 'package:jcg_fitness/features/nutritionist/screens/nutritionist_food_review_screen.dart';
+import 'package:jcg_fitness/features/nutritionist/screens/nutritionist_report_detail_screen.dart';
+import 'package:jcg_fitness/features/nutritionist/screens/nutritionist_workspace_screen.dart';
 import 'package:jcg_fitness/features/onboarding/onboarding_completion_provider.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
 
@@ -73,6 +78,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   final localTestEnabled = ref.watch(localTestAuthEnabledProvider);
   final sessionChecked = ref.watch(launchSessionCheckedProvider);
   final onboardingComplete = ref.watch(onboardingCompleteProvider);
+  final accountFlow = ref.watch(accountFlowProvider);
+  final nutritionistLanding = ref.watch(nutritionistLandingProvider);
+  final adminAccess = ref.watch(adminFlowProvider);
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -103,6 +111,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }
       if (location == '/session-loading') return null;
       if (isPublic) return '/session-loading';
+
+      // Nutritionist-flow accounts land in the professional experience and are
+      // not forced through the consumer onboarding wizard. Admins keep the
+      // admin console regardless of any reviewer intent.
+      if (!adminAccess && accountFlow == AccountFlowMode.nutritionist) {
+        if (location.startsWith('/nutritionist')) return null;
+        return landingRoute(nutritionistLanding);
+      }
+
       if (!onboardingComplete && !isOnboarding) return '/onboarding';
       if (onboardingComplete && isOnboarding) return '/dashboard';
       return null;
@@ -322,6 +339,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/nutritionist-application',
         builder: (_, __) => const NutritionistApplicationScreen(),
+      ),
+      GoRoute(
+        path: '/nutritionist',
+        builder: (_, __) => const NutritionistWorkspaceScreen(),
+      ),
+      GoRoute(
+        path: '/nutritionist/review',
+        builder: (_, state) => NutritionistFoodReviewScreen(
+          entry: state.extra as NutritionistCatalogEntry,
+        ),
+      ),
+      GoRoute(
+        path: '/nutritionist/report',
+        builder: (_, state) => NutritionistReportDetailScreen(
+          report: state.extra as FoodReport,
+        ),
       ),
       GoRoute(
         path: '/admin',

@@ -11,19 +11,25 @@ NutritionistApplication sampleApplication(String status) =>
       credentialName: 'Sample Dietitian',
       licenseNumber: 'RND-12345',
       credentialDocumentPath: 'auth-user/credential.jpg',
+      profession: 'Nutritionist-Dietitian',
+      prcLicenseExpirationDate: DateTime.utc(2030, 1, 31),
       status: status,
       submittedAt: DateTime.utc(2026, 9, 21),
       reviewedAt: status == 'pending' ? null : DateTime.utc(2026, 9, 21),
       reviewNote: null,
+      rejectionReason: null,
+      suspensionReason: null,
+      revalidationRequired: false,
     );
 
 void main() {
-  testWidgets('approved applicant sees reviewer access status', (tester) async {
+  testWidgets('verified applicant sees workspace access status',
+      (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           nutritionistApplicationProvider.overrideWith(
-            (ref) async => sampleApplication('approved'),
+            (ref) async => sampleApplication('verified'),
           ),
         ],
         child: const MaterialApp(home: NutritionistApplicationScreen()),
@@ -31,11 +37,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Application approved'), findsOneWidget);
-    expect(
-        find.text(
-            'You can now submit nutrition reviews on official food entries while online.'),
-        findsOneWidget);
+    expect(find.text('Professional verification complete'), findsOneWidget);
+    expect(find.text('Open nutritionist workspace'), findsOneWidget);
   });
 
   testWidgets('pending application shows wait state instead of resubmission',
@@ -52,7 +55,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Waiting for admin review'), findsOneWidget);
+    expect(find.text('Pending verification'), findsOneWidget);
     expect(find.text('Submit for review'), findsNothing);
   });
 
@@ -68,9 +71,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Apply to review food information'), findsOneWidget);
+    expect(find.text('Apply to verify food nutrition data'), findsOneWidget);
     expect(find.text('Name shown on credential'), findsOneWidget);
-    expect(find.text('License or registration number'), findsOneWidget);
+    expect(find.text('PRC license number'), findsOneWidget);
+    expect(find.text('PRC license expiration date'), findsOneWidget);
     expect(find.text('Choose credential image'), findsOneWidget);
   });
 }

@@ -5,11 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/errors/result.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
-import 'package:jcg_fitness/core/database/database_provider.dart';
-import 'package:jcg_fitness/core/sync/sync_initial_pull.dart';
 import 'package:jcg_fitness/core/validators/validators.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
-import 'package:jcg_fitness/features/onboarding/onboarding_completion_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -51,19 +48,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
 
     switch (result) {
-      case Success(data: final session):
-        await SyncInitialPull.pullInitialData(DatabaseProvider());
-        await SyncInitialPull.pullUserData(
-          session.user.id,
-          DatabaseProvider(),
-        );
-        final onboardingComplete =
-            await loadOnboardingComplete(session.user.id);
-        ref.read(onboardingCompleteProvider.notifier).state =
-            onboardingComplete;
-        if (mounted) {
-          context.go(onboardingComplete ? '/dashboard' : '/onboarding');
-        }
+      case Success():
+        // Session checking resolves the account flow (admin / nutritionist /
+        // consumer) and syncs before landing on the correct destination.
+        context.go('/session-loading');
       case Failure(error: final error):
         setState(() {
           _errorMessage = error.message;
@@ -84,15 +72,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!mounted) return;
 
     switch (result) {
-      case Success(data: final user):
-        await SyncInitialPull.pullInitialData(DatabaseProvider());
-        await SyncInitialPull.pullUserData(user.id, DatabaseProvider());
-        final onboardingComplete = await loadOnboardingComplete(user.id);
-        ref.read(onboardingCompleteProvider.notifier).state =
-            onboardingComplete;
-        if (mounted) {
-          context.go(onboardingComplete ? '/dashboard' : '/onboarding');
-        }
+      case Success():
+        context.go('/session-loading');
       case Failure(error: final error):
         setState(() {
           _errorMessage = error.message;

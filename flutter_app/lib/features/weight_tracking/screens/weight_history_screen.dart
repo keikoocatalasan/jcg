@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
+import 'package:jcg_fitness/core/widgets/scrollable_segmented_button.dart';
 import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
 import 'package:jcg_fitness/core/utils/date_helper.dart';
@@ -300,7 +301,7 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
       child: Row(
         children: [
           Expanded(
-            child: SegmentedButton<int>(
+            child: ScrollableSegmented<int>(
               segments: _rangeOptions.map((opt) {
                 return ButtonSegment<int>(
                   value: opt.$2,

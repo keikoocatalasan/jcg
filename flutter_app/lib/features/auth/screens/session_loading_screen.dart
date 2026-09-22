@@ -12,8 +12,10 @@ import 'package:jcg_fitness/core/errors/result.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 import 'package:jcg_fitness/core/sync/sync_initial_pull.dart';
+import 'package:jcg_fitness/features/auth/account_flow_provider.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/auth/session_loading_provider.dart';
+import 'package:jcg_fitness/features/nutritionist/nutritionist_provider.dart';
 import 'package:jcg_fitness/features/onboarding/onboarding_completion_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -34,6 +36,10 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
     _SessionStepStatus.pending,
     _SessionStepStatus.pending,
   ];
+  Timer? _slowTimer;
+  Timer? _fallbackTimer;
+  bool _slowConnection = false;
+  bool _finished = false;
 
   @override
   void initState() {
@@ -45,12 +51,76 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_runChecks());
     });
+    // Never trap the user on the loader: surface an offline escape hatch and
+    // fall back to cached state if the network steps do not finish in time.
+    _slowTimer = Timer(const Duration(seconds: 12), () {
+      if (mounted && !_finished) setState(() => _slowConnection = true);
+    });
+    _fallbackTimer = Timer(const Duration(seconds: 35), () {
+      if (mounted && !_finished) {
+        unawaited(_finishWithCachedState());
+      }
+    });
   }
 
   @override
   void dispose() {
+    _slowTimer?.cancel();
+    _fallbackTimer?.cancel();
     _spinnerController.dispose();
     super.dispose();
+  }
+
+  /// Bounds a network/local step so a stalled request can never block startup.
+  Future<T?> _guard<T>(
+    Future<T> Function() action, {
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    try {
+      return await action().timeout(timeout);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Routes using only locally cached state when Supabase cannot be reached.
+  Future<void> _finishWithCachedState() async {
+    if (_finished) return;
+    _finished = true;
+    _slowTimer?.cancel();
+    _fallbackTimer?.cancel();
+
+    String? userId;
+    try {
+      userId = Supabase.instance.client.auth.currentUser?.id;
+    } catch (_) {
+      userId = null;
+    }
+
+    if (userId == null) {
+      if (!mounted) return;
+      ref.read(launchSessionCheckedProvider.notifier).state = true;
+      context.go('/login');
+      return;
+    }
+
+    final onboardingCached = await loadCachedOnboardingComplete(userId);
+    final intent = hasNutritionistIntent();
+    if (!mounted) return;
+    ref.read(adminFlowProvider.notifier).state = false;
+    ref.read(accountFlowProvider.notifier).state =
+        intent ? AccountFlowMode.nutritionist : AccountFlowMode.consumer;
+    ref.read(nutritionistLandingProvider.notifier).state =
+        intent ? NutritionistLanding.application : NutritionistLanding.none;
+    ref.read(onboardingCompleteProvider.notifier).state = onboardingCached;
+    ref.read(launchSessionCheckedProvider.notifier).state = true;
+    context.go(
+      intent
+          ? '/nutritionist-application'
+          : onboardingCached
+              ? '/dashboard'
+              : '/onboarding',
+    );
   }
 
   Future<void> _runChecks() async {
@@ -91,46 +161,92 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
       return;
     }
 
-    final statusResult =
-        await ref.read(authServiceProvider).checkAccountStatus(session.user.id);
-    if (!mounted) return;
+    final statusResult = await _guard(
+      () => ref.read(authServiceProvider).checkAccountStatus(session.user.id),
+    );
+    if (!mounted || _finished) return;
+    if (statusResult == null) {
+      // Timed out or failed before reaching Supabase; use cached state.
+      await _finishWithCachedState();
+      return;
+    }
     _setStep(1, _SessionStepStatus.complete);
 
     if (statusResult is Failure) {
+      _resetFlowState();
       await supabase.auth.signOut();
       await Future<void>.delayed(const Duration(milliseconds: 450));
       if (mounted) {
+        _finished = true;
+        _slowTimer?.cancel();
+        _fallbackTimer?.cancel();
         ref.read(launchSessionCheckedProvider.notifier).state = true;
         context.go('/login');
       }
       return;
     }
 
-    await SyncInitialPull.pullInitialData(DatabaseProvider());
-    await SyncInitialPull.pullUserData(session.user.id, DatabaseProvider());
+    final userId = session.user.id;
+    final adminAccess =
+        await _guard(() => loadAdminAccess(userId), timeout: const Duration(seconds: 6)) ??
+            false;
+    final intent = hasNutritionistIntent();
+    NutritionistApplication? application;
+    if (intent) {
+      application = await _guard<NutritionistApplication?>(
+        () => ref.read(nutritionistServiceProvider).getMyApplication(),
+        timeout: const Duration(seconds: 8),
+      );
+    }
+    final landing = resolveNutritionistLanding(
+      hasIntent: intent,
+      application: application,
+    );
+    if (!mounted || _finished) return;
+    ref.read(adminFlowProvider.notifier).state = adminAccess;
+    ref.read(accountFlowProvider.notifier).state =
+        landing == NutritionistLanding.none
+            ? AccountFlowMode.consumer
+            : AccountFlowMode.nutritionist;
+    ref.read(nutritionistLandingProvider.notifier).state = landing;
+
+    await _guard(
+      () => SyncInitialPull.pullInitialData(DatabaseProvider()),
+      timeout: const Duration(seconds: 12),
+    );
+    await _guard(
+      () => SyncInitialPull.pullUserData(userId, DatabaseProvider()),
+      timeout: const Duration(seconds: 12),
+    );
 
     _setStep(2, _SessionStepStatus.active);
-    final onboardingComplete = await loadOnboardingComplete(session.user.id);
-    final adminAccess = await loadAdminAccess(session.user.id);
-    if (!mounted) return;
+    var onboardingComplete = await _guard(
+      () => loadOnboardingComplete(userId),
+      timeout: const Duration(seconds: 8),
+    );
+    onboardingComplete ??= await loadCachedOnboardingComplete(userId);
+    if (!mounted || _finished) return;
     ref.read(onboardingCompleteProvider.notifier).state = onboardingComplete;
     _setStep(2, _SessionStepStatus.complete);
 
     _setStep(3, _SessionStepStatus.active);
-    await _checkPendingSync();
-    if (!mounted) return;
+    await _guard(_checkPendingSync, timeout: const Duration(seconds: 5));
+    if (!mounted || _finished) return;
     _setStep(3, _SessionStepStatus.complete);
 
     await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
+    if (!mounted || _finished) return;
+    _finished = true;
+    _slowTimer?.cancel();
+    _fallbackTimer?.cancel();
     ref.read(launchSessionCheckedProvider.notifier).state = true;
-    context.go(
-      adminAccess
-          ? '/admin'
-          : onboardingComplete
-              ? '/dashboard'
-              : '/onboarding',
-    );
+    if (adminAccess) {
+      context.go('/admin');
+    } else if (landing != NutritionistLanding.none) {
+      context.go(landingRoute(landing));
+    } else {
+      context.go(onboardingComplete ? '/dashboard' : '/onboarding');
+    }
   }
 
   Future<void> _ensureSupabaseInitialized() async {
@@ -162,6 +278,13 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
       // Pending sync is non-blocking for app launch.
     }
     await Future<void>.delayed(const Duration(milliseconds: 500));
+  }
+
+  void _resetFlowState() {
+    ref.read(adminFlowProvider.notifier).state = false;
+    ref.read(accountFlowProvider.notifier).state = AccountFlowMode.consumer;
+    ref.read(nutritionistLandingProvider.notifier).state =
+        NutritionistLanding.none;
   }
 
   void _setStep(int index, _SessionStepStatus status) {
@@ -232,6 +355,14 @@ class _SessionLoadingScreenState extends ConsumerState<SessionLoadingScreen>
                               _SessionSpinner(controller: _spinnerController),
                               SizedBox(height: compact ? 26 : 44),
                               _ChecklistCard(statuses: _statuses),
+                              if (_slowConnection) ...[
+                                SizedBox(height: compact ? 14 : 20),
+                                OutlinedButton.icon(
+                                  onPressed: _finishWithCachedState,
+                                  icon: const Icon(Icons.cloud_off_outlined),
+                                  label: const Text('Continue offline'),
+                                ),
+                              ],
                               SizedBox(height: compact ? 30 : 58),
                               const _SecurityNote(),
                             ],

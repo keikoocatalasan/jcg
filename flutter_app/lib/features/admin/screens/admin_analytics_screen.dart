@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/app/theme.dart';
+import 'package:jcg_fitness/core/widgets/scrollable_segmented_button.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 
@@ -188,7 +189,7 @@ class _AdminAnalyticsScreenState extends ConsumerState<AdminAnalyticsScreen> {
   }
 
   Widget _buildRangeSelector() {
-    return SegmentedButton<int>(
+    return ScrollableSegmented<int>(
       segments: const [
         ButtonSegment(value: 7, label: Text('7 days')),
         ButtonSegment(value: 30, label: Text('30 days')),

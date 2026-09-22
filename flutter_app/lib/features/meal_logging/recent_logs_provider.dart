@@ -18,6 +18,7 @@ class LogEntry {
   final String amountUnit;
   final DateTime loggedAt;
   final String mealTypeCode;
+  final String? foodId;
 
   LogEntry({
     required this.id,
@@ -28,6 +29,7 @@ class LogEntry {
     required this.amountUnit,
     required this.loggedAt,
     this.mealTypeCode = '',
+    this.foodId,
   });
 }
 
@@ -105,6 +107,7 @@ DaySummary _buildDaySummary(
       amountUnit: 'kcal',
       loggedAt: DateTime.parse(meal.loggedAt).toLocal(),
       mealTypeCode: meal.mealTypeCode,
+      foodId: meal.foodId,
     ));
   }
 

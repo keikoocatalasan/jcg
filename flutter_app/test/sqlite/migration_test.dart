@@ -5,6 +5,7 @@ import 'package:jcg_fitness/core/database/migration_v2.dart';
 import 'package:jcg_fitness/core/database/migration_v3.dart';
 import 'package:jcg_fitness/core/database/migration_v4.dart';
 import 'package:jcg_fitness/core/database/migration_v5.dart';
+import 'package:jcg_fitness/core/database/migration_v6.dart';
 import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 
 void main() {
@@ -241,6 +242,26 @@ void main() {
       expect(await db.query('ai_scan_components'), hasLength(1));
       await db.delete('ai_scans', where: 'scan_id = ?', whereArgs: ['scan-1']);
       expect(await db.query('ai_scan_components'), isEmpty);
+    });
+  });
+
+  group('Migration V6', () {
+    test('adds nutrition verification fields to foods idempotently', () async {
+      await MigrationV6.run(db);
+      await MigrationV6.run(db);
+
+      final foodColumns = await db.rawQuery('PRAGMA table_info(foods)');
+      final foodNames = foodColumns.map((row) => row['name']).toSet();
+      expect(
+        foodNames,
+        containsAll(<String>{
+          'verification_status',
+          'verified_at',
+          'nutrition_source_type',
+          'nutrition_source_name',
+          'source_checked_at',
+        }),
+      );
     });
   });
 

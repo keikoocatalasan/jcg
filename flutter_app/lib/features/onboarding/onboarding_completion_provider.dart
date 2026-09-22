@@ -95,3 +95,10 @@ Future<void> saveOnboardingComplete(String userId, bool value) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool(onboardingCompleteKey(userId), value);
 }
+
+/// Last known onboarding state without touching the network. Used when the
+/// session check cannot reach Supabase so the app opens instead of hanging.
+Future<bool> loadCachedOnboardingComplete(String userId) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool(onboardingCompleteKey(userId)) ?? false;
+}

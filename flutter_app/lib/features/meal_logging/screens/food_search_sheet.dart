@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,8 +7,10 @@ import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
+import 'package:jcg_fitness/core/sync/official_foods_refresh.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
+import 'package:jcg_fitness/core/widgets/nutrition_verification_badge.dart';
 
 typedef FoodSearchFunction = Future<List<Food>> Function(
   String query,
@@ -44,6 +48,12 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
   ];
 
   final _recentSearches = ['Oatmeal', 'Greek Yogurt', 'Almonds', 'Rice'];
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(OfficialFoodsRefresh.maybeRefresh());
+  }
 
   @override
   void dispose() {
@@ -455,6 +465,10 @@ class _FoodResultTile extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.textSecondary,
                         ),
+                  ),
+                  const SizedBox(height: 4),
+                  NutritionVerificationBadge(
+                    status: food.verificationStatus,
                   ),
                   const SizedBox(height: 4),
                   Row(

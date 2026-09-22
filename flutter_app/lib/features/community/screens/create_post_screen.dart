@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/widgets/internet_required_widget.dart';
+import 'package:jcg_fitness/core/widgets/scrollable_segmented_button.dart';
 import 'package:jcg_fitness/features/community/community_provider.dart';
 import 'package:jcg_fitness/features/community/community_content_filter.dart';
 
@@ -276,7 +277,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                     ),
               ),
               const SizedBox(height: 8),
-              SegmentedButton<bool>(
+              ScrollableSegmented<bool>(
                 segments: const [
                   ButtonSegment(
                     value: true,

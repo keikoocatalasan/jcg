@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/features/nutritionist/nutritionist_provider.dart';
+import 'package:jcg_fitness/features/nutritionist/widgets/food_report_sheet.dart';
 
 class NutritionistFoodReviewSection extends ConsumerWidget {
   final Food food;
@@ -21,10 +22,13 @@ class NutritionistFoodReviewSection extends ConsumerWidget {
     final servingId = food.servingId;
     if (!food.isOfficial || servingId == null) return const SizedBox.shrink();
 
-    final approvedAsync = ref.watch(approvedNutritionistProvider);
+    final verificationAsync = isOnline
+        ? ref.watch(foodVerificationProvider((food.foodId, servingId)))
+        : const AsyncValue<NutritionistCatalogEntry?>.data(null);
     final reviewsAsync = isOnline
         ? ref.watch(foodNutritionistReviewsProvider((food.foodId, servingId)))
         : const AsyncValue.data(<FoodNutritionistReview>[]);
+    final verifiedAsync = ref.watch(verifiedNutritionistProvider);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -40,29 +44,32 @@ class NutritionistFoodReviewSection extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Nutritionist feedback',
+                    'Nutrition data review',
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
                         ?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
+                if (verificationAsync.valueOrNull != null)
+                  Flexible(
+                    child: _VerificationTag(
+                      status: verificationAsync.value!.verificationStatus,
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              isOnline
-                  ? 'Notes apply to this listed serving and do not replace personal nutrition advice.'
-                  : 'Connect to the internet to view or submit nutritionist feedback.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-            ),
             if (!isOnline) ...[
-              const SizedBox(height: 10),
-              const Text('This review feature is online-only.'),
+              Text(
+                'Connect to the internet to view verification details or report food data.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
             ] else ...[
-              const SizedBox(height: 10),
+              _VerificationDetails(entry: verificationAsync.valueOrNull),
+              const SizedBox(height: 8),
               reviewsAsync.when(
                 loading: () => const LinearProgressIndicator(),
                 error: (_, __) => Text(
@@ -71,7 +78,7 @@ class NutritionistFoodReviewSection extends ConsumerWidget {
                 ),
                 data: (reviews) => reviews.isEmpty
                     ? Text(
-                        'No nutritionist feedback for this serving yet.',
+                        'No nutritionist review has been recorded for this serving yet.',
                         style: Theme.of(context).textTheme.bodySmall,
                       )
                     : Column(
@@ -81,31 +88,36 @@ class NutritionistFoodReviewSection extends ConsumerWidget {
                       ),
               ),
               const SizedBox(height: 10),
-              approvedAsync.when(
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (approved) => approved
-                    ? Align(
-                        alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _openReviewForm(
-                            context,
-                            ref,
-                            servingId,
-                          ),
-                          icon: const Icon(Icons.rate_review_outlined),
-                          label: const Text('Submit or update review'),
-                        ),
-                      )
-                    : Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: () =>
-                              context.push('/nutritionist-application'),
-                          icon: const Icon(Icons.verified_user_outlined),
-                          label: const Text('Apply to review foods'),
-                        ),
-                      ),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () =>
+                        showFoodReportSheet(context, ref, food: food),
+                    icon: const Icon(Icons.flag_outlined),
+                    label: const Text('Report data issue'),
+                  ),
+                  if (verifiedAsync.valueOrNull == true)
+                    OutlinedButton.icon(
+                      onPressed: verificationAsync.valueOrNull == null
+                          ? null
+                          : () => context.push(
+                                '/nutritionist/review',
+                                extra: verificationAsync.value,
+                              ),
+                      icon: const Icon(Icons.rate_review_outlined),
+                      label: const Text('Open review'),
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: () =>
+                          context.push('/nutritionist-application'),
+                      icon: const Icon(Icons.verified_user_outlined),
+                      label: const Text('Apply to review foods'),
+                    ),
+                ],
               ),
             ],
           ],
@@ -113,22 +125,96 @@ class NutritionistFoodReviewSection extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Future<void> _openReviewForm(
-    BuildContext context,
-    WidgetRef ref,
-    String servingId,
-  ) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => _NutritionistReviewForm(
-        food: food,
-        servingId: servingId,
+class _VerificationTag extends StatelessWidget {
+  final String status;
+
+  const _VerificationTag({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      'verified' => AppColors.success,
+      'needs_revision' => AppColors.warning,
+      'rejected' => AppColors.error,
+      'in_review' => AppColors.primary,
+      _ => AppColors.textSecondary,
+    };
+    final label = nutritionistVerificationLabels[status] ?? 'Unreviewed';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
-    ref.invalidate(foodNutritionistReviewsProvider((food.foodId, servingId)));
+  }
+}
+
+class _VerificationDetails extends StatelessWidget {
+  final NutritionistCatalogEntry? entry;
+
+  const _VerificationDetails({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    if (entry == null) {
+      return Text(
+        'Notes apply to this listed serving and do not replace personal nutrition advice.',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+      );
+    }
+    final sourceLabel = entry!.sourceType == null
+        ? null
+        : nutritionistSourceTypes[entry!.sourceType] ?? entry!.sourceType;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Notes apply to this listed serving and do not replace personal nutrition advice.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+        ),
+        if (entry!.verifiedAt != null)
+          Text(
+            'Reviewed ${DateFormat('MMM d, yyyy').format(entry!.verifiedAt!.toLocal())} · Admin-approved nutritionist',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        if (sourceLabel != null)
+          Text(
+            'Source: $sourceLabel${entry!.sourceName == null ? '' : ' · ${entry!.sourceName}'}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+          ),
+        if (entry!.verificationStatus != 'verified')
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'This nutrition data has not been verified by an admin-approved nutritionist.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.warning,
+                  ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -139,6 +225,10 @@ class _ReviewItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLegacy = review.isLegacy;
+    final decisionLabel = review.decision == null
+        ? null
+        : nutritionistVerificationLabels[review.decision] ?? review.decision!;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 8),
@@ -150,21 +240,33 @@ class _ReviewItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _AssessmentTag(label: _servingLabel(review.servingAssessment)),
-              _AssessmentTag(label: _macroLabel(review.macroAssessment)),
-            ],
-          ),
-          if (review.comment?.trim().isNotEmpty == true) ...[
+          if (decisionLabel != null) ...[
+            _AssessmentTag(label: decisionLabel),
+          ] else if (isLegacy) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (review.servingAssessment != null)
+                  _AssessmentTag(
+                    label: _servingLabel(review.servingAssessment!),
+                  ),
+                if (review.macroAssessment != null)
+                  _AssessmentTag(
+                    label: _macroLabel(review.macroAssessment!),
+                  ),
+              ],
+            ),
+          ],
+          if ((review.reviewNote ?? review.comment ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(review.comment!),
+            Text((review.reviewNote ?? review.comment ?? '').trim()),
           ],
           const SizedBox(height: 4),
           Text(
-            'Updated ${DateFormat('MMM d, yyyy').format(review.updatedAt.toLocal())} · Admin-approved nutritionist',
+            isLegacy
+                ? 'Advisory note (legacy) · ${DateFormat('MMM d, yyyy').format(review.updatedAt.toLocal())}'
+                : 'Updated ${DateFormat('MMM d, yyyy').format(review.updatedAt.toLocal())} · Admin-approved nutritionist',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -198,164 +300,6 @@ class _AssessmentTag extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       label: Text(label),
       padding: EdgeInsets.zero,
-    );
-  }
-}
-
-class _NutritionistReviewForm extends ConsumerStatefulWidget {
-  final Food food;
-  final String servingId;
-
-  const _NutritionistReviewForm({required this.food, required this.servingId});
-
-  @override
-  ConsumerState<_NutritionistReviewForm> createState() =>
-      _NutritionistReviewFormState();
-}
-
-class _NutritionistReviewFormState
-    extends ConsumerState<_NutritionistReviewForm> {
-  final _commentController = TextEditingController();
-  String _servingAssessment = 'needs_context';
-  String _macroAssessment = 'insufficient_source';
-  bool _saving = false;
-
-  @override
-  void dispose() {
-    _commentController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    setState(() => _saving = true);
-    try {
-      await ref.read(nutritionistServiceProvider).submitFoodReview(
-            foodId: widget.food.foodId,
-            servingId: widget.servingId,
-            servingAssessment: _servingAssessment,
-            macroAssessment: _macroAssessment,
-            comment: _commentController.text.trim(),
-          );
-      if (mounted) Navigator.of(context).pop();
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Review could not be saved: $error')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        20,
-        16,
-        MediaQuery.viewInsetsOf(context).bottom + 20,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Review ${widget.food.foodName}',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Assess the listed serving, not whether the food is universally healthy. Your feedback will not directly change the official nutrition values.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _servingAssessment,
-            decoration: const InputDecoration(
-              labelText: 'Serving assessment',
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'balanced_for_serving',
-                child: Text('Balanced for this serving'),
-              ),
-              DropdownMenuItem(
-                value: 'watch_portion',
-                child: Text('Consider the portion'),
-              ),
-              DropdownMenuItem(
-                value: 'needs_context',
-                child: Text('Needs more context'),
-              ),
-            ],
-            onChanged: _saving
-                ? null
-                : (value) {
-                    if (value != null) {
-                      setState(() => _servingAssessment = value);
-                    }
-                  },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _macroAssessment,
-            decoration: const InputDecoration(
-              labelText: 'Macro calculation',
-              border: OutlineInputBorder(),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'consistent',
-                child: Text('Looks consistent'),
-              ),
-              DropdownMenuItem(
-                value: 'needs_recheck',
-                child: Text('Needs rechecking'),
-              ),
-              DropdownMenuItem(
-                value: 'insufficient_source',
-                child: Text('Not enough source information'),
-              ),
-            ],
-            onChanged: _saving
-                ? null
-                : (value) {
-                    if (value != null) {
-                      setState(() => _macroAssessment = value);
-                    }
-                  },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _commentController,
-            maxLength: 1200,
-            minLines: 2,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: 'Nutritionist note (optional)',
-              border: OutlineInputBorder(),
-              alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _saving ? null : _submit,
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.send_outlined),
-            label: Text(_saving ? 'Saving…' : 'Save nutritionist review'),
-          ),
-        ],
-      ),
     );
   }
 }

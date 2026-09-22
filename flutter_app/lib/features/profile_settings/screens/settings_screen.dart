@@ -28,8 +28,8 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsTile(
             icon: Icons.verified_user_outlined,
             iconColor: AppColors.secondary,
-            title: 'Nutritionist reviewer access',
-            onTap: () => context.push('/nutritionist-application'),
+            title: 'Nutritionist workspace',
+            onTap: () => context.push('/nutritionist'),
           ),
           const GoogleConnectionTile(),
           const _SectionHeader(title: 'APP PREFERENCES'),

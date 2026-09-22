@@ -59,6 +59,46 @@ final categoriesProvider = Provider<List<String>>((ref) {
   return FoodTaxonomy.categories;
 });
 
+/// IDs of official foods whose nutrition data is verified by an
+/// admin-approved nutritionist. Read from the locally synced catalog so the
+/// indicator also works offline.
+final verifiedFoodIdsProvider =
+    FutureProvider.autoDispose<Set<String>>((ref) async {
+  final db = await DatabaseProvider().database;
+  final rows = await db.query(
+    'foods',
+    columns: ['food_id'],
+    where: 'verification_status = ?',
+    whereArgs: ['verified'],
+  );
+  return rows.map((row) => row['food_id'] as String).toSet();
+});
+
+/// Local official food matched by name, used to surface verification state on
+/// scanner results that do not carry a catalog id.
+final officialFoodVerificationProvider =
+    FutureProvider.autoDispose.family<Food?, String>((ref, foodName) async {
+  final normalized = foodName.trim().toLowerCase();
+  if (normalized.isEmpty) return null;
+  final db = await DatabaseProvider().database;
+  var rows = await db.query(
+    'foods',
+    where: 'is_official = 1 AND normalized_name = ?',
+    whereArgs: [normalized],
+    limit: 1,
+  );
+  if (rows.isEmpty) {
+    rows = await db.query(
+      'foods',
+      where: 'is_official = 1 AND normalized_name LIKE ?',
+      whereArgs: ['%$normalized%'],
+      limit: 1,
+    );
+  }
+  if (rows.isEmpty) return null;
+  return Food.fromMap(rows.first);
+});
+
 class FoodFormData {
   final String userId;
   final String foodName;

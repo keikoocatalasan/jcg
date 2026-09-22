@@ -11,6 +11,7 @@ import 'package:jcg_fitness/features/analytics/analytics_provider.dart';
 import 'package:jcg_fitness/features/analytics/widgets/calorie_adherence_card.dart';
 import 'package:jcg_fitness/features/analytics/widgets/macro_consistency_chart.dart';
 import 'package:jcg_fitness/features/analytics/widgets/spending_chart.dart';
+import 'package:jcg_fitness/features/food_database/widgets/verified_food_tick.dart';
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
@@ -1177,13 +1178,21 @@ class _PreviousLogsCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              log.foodNameSnapshot,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    log.foodNameSnapshot,
+                                    style:
+                                        theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                VerifiedFoodTick(foodId: log.foodId),
+                              ],
                             ),
                             const SizedBox(height: 2),
                             Text(

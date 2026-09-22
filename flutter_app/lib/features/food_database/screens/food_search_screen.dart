@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
+import 'package:jcg_fitness/core/sync/official_foods_refresh.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
+import 'package:jcg_fitness/core/widgets/nutrition_verification_badge.dart';
 import 'package:jcg_fitness/features/food_database/food_provider.dart';
 import 'package:jcg_fitness/features/food_database/screens/food_detail_screen.dart';
 
@@ -24,6 +28,13 @@ class _FoodSearchScreenState extends ConsumerState<FoodSearchScreen> {
     'banana',
     'protein shake',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Pick up nutritionist verification changes without requiring a re-login.
+    unawaited(OfficialFoodsRefresh.maybeRefresh());
+  }
 
   @override
   void dispose() {
@@ -768,22 +779,34 @@ class _FoodResultTile extends StatelessWidget {
                             ),
                       ),
                       const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          food.categoryName,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              food.categoryName,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppColors.primary,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                   ),
-                        ),
+                            ),
+                          ),
+                          NutritionVerificationBadge(
+                            status: food.verificationStatus,
+                          ),
+                        ],
                       ),
                     ],
                   ),

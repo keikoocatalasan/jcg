@@ -23,6 +23,11 @@ class Food {
   final List<String> mealTypeCodes;
   final bool isDeleted;
   final String syncStatus;
+  final String verificationStatus;
+  final String? verifiedAt;
+  final String? nutritionSourceType;
+  final String? nutritionSourceName;
+  final String? sourceCheckedAt;
   final String createdAt;
   final String updatedAt;
 
@@ -48,9 +53,16 @@ class Food {
     this.mealTypeCodes = const [],
     this.isDeleted = false,
     this.syncStatus = 'pending',
+    this.verificationStatus = 'unreviewed',
+    this.verifiedAt,
+    this.nutritionSourceType,
+    this.nutritionSourceName,
+    this.sourceCheckedAt,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  bool get isNutritionVerified => verificationStatus == 'verified';
 
   factory Food.fromMap(Map<String, dynamic> map) {
     return Food(
@@ -75,6 +87,12 @@ class Food {
       mealTypeCodes: FoodTaxonomy.parseMealTypeCodes(map['meal_type_codes']),
       isDeleted: (map['is_deleted'] as int) == 1,
       syncStatus: map['sync_status'] as String? ?? 'synced',
+      verificationStatus:
+          map['verification_status'] as String? ?? 'unreviewed',
+      verifiedAt: map['verified_at'] as String?,
+      nutritionSourceType: map['nutrition_source_type'] as String?,
+      nutritionSourceName: map['nutrition_source_name'] as String?,
+      sourceCheckedAt: map['source_checked_at'] as String?,
       createdAt: map['created_at'] as String,
       updatedAt: map['updated_at'] as String,
     );

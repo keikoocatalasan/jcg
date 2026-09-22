@@ -6,6 +6,7 @@ import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
+import 'package:jcg_fitness/features/food_database/widgets/verified_food_tick.dart';
 import 'package:jcg_fitness/core/widgets/macro_bar.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
@@ -402,16 +403,23 @@ class _RecentLogsCard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  log.foodNameSnapshot,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w500,
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        log.foodNameSnapshot,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                    ),
+                                    VerifiedFoodTick(foodId: log.foodId),
+                                  ],
                                 ),
                                 const SizedBox(height: 2),
                                 Text(

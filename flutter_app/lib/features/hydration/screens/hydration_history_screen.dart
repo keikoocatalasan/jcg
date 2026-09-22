@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/database/water_log_repository.dart';
+import 'package:jcg_fitness/core/widgets/scrollable_segmented_button.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
 import 'package:jcg_fitness/features/hydration/hydration_provider.dart';
 
@@ -118,7 +119,7 @@ class _HydrationHistoryScreenState
   Widget _buildSegmentedButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SegmentedButton<int>(
+      child: ScrollableSegmented<int>(
         segments: _rangeOptions.map((opt) {
           return ButtonSegment<int>(
             value: opt.$2,
@@ -277,7 +278,7 @@ class _HydrationHistoryScreenState
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  SegmentedButton<bool>(
+                  ScrollableSegmented<bool>(
                     segments: const [
                       ButtonSegment(
                           value: true,

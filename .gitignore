@@ -97,3 +97,6 @@ flutter_app/chatbot_*.png
 flutter_sdk/
 flutter_windows.zip
 .od-skills/
+
+# Local test APK builds at the repository root
+/JCG-Fitness-*.apk

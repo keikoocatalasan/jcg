@@ -32,7 +32,16 @@ The local bypass is compile-time, visibly marked `LOCAL QA`, rejected for releas
 - Emulator: the debug APK built and installed. The local QA dashboard, Recent Logs, manual meal search, and Cheddar nutrition/quantity flow were opened. The modal add-on picker is covered by a widget test that exercises result rendering, selection, and keyboard resizing.
 - Release package: a production-configured APK for `com.jcg.fitness` version `1.0.11` / build `4012` built successfully and its APK v2 signature verified. Physical-device install/acceptance has not been run.
 - Food recognition is online-only: the app no longer contains a TFLite model, frame-stream inference, or the image conversion dependency. Live provider recognition is not verified locally because the backend environment is set to deterministic mode; a valid NVIDIA/OpenAI provider configuration is required.
-- Nutritionist application/review screens pass their UI tests; approval is blocked in the UI when its credential image cannot load, and the admin approval RPC also checks that the private image still exists. The Supabase migrations remain local and were not applied to a database because this machine has no PostgreSQL or Docker service available.
+- Nutritionist application/review screens pass their UI tests; approval is blocked in the UI when its credential image cannot load, and the admin approval RPC also checks that the private image still exists. At that historical checkpoint, the Supabase migrations had not yet been applied because this machine had no PostgreSQL or Docker service available.
+
+### Nutritionist rollout verification (2026-09-22)
+
+- Supabase migrations `20260922090000`, `20260922100000`, `20260922120000`, and `20260922123000` were applied to the connected project in order. Schema checks confirmed the professional fields, verification metadata, `food_report`, `nutritionist_action_log`, RLS policies, catalog metadata, and nutritionist RPC grants. The legacy `submit_food_nutritionist_review` client grant is revoked.
+- Rollback-only RBAC probes passed for normal, pending, rejected, suspended, future-expiry verified, and expired verified states. Verified nutritionists can begin/complete reviews and archive records; non-verified states are denied. Admin-only functions reject verified nutritionists. Direct table writes are denied, and private meal/profile/app-user rows are not visible to nutritionists.
+- Report workflow passed: a normal user can submit a food-data report; a verified nutritionist can see and dismiss it only with a reason. All probe data was rolled back.
+- A follow-up fixed the schema-qualified app-user helper used by authenticated policies/report submission and changed `admin_list_users` to return an explicit authorization error instead of silently returning an empty result to non-admin callers.
+- Abandoned review drafts are now cancellable through `nutritionist_cancel_review`; the review screen uses predictive-back-compatible cancellation and restores an unreviewed profile when no completed review exists. The cancellation probe passed and was rolled back.
+- Flutter: 259 tests passed. Analyzer reports zero errors/warnings and 80 existing informational lints. Backend: 76 tests passed. The emulator was restarted with 6 GB RAM and a 100 GB configured data partition, then the live-auth Flutter app rebuilt and launched on `emulator-5554`.
 
 ### Historical recorded local evidence (2026-09-05; superseded)
 

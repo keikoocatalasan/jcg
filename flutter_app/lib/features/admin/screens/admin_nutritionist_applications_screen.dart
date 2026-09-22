@@ -44,7 +44,7 @@ class AdminNutritionistApplicationsScreen extends ConsumerWidget {
               icon: Icons.verified_user_outlined,
               title: 'No applications yet',
               subtitle:
-                  'Nutritionist credential applications will appear here for manual admin review.',
+                  'Nutritionist credential applications will appear here for manual admin verification.',
             );
           }
           return RefreshIndicator(
@@ -57,7 +57,7 @@ class AdminNutritionistApplicationsScreen extends ConsumerWidget {
                   child: Padding(
                     padding: EdgeInsets.all(12),
                     child: Text(
-                      'Review the submitted credential image and details. Approval is an in-app admin decision, not an automatic PRC verification.',
+                      'Review the submitted PRC credential image and details, verify the license externally within the official PRC service, then record the decision here. This is a manual admin review, not automatic PRC verification.',
                     ),
                   ),
                 ),
@@ -86,11 +86,18 @@ class _ApplicationCard extends ConsumerWidget {
       ),
     );
     final statusColor = switch (application.status) {
-      'approved' => AppColors.success,
+      'verified' => AppColors.success,
       'rejected' => AppColors.error,
       'suspended' => AppColors.warning,
       _ => AppColors.primary,
     };
+    final expiration = application.prcLicenseExpirationDate;
+    final expirationLabel = expiration == null
+        ? 'Not recorded'
+        : DateFormat('MMM d, yyyy').format(expiration);
+    final canVerify = credentialUrlAsync.hasValue &&
+        !credentialUrlAsync.hasError &&
+        !application.isExpired;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -116,8 +123,10 @@ class _ApplicationCard extends ConsumerWidget {
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 3),
+                      Text(application.profession),
                       Text(
-                          'License/registration: ${application.licenseNumber}'),
+                          'PRC license: ${application.licenseNumber}'),
+                      Text('Expires: $expirationLabel'),
                       Text(
                         'Submitted ${DateFormat('MMM d, yyyy').format(application.submittedAt.toLocal())}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -145,6 +154,26 @@ class _ApplicationCard extends ConsumerWidget {
                 ),
               ],
             ),
+            if (application.isExpired) ...[
+              const SizedBox(height: 8),
+              Text(
+                'The PRC credential is expired and cannot be verified.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppColors.error),
+              ),
+            ],
+            if (application.revalidationRequired) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Grandfathered approval: PRC expiration was not on record and needs revalidation.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppColors.warning),
+              ),
+            ],
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -167,9 +196,13 @@ class _ApplicationCard extends ConsumerWidget {
                 ),
               ),
             ),
-            if (application.reviewNote?.trim().isNotEmpty == true) ...[
+            if (application.rejectionReason?.trim().isNotEmpty == true) ...[
               const SizedBox(height: 10),
-              Text('Previous admin note: ${application.reviewNote}'),
+              Text('Rejection reason: ${application.rejectionReason}'),
+            ],
+            if (application.suspensionReason?.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 10),
+              Text('Suspension reason: ${application.suspensionReason}'),
             ],
             if (application.reviewedAt != null) ...[
               const SizedBox(height: 4),
@@ -185,14 +218,13 @@ class _ApplicationCard extends ConsumerWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (application.status != 'approved')
+                if (application.status != 'verified')
                   FilledButton.icon(
-                    onPressed: credentialUrlAsync.hasValue &&
-                            !credentialUrlAsync.hasError
-                        ? () => _review(context, ref, 'approved')
+                    onPressed: canVerify
+                        ? () => _review(context, ref, 'verified')
                         : null,
                     icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Approve reviewer'),
+                    label: Text(_verifyLabel(application.status)),
                   ),
                 if (application.status != 'rejected')
                   OutlinedButton.icon(
@@ -200,7 +232,7 @@ class _ApplicationCard extends ConsumerWidget {
                     icon: const Icon(Icons.cancel_outlined),
                     label: const Text('Reject'),
                   ),
-                if (application.status == 'approved')
+                if (application.status == 'verified')
                   TextButton.icon(
                     onPressed: () => _review(context, ref, 'suspended'),
                     icon: const Icon(Icons.pause_circle_outline),
@@ -229,9 +261,11 @@ class _ApplicationCard extends ConsumerWidget {
           maxLength: 1000,
           minLines: 2,
           maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Note for the applicant (optional)',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: decision == 'verified'
+                ? 'Verification note (optional)'
+                : 'Reason for the applicant (optional)',
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -268,23 +302,33 @@ class _ApplicationCard extends ConsumerWidget {
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update application: $error')),
+          SnackBar(
+            content: Text(
+              'Could not update application: ${error.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
         );
       }
     }
   }
 
   String _statusLabel(String status) => switch (status) {
-        'approved' => 'APPROVED',
+        'verified' => 'VERIFIED',
         'rejected' => 'REJECTED',
         'suspended' => 'SUSPENDED',
         _ => 'PENDING',
       };
 
   String _decisionLabel(String decision) => switch (decision) {
-        'approved' => 'Approve',
+        'verified' => 'Verify',
         'rejected' => 'Reject',
         _ => 'Suspend',
+      };
+
+  String _verifyLabel(String status) => switch (status) {
+        'suspended' => 'Restore access',
+        'rejected' => 'Approve now',
+        _ => 'Verify nutritionist',
       };
 }
 
