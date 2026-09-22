@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:jcg_fitness/app/config.dart';
 import 'package:jcg_fitness/app/theme.dart';
 import 'package:jcg_fitness/core/network/supabase_client_provider.dart';
 import 'package:jcg_fitness/core/widgets/empty_state_widget.dart';
@@ -256,6 +257,11 @@ class _UserCardState extends ConsumerState<_UserCard> {
       return;
     }
 
+    if (_isLocalDemoUser) {
+      _showLocalQaMessage();
+      return;
+    }
+
     final supabase = ref.read(supabaseClientProvider);
     if (supabase.auth.currentUser?.id == widget.entry.authUserId) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -331,6 +337,11 @@ class _UserCardState extends ConsumerState<_UserCard> {
   Future<void> _changeRole(int? roleId) async {
     if (roleId == null || roleId == widget.entry.roleId || _saving) return;
 
+    if (_isLocalDemoUser) {
+      _showLocalQaMessage();
+      return;
+    }
+
     final supabase = ref.read(supabaseClientProvider);
     if (supabase.auth.currentUser?.id == widget.entry.authUserId) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -405,7 +416,7 @@ class _UserCardState extends ConsumerState<_UserCard> {
         widget.roles.any((role) => role.id == widget.entry.roleId);
     final currentStatusExists =
         widget.statuses.any((status) => status.id == widget.entry.statusId);
-    final isCurrentUser =
+    final isCurrentUser = _isLocalDemoUser ||
         ref.read(supabaseClientProvider).auth.currentUser?.id ==
             widget.entry.authUserId;
 
@@ -521,6 +532,19 @@ class _UserCardState extends ConsumerState<_UserCard> {
                 child: LinearProgressIndicator(),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  bool get _isLocalDemoUser =>
+      widget.entry.authUserId == AppConfig.localTestUserId;
+
+  void _showLocalQaMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'User management changes require a connected administrator account.',
         ),
       ),
     );
