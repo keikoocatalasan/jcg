@@ -65,6 +65,8 @@ class GroqChatService:
                         continue
                     raise
 
+        if not isinstance(payload, dict):
+            raise RuntimeError("Groq returned an invalid response")
         text = self._extract_text(payload)
         if not text:
             raise RuntimeError("Groq returned no output text")
@@ -72,10 +74,12 @@ class GroqChatService:
 
     @staticmethod
     def _extract_text(payload: dict) -> str:
-        choices = payload.get("choices") or []
-        if not choices:
+        choices = payload.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
             return ""
-        message = choices[0].get("message") or {}
+        message = choices[0].get("message")
+        if not isinstance(message, dict):
+            return ""
         content = message.get("content")
         if isinstance(content, str):
             return content.strip()
@@ -83,7 +87,7 @@ class GroqChatService:
             parts = [
                 item.get("text", "")
                 for item in content
-                if isinstance(item, dict) and item.get("text")
+                if isinstance(item, dict) and isinstance(item.get("text"), str)
             ]
             return "".join(parts).strip()
         return ""

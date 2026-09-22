@@ -46,7 +46,6 @@ dependencies:
 
   # Camera / image (AI scanner)
   camera: ^0.10.5
-  image: ^4.9.2
   image_picker: ^1.0.7
 
   # Secure storage for tokens

@@ -6,6 +6,16 @@ Git repository. Only reviewed metadata, split files and the final compact
 Model exports are for server-side evaluation or training artifacts; do not copy
 TFLite models into the Flutter app because food image recognition is online-only.
 
+## Runtime boundary
+
+The current online scanner sends captured images to the configured NVIDIA or
+OpenAI vision provider through the backend. This training pipeline produces
+separate experimental TFLite artifacts; adding images or retraining one does
+not update the scanner or train either hosted provider. The artifacts are not
+loaded by the app or the current scanner route. Connecting a custom model would
+require a separate server-side inference service and is outside the current
+online-provider flow.
+
 ## Current registry
 
 `dish_registry.json` contains 100 provisional dish IDs. A class is not

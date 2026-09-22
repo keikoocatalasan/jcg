@@ -6,7 +6,7 @@ This plan covers the local defense build, the production release gates, and the 
 
 | Environment | Purpose | Required configuration |
 |---|---|---|
-| Local Android emulator | Repeatable UI, camera lifecycle, CRUD, admin, and offline-first walkthrough | `APP_ENV=development`, `JCG_DEV_BYPASS_AUTH=true`, backend on dedicated port `8001`, `JCG_LIVE_PREVIEW=false` |
+| Local Android emulator | Repeatable UI, camera lifecycle, CRUD, admin, and offline-first walkthrough | `APP_ENV=development`, `JCG_DEV_BYPASS_AUTH=true`, backend on dedicated port `8001` |
 | Local backend | API contract and safety tests without spending provider quota | `AI_MODEL_PROVIDER=deterministic` |
 | Render staging/production | Real authentication, Supabase RLS, real scanner provider, and chatbot provider smoke tests | `APP_ENV=production`, real Supabase values, restricted CORS, server-side AI keys only |
 | Physical Android device | Final camera/performance and release APK check | USB debugging, camera permission, production API URL, signed release build |
@@ -25,12 +25,21 @@ The local bypass is compile-time, visibly marked `LOCAL QA`, rejected for releas
 - [ ] Install the signed artifact on a physical Android device.
 - [ ] Run authenticated Render smoke tests after confirming deployed environment variables.
 
-### Recorded local evidence
+### Latest local verification (2026-09-21)
+
+- Flutter: 241 tests passed; the changed feature screens and tests pass targeted analysis with warnings treated as failures.
+- Backend: 76 tests passed, including production HTTPS/configuration, provider routing, malformed-response, and limiter cleanup regressions.
+- Emulator: the debug APK built and installed. The local QA dashboard, Recent Logs, manual meal search, and Cheddar nutrition/quantity flow were opened. The modal add-on picker is covered by a widget test that exercises result rendering, selection, and keyboard resizing.
+- Release package: a production-configured APK for `com.jcg.fitness` version `1.0.11` / build `4012` built successfully and its APK v2 signature verified. Physical-device install/acceptance has not been run.
+- Food recognition is online-only: the app no longer contains a TFLite model, frame-stream inference, or the image conversion dependency. Live provider recognition is not verified locally because the backend environment is set to deterministic mode; a valid NVIDIA/OpenAI provider configuration is required.
+- Nutritionist application/review screens pass their UI tests; approval is blocked in the UI when its credential image cannot load, and the admin approval RPC also checks that the private image still exists. The Supabase migrations remain local and were not applied to a database because this machine has no PostgreSQL or Docker service available.
+
+### Historical recorded local evidence (2026-09-05; superseded)
 
 - Backend: 38 tests passed; live `health`, `readiness`, and `version` endpoints returned successfully on port `8001`.
 - Chat: authenticated local safe-question request returned a context-aware response; an extreme-fasting request was blocked before provider execution.
-- Flutter: 205 tests passed (one expected Windows-only TFLite host-DLL skip); analyzer completed with zero fatal issues and 79 informational lints.
-- Emulator: the local demo dashboard, Recent Logs, meal edit, water edit, community, admin, scanner, camera preview/live mode, capture preview, local scan result, and chatbot response flows were opened after the latest APK install. The cards fit the phone viewport, and steady-state logs contained no Flutter exceptions, defunct-element errors, or image-buffer drops. Android's emulator camera2 layer reports a short one-time contention when switching between live stream and still capture; preview inference remains bounded and the transition is surfaced by the capture progress state.
+- Flutter: 205 tests passed (one expected Windows-only TFLite host-DLL skip); analyzer completed with zero fatal issues and 79 informational lints at that time.
+- Emulator: the local demo dashboard, Recent Logs, meal edit, water edit, community, admin, scanner, camera preview/live mode, capture preview, local scan result, and chatbot response flows were opened in that historical run. Live frame inference has since been removed; current food recognition occurs only after capture and requires the online backend provider.
 
 ## 3. Module test matrix
 
@@ -70,10 +79,10 @@ The local bypass is compile-time, visibly marked `LOCAL QA`, rejected for releas
 1. Grant camera permission and open the scanner; preview must start without a crash.
 2. Keep live analysis off: preview remains smooth and the status explicitly says analysis is off.
 3. Capture a still image; preview, retry, manual search, and confirmation routes must all work.
-4. Toggle live analysis on and off repeatedly; confirm stale requests cannot overwrite a newer frame and leaving the screen disposes the camera without `setState`/defunct-element errors.
+4. Confirm there is no live/offline recognition mode. Leave the scanner offline and verify it does not return an image-recognition result; reconnect, capture a still image, and verify the authenticated backend path is used.
 5. Test bright, dim, close, far, angled, partially occluded, rice-plus-ulam, and non-food images.
 6. Treat confidence as a gate, not a guarantee: high-confidence results can be confirmed, while ambiguous results require manual confirmation/search.
-7. Record latency and dropped-frame observations on emulator and physical device; target no sustained preview jank during live inference.
+7. Record camera capture responsiveness and the transition to the authenticated online scan on emulator and physical device.
 8. Confirm upload-size, invalid-image, network timeout, and unavailable-provider errors are shown as actionable text.
 
 ### Chatbot

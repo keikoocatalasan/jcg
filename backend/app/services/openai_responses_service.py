@@ -27,14 +27,20 @@ class OpenAIResponsesService:
         *,
         instructions: str,
         input_content: str | list[dict],
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
         json_schema: dict | None = None,
         tools: list[dict] | None = None,
         include: list[str] | None = None,
         tool_choice: str | dict | None = None,
         max_output_tokens: int | None = None,
     ) -> OpenAIResponseResult:
-        if not settings.ai_model_api_key:
-            raise RuntimeError("AI_MODEL_API_KEY is required for the OpenAI provider")
+        selected_api_key = api_key if api_key is not None else settings.ai_model_api_key
+        selected_model = model if model is not None else settings.ai_model_name
+        selected_base_url = base_url if base_url is not None else settings.openai_base_url
+        if not selected_api_key:
+            raise RuntimeError("An API key is required for the OpenAI provider")
 
         content = (
             [{"type": "input_text", "text": input_content}]
@@ -42,7 +48,7 @@ class OpenAIResponsesService:
             else input_content
         )
         body: dict = {
-            "model": settings.ai_model_name,
+            "model": selected_model,
             "instructions": instructions,
             "input": [{"role": "user", "content": content}],
             "store": False,
@@ -69,15 +75,21 @@ class OpenAIResponsesService:
             timeout=settings.ai_request_timeout_seconds,
         ) as client:
             response = await client.post(
-                f"{settings.openai_base_url.rstrip('/')}/responses",
+                f"{selected_base_url.rstrip('/')}/responses",
                 headers={
-                    "Authorization": f"Bearer {settings.ai_model_api_key}",
+                    "Authorization": f"Bearer {selected_api_key}",
                     "Content-Type": "application/json",
                 },
                 json=body,
             )
             response.raise_for_status()
-            payload = response.json()
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                raise RuntimeError("OpenAI provider returned invalid JSON") from exc
+
+        if not isinstance(payload, dict):
+            raise RuntimeError("OpenAI provider returned an invalid response")
 
         text = self._extract_text(payload)
         if not text:
@@ -94,40 +106,81 @@ class OpenAIResponsesService:
         *,
         instructions: str,
         input_content: str | list[dict],
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
         json_schema: dict | None = None,
     ) -> str:
         result = await self.create(
             instructions=instructions,
             input_content=input_content,
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
             json_schema=json_schema,
         )
         return result.text
 
     @staticmethod
     def _extract_text(payload: dict) -> str:
-        for output in payload.get("output", []):
-            for item in output.get("content", []):
-                if item.get("type") == "output_text" and item.get("text"):
-                    return item["text"]
+        outputs = payload.get("output")
+        if not isinstance(outputs, list):
+            return ""
+        for output in outputs:
+            if not isinstance(output, dict):
+                continue
+            content = output.get("content")
+            if not isinstance(content, list):
+                continue
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                text = item.get("text")
+                if item.get("type") == "output_text" and isinstance(text, str) and text.strip():
+                    return text
         return ""
 
     @staticmethod
     def _extract_sources(payload: dict) -> list[OpenAISource]:
         found: dict[str, OpenAISource] = {}
-        for output in payload.get("output", []):
+        outputs = payload.get("output")
+        if not isinstance(outputs, list):
+            return []
+        for output in outputs:
+            if not isinstance(output, dict):
+                continue
             action = output.get("action") or {}
-            for source in action.get("sources", []) or []:
+            if not isinstance(action, dict):
+                action = {}
+            sources = action.get("sources")
+            if not isinstance(sources, list):
+                sources = []
+            for source in sources:
+                if not isinstance(source, dict):
+                    continue
                 url = source.get("url")
                 if url:
                     found[url] = OpenAISource(
                         url=url,
                         title=source.get("title") or url,
                     )
-            for item in output.get("content", []) or []:
-                for annotation in item.get("annotations", []) or []:
+            content = output.get("content")
+            if not isinstance(content, list):
+                continue
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                annotations = item.get("annotations")
+                if not isinstance(annotations, list):
+                    continue
+                for annotation in annotations:
+                    if not isinstance(annotation, dict):
+                        continue
                     if annotation.get("type") != "url_citation":
                         continue
                     citation = annotation.get("url_citation") or annotation
+                    if not isinstance(citation, dict):
+                        continue
                     url = citation.get("url")
                     if url:
                         found[url] = OpenAISource(

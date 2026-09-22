@@ -58,11 +58,12 @@
 - Show total for the day
 
 ### 8. Log Weight (Show Recalculation)
-**"Logging a new weight recalculates my BMI and adjusts nutrition targets."**
+**"Logging a new weight updates my BMI and recalculates my nutrition targets."**
 
 - Open Weight screen
 - Enter: 57.5 kg
-- Show BMI change
+- Open Weight Trend and show the updated BMI value and adult category (for ages 20+).
+- For users under 20, show the numeric BMI with the note that BMI-for-age interpretation is not included.
 - Navigate back to Dashboard — show updated calorie target
 
 ### 9. Generate Budget Recommendations

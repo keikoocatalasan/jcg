@@ -15,6 +15,7 @@ import 'package:jcg_fitness/features/admin/screens/reports_screen.dart';
 import 'package:jcg_fitness/features/admin/screens/admin_analytics_screen.dart';
 import 'package:jcg_fitness/features/admin/screens/admin_audit_screen.dart';
 import 'package:jcg_fitness/features/admin/screens/admin_users_screen.dart';
+import 'package:jcg_fitness/features/admin/screens/admin_nutritionist_applications_screen.dart';
 import 'package:jcg_fitness/features/admin/screens/content_rules_screen.dart';
 import 'package:jcg_fitness/features/ai_scanner/screens/ai_scanner_screen.dart';
 import 'package:jcg_fitness/features/analytics/screens/analytics_screen.dart';
@@ -61,6 +62,7 @@ import 'package:jcg_fitness/features/weight_tracking/screens/weight_screen.dart'
 import 'package:jcg_fitness/features/weight_tracking/screens/weight_history_screen.dart';
 import 'package:jcg_fitness/features/weight_tracking/screens/edit_weight_log_screen.dart';
 import 'package:jcg_fitness/features/nutrition/screens/nutrition_target_screen.dart';
+import 'package:jcg_fitness/features/nutritionist/screens/nutritionist_application_screen.dart';
 import 'package:jcg_fitness/features/onboarding/onboarding_completion_provider.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
 
@@ -318,6 +320,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const SyncStatusScreen(),
       ),
       GoRoute(
+        path: '/nutritionist-application',
+        builder: (_, __) => const NutritionistApplicationScreen(),
+      ),
+      GoRoute(
         path: '/admin',
         builder: (_, __) => const _AdminGuard(child: AdminScreen()),
         routes: [
@@ -371,6 +377,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'users',
             builder: (_, __) => const _AdminGuard(child: AdminUsersScreen()),
+          ),
+          GoRoute(
+            path: 'nutritionist-applications',
+            builder: (_, __) => const _AdminGuard(
+              child: AdminNutritionistApplicationsScreen(),
+            ),
           ),
           GoRoute(
             path: 'content-rules',

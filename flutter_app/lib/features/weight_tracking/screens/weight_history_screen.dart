@@ -9,8 +9,13 @@ import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
 import 'package:jcg_fitness/core/database/weight_log_repository.dart';
 import 'package:jcg_fitness/core/utils/date_helper.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
+import 'package:jcg_fitness/features/body_metrics/bmi_calculator.dart';
+import 'package:jcg_fitness/features/body_metrics/body_metrics_provider.dart';
+import 'package:jcg_fitness/features/body_metrics/widgets/bmi_summary_card.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
 import 'package:jcg_fitness/features/profile_settings/profile_provider.dart';
+import 'package:jcg_fitness/features/weight_tracking/weight_provider.dart';
+import 'package:jcg_fitness/features/weight_tracking/weekly_weight_check_in.dart';
 
 class WeightHistoryScreen extends ConsumerStatefulWidget {
   const WeightHistoryScreen({super.key});
@@ -113,6 +118,7 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final logs = _logs;
+    final bodyMetrics = ref.watch(bodyMetricsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -127,13 +133,33 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
           : _error != null
               ? _buildErrorState(theme)
               : logs == null || logs.isEmpty
-                  ? _buildEmptyState(theme)
-                  : _buildContent(theme, logs),
+                  ? _buildEmptyContent(theme, bodyMetrics)
+                  : _buildContent(theme, logs, bodyMetrics),
       bottomNavigationBar: _buildBottomNav(context),
     );
   }
 
-  Widget _buildContent(ThemeData theme, List<WeightLog> logs) {
+  Widget _buildEmptyContent(
+    ThemeData theme,
+    AsyncValue<BmiResult?> bodyMetrics,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      children: [
+        _buildWeeklyWeightCheckInCard(),
+        const SizedBox(height: 16),
+        _buildBmiSummaryCard(bodyMetrics),
+        const SizedBox(height: 16),
+        SizedBox(height: 380, child: _buildEmptyState(theme)),
+      ],
+    );
+  }
+
+  Widget _buildContent(
+    ThemeData theme,
+    List<WeightLog> logs,
+    AsyncValue<BmiResult?> bodyMetrics,
+  ) {
     final currentWeight = logs.last.weightKg;
     final firstWeight = logs.first.weightKg;
     final change = currentWeight - firstWeight;
@@ -158,6 +184,10 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
           const SizedBox(height: 8),
           _buildCurrentWeightCard(theme, currentWeight, change, logs),
           const SizedBox(height: 16),
+          _buildWeeklyWeightCheckInCard(),
+          const SizedBox(height: 16),
+          _buildBmiSummaryCard(bodyMetrics),
+          const SizedBox(height: 16),
           _buildRangeSelector(),
           const SizedBox(height: 16),
           _buildChartSection(theme, logs, goalWeight),
@@ -173,6 +203,26 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
           const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+
+  Widget _buildBmiSummaryCard(AsyncValue<BmiResult?> state) {
+    return BmiSummaryCard(
+      result: state.valueOrNull,
+      isLoading: state.isLoading,
+      hasError: state.hasError,
+    );
+  }
+
+  Widget _buildWeeklyWeightCheckInCard() {
+    final latestWeight = ref.watch(latestWeightProvider);
+    if (latestWeight.isLoading || latestWeight.hasError) {
+      return const SizedBox.shrink();
+    }
+
+    return WeeklyWeightCheckInCard(
+      lastLoggedAt: DateTime.tryParse(latestWeight.valueOrNull?.loggedAt ?? ''),
+      onLogWeight: () => context.push('/weight'),
     );
   }
 
@@ -383,8 +433,9 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
                           interval: _calcBottomInterval(logs.length),
                           getTitlesWidget: (value, meta) {
                             final index = value.toInt();
-                            if (index < 0 || index >= logs.length)
+                            if (index < 0 || index >= logs.length) {
                               return const SizedBox.shrink();
+                            }
                             final dt = DateTime.tryParse(logs[index].loggedAt);
                             if (dt == null) return const SizedBox.shrink();
                             return Padding(
@@ -700,7 +751,10 @@ class _WeightHistoryScreenState extends ConsumerState<WeightHistoryScreen> {
         width: double.infinity,
         height: 48,
         child: ElevatedButton(
-          onPressed: () => context.push('/weight'),
+          onPressed: () async {
+            await context.push('/weight');
+            if (mounted) await _loadData();
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.textOnAccent,

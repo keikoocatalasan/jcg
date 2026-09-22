@@ -32,15 +32,15 @@
 - [ ] `SUPABASE_URL`
 - [ ] `SUPABASE_ANON_KEY`
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`
-- [ ] `SUPABASE_JWT_SECRET` — optional legacy HS256 verification fallback
+- [ ] `SUPABASE_JWT_SECRET` — required by production startup and used as the legacy HS256 verification fallback
 - [ ] `AI_MODEL_PROVIDER` — `deterministic`, `openai`, or `nvidia`
 - [ ] `AI_MODEL_API_KEY` — required when `AI_MODEL_PROVIDER` is `openai` or `nvidia`
 - [ ] `AI_MODEL_NAME` — use `meta/llama-3.2-11b-vision-instruct` for NVIDIA text + image inference
 - [ ] `NVIDIA_BASE_URL` — `https://integrate.api.nvidia.com/v1` when using NVIDIA NIM
-- [ ] `CHAT_MODEL_PROVIDER` — keep `inherit` for the existing NVIDIA setup, or set `groq` for the independent free-tier chatbot path
-- [ ] `CHAT_MODEL_API_KEY` — store the Groq key here when `CHAT_MODEL_PROVIDER=groq`; never put it in Flutter or source control
-- [ ] `CHAT_MODEL_NAME` — use the currently active Groq text model selected from the official model list (default: `openai/gpt-oss-20b`)
-- [ ] `GROQ_BASE_URL` — `https://api.groq.com/openai/v1` when using Groq
+- [ ] `CHAT_MODEL_PROVIDER` — `inherit`, `openai`, `nvidia`, or `groq`; keep `inherit` to use the scanner provider
+- [ ] `CHAT_MODEL_API_KEY` — required when chat uses a separate provider; store the secret on the backend only
+- [ ] `CHAT_MODEL_NAME` — choose a model identifier supported by the selected chat provider
+- [ ] `OPENAI_BASE_URL`, `NVIDIA_BASE_URL`, and `GROQ_BASE_URL` — use HTTPS URLs for every configured provider
 - [ ] `AI_WEB_SEARCH_ENABLED` — enable only after the configured model passes a web-search smoke test
 - [ ] `AI_ALLOWED_DOMAINS` — comma-separated approved nutrition-source domains
 - [ ] `ALLOWED_ORIGINS` — comma-separated list of allowed origins
@@ -77,8 +77,15 @@
 - [ ] Manual meal log saves correctly
 - [ ] Hydration tracking works
 - [ ] Weight logging updates targets
+- [ ] Weight Trend shows BMI from the newest saved weight and profile height; ages below 20 do not show adult categories
+- [ ] Weekly weight check-in appears when due and opens the existing weight form
+- [ ] Meal add-ons such as cheese and tomato can be logged as separate items and included in meal totals
 - [ ] AI food scan captures and processes image
+- [ ] AI food recognition clearly requires an internet connection and does not run offline
 - [ ] Chatbot responds to queries
+- [ ] Chatbot answers the current question and, when context is available, uses only the signed-in user's targets, meal totals, preferences, and relevant food records
+- [ ] Nutritionist credential submission uploads privately; only an administrator can approve reviewer access
+- [ ] Approved nutritionists can submit serving/macro feedback without directly changing official food values
 - [ ] If Groq is enabled, verify `/version` reports the intended chat provider/model and run a real chat request within the account's free limits
 - [ ] Analytics displays charts
 - [ ] Admin food management functions

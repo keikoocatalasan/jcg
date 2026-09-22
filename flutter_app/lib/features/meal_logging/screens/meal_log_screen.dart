@@ -326,7 +326,7 @@ class _MealLogScreenState extends ConsumerState<MealLogScreen> {
                 },
                 onDateTimeTap: _pickDateTime,
               ),
-              const _SectionHeader(number: '2', title: 'Add Food Items'),
+              const _SectionHeader(number: '2', title: 'Meal Items & Add-ons'),
               _AddFoodSection(
                 searchMode: _searchMode,
                 mealType: _mealType,
@@ -664,6 +664,16 @@ class _AddFoodSectionState extends State<_AddFoodSection> {
                   ),
             ),
           ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Add extras like cheese or tomato separately so their calories and macros are counted.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+          ),
           if (widget.searchQuery.length >= 2) ...[
             const SizedBox(height: 12),
             ...widget.searchResults.map((food) => _SearchResultTile(
@@ -692,7 +702,7 @@ class _AddFoodSectionState extends State<_AddFoodSection> {
               child: TextButton.icon(
                 onPressed: widget.onAddAnother,
                 icon: const Icon(Icons.add_circle_outline, size: 18),
-                label: const Text('Add Another Item'),
+                label: const Text('Add Food or Add-on'),
               ),
             ),
           ],

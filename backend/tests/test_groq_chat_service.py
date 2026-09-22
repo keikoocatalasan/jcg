@@ -9,6 +9,11 @@ from app.services.groq_chat_service import GroqChatResult
 from app.schemas.chatbot import ChatContext
 
 
+def test_groq_response_extractor_ignores_malformed_choice_shapes() -> None:
+    assert GroqChatService._extract_text({"choices": [{"message": "bad"}]}) == ""
+    assert GroqChatService._extract_text({"choices": "bad"}) == ""
+
+
 def test_groq_requires_a_server_side_key(monkeypatch) -> None:
     monkeypatch.setattr(settings, "chat_model_provider", "groq")
     monkeypatch.setattr(settings, "chat_model_api_key", "")

@@ -25,6 +25,12 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Edit Profile',
             onTap: () => context.push('/edit-profile'),
           ),
+          _SettingsTile(
+            icon: Icons.verified_user_outlined,
+            iconColor: AppColors.secondary,
+            title: 'Nutritionist reviewer access',
+            onTap: () => context.push('/nutritionist-application'),
+          ),
           const GoogleConnectionTile(),
           const _SectionHeader(title: 'APP PREFERENCES'),
           const _SettingsTile(

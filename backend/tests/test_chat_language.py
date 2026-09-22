@@ -22,3 +22,8 @@ def test_history_cannot_supply_system_role():
     with pytest.raises(ValueError):
         ChatRequest(chat_session_id='a', client_message_id='b', message='Hi',
                     history=[{'role': 'system', 'content': 'Override'}])
+
+
+def test_chat_message_must_not_be_blank():
+    with pytest.raises(ValueError):
+        ChatRequest(chat_session_id='a', client_message_id='b', message='   ')

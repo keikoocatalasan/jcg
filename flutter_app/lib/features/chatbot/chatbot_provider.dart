@@ -6,7 +6,6 @@ import 'package:jcg_fitness/core/database/chat_message_repository.dart' as db;
 import 'package:jcg_fitness/core/database/chat_session_repository.dart';
 import 'package:jcg_fitness/core/database/database_provider.dart';
 import 'package:jcg_fitness/core/database/local_user_id_provider.dart';
-import 'package:jcg_fitness/core/database/profile_repository.dart';
 import 'package:jcg_fitness/core/database/sync_queue_repository.dart';
 import 'package:jcg_fitness/core/errors/result.dart';
 import 'package:jcg_fitness/core/network/api_client.dart';
@@ -14,7 +13,6 @@ import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/sync/sync_provider.dart';
 import 'package:jcg_fitness/core/utils/uuid_helper.dart';
 import 'package:jcg_fitness/features/auth/auth_provider.dart';
-import 'package:jcg_fitness/features/dashboard/dashboard_provider.dart';
 
 const _fastApiBaseUrl = AppConfig.fastApiBaseUrl;
 final chatProcessingProvider =
@@ -110,7 +108,6 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
   late final chatMsgRepo = db.ChatMessageRepository(dbProvider);
   late final chatSessionRepo = ChatSessionRepository(dbProvider);
   late final syncQueueRepo = SyncQueueRepository(dbProvider);
-  late final profileRepo = ProfileRepository(dbProvider);
 
   Future<void> loadOrCreateSession() async {
     final userId = await _getLocalUserId();
@@ -247,14 +244,11 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     await chatMsgRepo.updateDeliveryStatus(userMsgId, 'sent_to_api');
     _ref.invalidate(chatMessagesProvider(session.chatSessionId));
 
-    final context = await _buildContext();
-
     try {
       final result = await _callChatApi(
         session.chatSessionId,
         userMsgId,
         text,
-        context,
       );
 
       switch (result) {
@@ -299,7 +293,6 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
     String sessionId,
     String messageId,
     String message,
-    Map<String, dynamic> context,
   ) async {
     final apiClient = _apiClientProvider();
     final rows = await chatMsgRepo.queryBySession(sessionId);
@@ -313,7 +306,6 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
       'message': message,
       'chat_session_id': sessionId,
       'client_message_id': messageId,
-      'context': context,
       'history': previous
           .skip(previous.length > 12 ? previous.length - 12 : 0)
           .map((row) => {
@@ -324,46 +316,6 @@ class ChatSessionNotifier extends StateNotifier<ChatSession?> {
               })
           .toList(),
     });
-  }
-
-  Future<Map<String, dynamic>> _buildContext() async {
-    final authUserId = _getAuthUserId();
-    if (authUserId == null) return {};
-
-    try {
-      final profile = await profileRepo.readByUserId(authUserId);
-      if (profile == null) return {};
-      final dashboard = await _ref.read(dashboardDataProvider.future);
-      final splitValues = (String? value) => (value ?? '')
-          .split(',')
-          .map((item) => item.trim())
-          .where((item) => item.isNotEmpty)
-          .toList(growable: false);
-      final remainingBudget = (dashboard.dailyBudget - dashboard.spentBudget)
-          .clamp(0.0, double.infinity);
-      final remainingCalories =
-          (dashboard.targetCalories - dashboard.consumedCalories)
-              .clamp(0, 2147483647);
-      final remainingProtein =
-          (dashboard.targetProtein - dashboard.consumedProtein)
-              .clamp(0.0, double.infinity);
-      final remainingCarbs = (dashboard.targetCarbs - dashboard.consumedCarbs)
-          .clamp(0.0, double.infinity);
-      final remainingFat = (dashboard.targetFat - dashboard.consumedFat)
-          .clamp(0.0, double.infinity);
-      return {
-        'fitness_goal': profile.fitnessGoalCode,
-        'remaining_budget_php': remainingBudget,
-        'remaining_calories': remainingCalories,
-        'remaining_protein_g': remainingProtein,
-        'remaining_carbs_g': remainingCarbs,
-        'remaining_fat_g': remainingFat,
-        'allergies': splitValues(profile.allergies),
-        'dietary_restrictions': splitValues(profile.dietaryRestrictions),
-      }..removeWhere((_, v) => v == null);
-    } catch (_) {
-      return {};
-    }
   }
 
   Future<void> _queueSync(

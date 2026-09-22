@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:jcg_fitness/app/theme.dart';
 
 class PrivacyScreen extends StatelessWidget {
@@ -23,7 +23,7 @@ class PrivacyScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Last updated: January 2025',
+              'Last updated: September 21, 2026',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -52,31 +52,36 @@ class PrivacyScreen extends StatelessWidget {
             _buildSection(
               context,
               '5. AI and Food Recognition',
-              'When you use the AI food scanner feature:\n\n• Images are processed to identify food items\n• Images are not stored permanently after processing\n• Recognition results are used to suggest nutritional data\n• You can manually correct any识别 errors',
+              'When you use the AI food scanner feature:\n\n• Images are sent to the configured AI provider online to identify food items\n• Recognition results are used to suggest nutritional data\n• You can manually correct recognition errors',
             ),
             _buildSection(
               context,
-              '6. Community Features',
+              '6. AI Chatbot',
+              'When you use the AI chatbot, your message and recent conversation history are sent to the configured AI provider to generate a reply. When available, the App also sends limited context needed to answer your question, such as your fitness goal, nutrition targets, today\'s logged meal totals, budget, allergies or dietary restrictions, and matching food-catalog information. Do not include information you do not want processed by the AI provider.',
+            ),
+            _buildSection(
+              context,
+              '7. Community Features',
               'Content you post in community features is visible to other users. You can control visibility by:\n\n• Deleting your posts\n• Reporting inappropriate content\n• Choosing what to share',
             ),
             _buildSection(
               context,
-              '7. Your Rights',
+              '8. Your Rights',
               'You have the right to:\n\n• Access your personal data\n• Correct inaccurate data\n• Delete your account and data\n• Export your data\n• Opt-out of non-essential data collection',
             ),
             _buildSection(
               context,
-              '8. Children\'s Privacy',
+              '9. Children\'s Privacy',
               'The App is not intended for children under 13. We do not knowingly collect information from children under 13. If you are a parent or guardian and believe your child has provided us with information, please contact us.',
             ),
             _buildSection(
               context,
-              '9. Changes to This Policy',
+              '10. Changes to This Policy',
               'We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new policy in the App and updating the "Last updated" date.',
             ),
             _buildSection(
               context,
-              '10. Contact Us',
+              '11. Contact Us',
               'If you have questions about this Privacy Policy, please contact us through the App\'s support features.',
             ),
             const SizedBox(height: 32),

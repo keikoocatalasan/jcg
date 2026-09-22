@@ -10,7 +10,9 @@ from app.main import app
 from app.routes.auth import _otp_store, _store_otp, _verify_otp
 from app.routes.chat import chatbot_service
 from app.routes.scan_food import scanner_service
+from app.schemas.chatbot import ChatContext
 from app.schemas.scan_food import ScanCandidate, ScanComponent
+from app.services.chatbot_service import ChatResult
 from app.services.nvidia_chat_service import NvidiaChatResult
 from app.services.scanner_service import ScanResult
 
@@ -109,6 +111,56 @@ def test_chat_route_returns_safe_response(monkeypatch) -> None:
     assert body["safety_status"] == "safe"
     assert body["assistant_message_id"]
     assert "breakfast" in body["reply"].lower()
+
+
+def test_chat_route_uses_server_context_and_preserves_client_contract(monkeypatch) -> None:
+    captured = {}
+
+    async def fake_context(**_kwargs):
+        return ChatContext(remaining_calories=125, allergies=["Peanuts"])
+
+    async def fake_response(message, context, history):
+        captured["message"] = message
+        captured["context"] = context
+        captured["history"] = history
+        return ChatResult(reply="Based on your JCG target, you have 125 kcal remaining.")
+
+    monkeypatch.setattr("app.routes.chat.chat_context_service.get_context", fake_context)
+    monkeypatch.setattr(chatbot_service, "get_response", fake_response)
+    response = client.post(
+        "/ai/chat",
+        headers=auth_headers("server-context-user"),
+        json={
+            "chat_session_id": "chat-context",
+            "client_message_id": "message-context",
+            "message": "What is left for today?",
+            "context": {"remaining_calories": 9999, "allergies": []},
+            "history": [{"role": "user", "content": "What was my target?"}],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["reply"].startswith("Based on your JCG target")
+    assert response.json()["assistant_message_id"]
+    assert response.json()["safety_status"] == "safe"
+    assert captured["context"].remaining_calories == 125
+    assert captured["context"].allergies == ["Peanuts"]
+    assert captured["history"][0].content == "What was my target?"
+
+
+def test_chat_route_rejects_message_over_limit() -> None:
+    response = client.post(
+        "/ai/chat",
+        headers=auth_headers("chat-too-long-user"),
+        json={
+            "chat_session_id": "chat-too-long",
+            "client_message_id": "message-too-long",
+            "message": "x" * 4001,
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_deterministic_chat_fallback_responds_to_the_input(monkeypatch) -> None:
@@ -427,9 +479,17 @@ def test_nvidia_provider_paths_are_connected_without_network(monkeypatch) -> Non
         )
 
     monkeypatch.setattr(settings, "ai_model_provider", "nvidia")
+    monkeypatch.setattr(settings, "chat_model_provider", "inherit")
     monkeypatch.setattr(settings, "ai_model_api_key", "test-nvidia-key")
     monkeypatch.setattr(scanner_service._nvidia, "create_text", fake_nvidia_create_text)
-    monkeypatch.setattr(chatbot_service._nvidia, "create_text", fake_nvidia_create_text)
+
+    async def fake_nvidia_create_chat(**_kwargs) -> NvidiaChatResult:
+        return NvidiaChatResult(
+            text="Try chicken adobo with vegetables within your remaining budget.",
+            model="meta/llama-3.2-11b-vision-instruct",
+        )
+
+    monkeypatch.setattr(chatbot_service._nvidia, "create_chat", fake_nvidia_create_chat)
 
     image = Image.new("RGB", (224, 224), color="white")
     buffer = BytesIO()

@@ -249,6 +249,11 @@ class AdminDashboardScreen extends ConsumerWidget {
         onTap: () => context.push('/admin/users'),
       ),
       (
+        icon: Icons.verified_user_outlined,
+        label: 'Nutritionist\nCredentials',
+        onTap: () => context.push('/admin/nutritionist-applications'),
+      ),
+      (
         icon: Icons.shield_outlined,
         label: 'Content Rules',
         onTap: () => context.push('/admin/content-rules'),

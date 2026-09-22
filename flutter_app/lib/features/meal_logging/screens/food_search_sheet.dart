@@ -8,14 +8,21 @@ import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 
+typedef FoodSearchFunction = Future<List<Food>> Function(
+  String query,
+  String mealType,
+);
+
 class FoodSearchSheet extends ConsumerStatefulWidget {
   final ValueChanged<Food> onFoodSelected;
   final String mealType;
+  final FoodSearchFunction? searchFoods;
 
   const FoodSearchSheet({
     super.key,
     required this.onFoodSelected,
     this.mealType = 'lunch',
+    this.searchFoods,
   });
 
   @override
@@ -60,11 +67,13 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
     });
 
     try {
-      final repo = FoodRepository(DatabaseProvider());
-      final results = await repo.searchByName(
-        query.trim(),
-        mealTypeCode: widget.mealType,
-      );
+      final normalizedQuery = query.trim();
+      final results = widget.searchFoods != null
+          ? await widget.searchFoods!(normalizedQuery, widget.mealType)
+          : await FoodRepository(DatabaseProvider()).searchByName(
+              normalizedQuery,
+              mealTypeCode: widget.mealType,
+            );
       if (mounted) {
         setState(() {
           _searchResults = results;
@@ -84,104 +93,118 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
   Widget build(BuildContext context) {
     final isOnline = ref.watch(isOnlineProvider);
 
-    return GlassContainer(
-      level: GlassSurfaceLevel.modal,
-      liveBlur: true,
-      height: MediaQuery.of(context).size.height * 0.9,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      child: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.divider,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const Expanded(
-                  child: Text(
-                    'Food Search',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(width: 48),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.filter_alt_outlined,
-                    size: 17, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Showing foods suitable for ${_mealTypeLabel(widget.mealType)}.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              controller: _searchController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Search for a food',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.qr_code_scanner),
-                  onPressed: () => context.push('/ai-scanner'),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final availableHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : MediaQuery.sizeOf(context).height;
+
+        return GlassContainer(
+          level: GlassSurfaceLevel.modal,
+          liveBlur: false,
+          width: availableWidth,
+          height: availableHeight * 0.9,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              onChanged: _search,
-            ),
-          ),
-          if (!isOnline)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Food Search',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.cloud_off,
-                      size: 16, color: AppColors.warning),
-                  const SizedBox(width: 8),
-                  Text(
-                    "You're offline. Showing results from local database only.",
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.warning,
-                        ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.filter_alt_outlined,
+                        size: 17, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Showing foods suitable for ${_mealTypeLabel(widget.mealType)}.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Search for a food',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.qr_code_scanner),
+                      onPressed: () => context.push('/ai-scanner'),
+                    ),
                   ),
-                ],
+                  onChanged: _search,
+                ),
               ),
-            ),
-          Expanded(
-            child:
-                _hasSearched ? _buildSearchResults() : _buildBrowseSections(),
+              if (!isOnline)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off,
+                          size: 16, color: AppColors.warning),
+                      const SizedBox(width: 8),
+                      Text(
+                        "You're offline. Showing results from local database only.",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.warning,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: _hasSearched
+                    ? _buildSearchResults()
+                    : _buildBrowseSections(),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -233,11 +256,11 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
       return _buildEmptyState();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(0, 16, 0, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -256,17 +279,10 @@ class _FoodSearchSheetState extends ConsumerState<FoodSearchSheet> {
             ],
           ),
         ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: _searchResults.length,
-            itemBuilder: (context, index) {
-              final food = _searchResults[index];
-              return _FoodResultTile(
-                food: food,
-                onTap: () => _onFoodSelected(food),
-              );
-            },
+        ..._searchResults.map(
+          (food) => _FoodResultTile(
+            food: food,
+            onTap: () => _onFoodSelected(food),
           ),
         ),
       ],

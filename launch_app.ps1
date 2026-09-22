@@ -33,13 +33,7 @@ $devAuthBypass = if ($env:JCG_DEV_BYPASS_AUTH) {
 } else {
     "false"
 }
-$livePreview = if ($env:JCG_LIVE_PREVIEW) {
-    $env:JCG_LIVE_PREVIEW
-} else {
-    "false"
-}
 flutter run -d $deviceId --dart-define-from-file=.env `
     --dart-define=FASTAPI_BASE_URL=$fastApiBaseUrl `
     --dart-define=APP_ENV=$appEnvironment `
-    --dart-define=JCG_DEV_BYPASS_AUTH=$devAuthBypass `
-    --dart-define=JCG_LIVE_PREVIEW=$livePreview
+    --dart-define=JCG_DEV_BYPASS_AUTH=$devAuthBypass

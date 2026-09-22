@@ -7,6 +7,7 @@ import 'package:jcg_fitness/core/database/food_repository.dart';
 import 'package:jcg_fitness/core/network/connectivity_service.dart';
 import 'package:jcg_fitness/core/utils/formatters.dart';
 import 'package:jcg_fitness/core/widgets/status_tag.dart';
+import 'package:jcg_fitness/features/nutritionist/widgets/nutritionist_food_review_section.dart';
 
 class FoodDetailScreen extends ConsumerStatefulWidget {
   final Food food;
@@ -73,6 +74,7 @@ class _FoodDetailScreenState extends ConsumerState<FoodDetailScreen> {
               ),
             ),
           _FoodHeader(food: _food),
+          NutritionistFoodReviewSection(food: _food, isOnline: isOnline),
           _MacroSummaryRow(food: _food),
           _NutritionFactsCard(food: _food),
           _LogFoodSection(

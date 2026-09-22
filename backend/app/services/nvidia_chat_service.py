@@ -17,6 +17,62 @@ class NvidiaChatResult:
 class NvidiaChatService:
     """Small client for NVIDIA's OpenAI-compatible serverless endpoint."""
 
+    async def create_chat(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        max_output_tokens: int | None = None,
+    ) -> NvidiaChatResult:
+        """Send role-separated text messages without changing scanner requests."""
+        api_key = settings.effective_chat_api_key
+        if not api_key:
+            raise RuntimeError(
+                "CHAT_MODEL_API_KEY or AI_MODEL_API_KEY is required for the NVIDIA provider"
+            )
+
+        body: dict = {
+            "model": settings.effective_chat_model,
+            "messages": messages,
+            "temperature": 0.2,
+            "stream": False,
+        }
+        if max_output_tokens is not None:
+            body["max_tokens"] = max_output_tokens
+
+        async with httpx.AsyncClient(
+            timeout=settings.ai_request_timeout_seconds,
+        ) as client:
+            for attempt in range(2):
+                try:
+                    response = await client.post(
+                        f"{settings.nvidia_base_url.rstrip('/')}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Accept": "application/json",
+                            "Content-Type": "application/json",
+                        },
+                        json=body,
+                    )
+                    response.raise_for_status()
+                    try:
+                        payload = response.json()
+                    except ValueError as exc:
+                        raise RuntimeError("NVIDIA provider returned invalid JSON") from exc
+                    break
+                except httpx.HTTPStatusError as exc:
+                    retryable = exc.response.status_code in {429, 500, 502, 503, 504}
+                    if attempt == 0 and retryable:
+                        await asyncio.sleep(0.75)
+                        continue
+                    raise
+
+        if not isinstance(payload, dict):
+            raise RuntimeError("NVIDIA provider returned an invalid response")
+        text = self._extract_text(payload)
+        if not text:
+            raise RuntimeError("NVIDIA provider returned no output text")
+        return NvidiaChatResult(text=text, model=payload.get("model"))
+
     async def create_text(
         self,
         *,
@@ -59,7 +115,10 @@ class NvidiaChatService:
                         json=body,
                     )
                     response.raise_for_status()
-                    payload = response.json()
+                    try:
+                        payload = response.json()
+                    except ValueError as exc:
+                        raise RuntimeError("NVIDIA provider returned invalid JSON") from exc
                     break
                 except httpx.HTTPStatusError as exc:
                     retryable = exc.response.status_code in {429, 500, 502, 503, 504}
@@ -68,6 +127,8 @@ class NvidiaChatService:
                         continue
                     raise
 
+        if not isinstance(payload, dict):
+            raise RuntimeError("NVIDIA provider returned an invalid response")
         text = self._extract_text(payload)
         if not text:
             raise RuntimeError("NVIDIA provider returned no output text")
@@ -117,10 +178,12 @@ class NvidiaChatService:
 
     @staticmethod
     def _extract_text(payload: dict) -> str:
-        choices = payload.get("choices") or []
-        if not choices:
+        choices = payload.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
             return ""
-        message = choices[0].get("message") or {}
+        message = choices[0].get("message")
+        if not isinstance(message, dict):
+            return ""
         content = message.get("content")
         if isinstance(content, str):
             return content.strip()
@@ -128,7 +191,7 @@ class NvidiaChatService:
             parts = [
                 item.get("text", "")
                 for item in content
-                if isinstance(item, dict) and item.get("text")
+                if isinstance(item, dict) and isinstance(item.get("text"), str)
             ]
             return "".join(parts).strip()
         return ""

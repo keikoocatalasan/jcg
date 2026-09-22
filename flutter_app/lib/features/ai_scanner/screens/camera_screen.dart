@@ -1,11 +1,8 @@
 import 'dart:async';
-import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -33,18 +30,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   bool _noCameras = false;
   bool _isInitializing = false;
   bool _isTakingPhoto = false;
-  bool _isLiveInferenceBusy = false;
-  static const _liveInferenceDefault = bool.fromEnvironment(
-    'JCG_LIVE_PREVIEW',
-    defaultValue: false,
-  );
-  bool _liveInferenceEnabled = _liveInferenceDefault;
-  int _liveInferenceGeneration = 0;
-  DateTime? _lastLiveInferenceAt;
-  String? _liveFoodName;
-  double _liveConfidence = 0;
-  int _stableFrameCount = 0;
-  String? _stableFoodName;
   String? _cameraError;
 
   @override
@@ -121,11 +106,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
         _isInitialized = true;
         _permissionChecked = true;
         _noCameras = false;
-        _lastLiveInferenceAt = null;
       });
-      if (_liveInferenceEnabled) {
-        unawaited(_startLiveInference(controller));
-      }
     } on CameraException catch (e) {
       if (mounted) {
         final denied = e.code == 'CameraAccessDenied' ||
@@ -168,30 +149,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
   Future<void> _disposeCamera({bool updateState = true}) async {
     final controller = _controller;
     _controller = null;
-    _liveInferenceGeneration++;
-    if (controller?.value.isStreamingImages == true) {
-      try {
-        await controller!.stopImageStream();
-      } catch (_) {
-        // The controller may already be closing during an app lifecycle change.
-      }
-    }
     if (updateState && mounted) setState(() => _isInitialized = false);
     await controller?.dispose();
-  }
-
-  Future<void> _toggleLiveInference() async {
-    final controller = _controller;
-    if (controller == null || !_isInitialized) return;
-
-    if (_liveInferenceEnabled) {
-      setState(() => _liveInferenceEnabled = false);
-      await _stopLiveInference();
-      return;
-    }
-
-    setState(() => _liveInferenceEnabled = true);
-    await _startLiveInference(controller);
   }
 
   Future<void> _toggleFlash() async {
@@ -240,7 +199,6 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
 
     try {
       setState(() => _isTakingPhoto = true);
-      await _stopLiveInference();
       final xfile = await _controller!.takePicture();
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -263,114 +221,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
     }
   }
 
-  Future<void> _startLiveInference(CameraController controller) async {
-    if (!_liveInferenceEnabled) return;
-    if (controller.value.isStreamingImages) return;
-    try {
-      await controller.startImageStream(_onCameraImage);
-    } on CameraException {
-      // Live preview is an enhancement; the shutter still works if the device
-      // cannot provide a compatible image stream.
-      if (mounted) setState(() => _liveInferenceEnabled = false);
-    }
-  }
-
-  Future<void> _stopLiveInference() async {
-    final controller = _controller;
-    _liveInferenceGeneration++;
-    if (controller != null && controller.value.isStreamingImages) {
-      try {
-        await controller.stopImageStream();
-      } catch (_) {
-        // Ignore a stream that was already stopped by the camera plugin.
-      }
-    }
-    if (mounted) {
-      setState(() {
-        _isLiveInferenceBusy = false;
-        _liveFoodName = null;
-        _liveConfidence = 0;
-        _stableFrameCount = 0;
-        _stableFoodName = null;
-      });
-    }
-  }
-
-  void _onCameraImage(CameraImage image) {
-    // Food recognition is performed only by the authenticated online scan.
-  }
-
-  Uint8List? _cameraImageToJpeg(CameraImage image) {
-    final format = image.format.group;
-    if (format != ImageFormatGroup.yuv420 &&
-        format != ImageFormatGroup.bgra8888) {
-      return null;
-    }
-    final width = image.width;
-    final height = image.height;
-    if (width <= 0 || height <= 0 || image.planes.isEmpty) return null;
-
-    // Live inference is a preview hint, not a photo export. Downsample before
-    // any conversion so a 1080p camera frame never becomes a million-pixel
-    // Dart loop on the UI isolate.
-    final scale = math.min(1.0, 320 / math.max(width, height));
-    final sampledWidth = math.max(1, (width * scale).round());
-    final sampledHeight = math.max(1, (height * scale).round());
-    final output = img.Image(width: sampledWidth, height: sampledHeight);
-
-    int readByte(Plane plane, int row, int column) {
-      final bytesPerPixel = plane.bytesPerPixel ?? 1;
-      final index = row * plane.bytesPerRow + column * bytesPerPixel;
-      if (index < 0 || index >= plane.bytes.length) return 128;
-      return plane.bytes[index];
-    }
-
-    for (var y = 0; y < sampledHeight; y++) {
-      final sourceY = (y * height / sampledHeight).floor().clamp(0, height - 1);
-      for (var x = 0; x < sampledWidth; x++) {
-        final sourceX = (x * width / sampledWidth).floor().clamp(0, width - 1);
-        int red;
-        int green;
-        int blue;
-        if (format == ImageFormatGroup.bgra8888) {
-          final plane = image.planes.first;
-          final bytesPerPixel = plane.bytesPerPixel ?? 4;
-          final index = sourceY * plane.bytesPerRow + sourceX * bytesPerPixel;
-          if (index < 0 || index + 2 >= plane.bytes.length) return null;
-          blue = plane.bytes[index];
-          green = plane.bytes[index + 1];
-          red = plane.bytes[index + 2];
-        } else {
-          if (image.planes.length < 3) return null;
-          final yPlane = image.planes[0];
-          final uPlane = image.planes[1];
-          final vPlane = image.planes[2];
-          final yValue = readByte(yPlane, sourceY, sourceX);
-          final uvRow = sourceY ~/ 2;
-          final uvColumn = sourceX ~/ 2;
-          final uValue = readByte(uPlane, uvRow, uvColumn);
-          final vValue = readByte(vPlane, uvRow, uvColumn);
-          final luminance = yValue.toDouble();
-          red = (luminance + 1.402 * (vValue - 128)).round();
-          green = (luminance -
-                  0.344136 * (uValue - 128) -
-                  0.714136 * (vValue - 128))
-              .round();
-          blue = (luminance + 1.772 * (uValue - 128)).round();
-        }
-        output.setPixelRgb(
-          x,
-          y,
-          red.clamp(0, 255),
-          green.clamp(0, 255),
-          blue.clamp(0, 255),
-        );
-      }
-    }
-    return Uint8List.fromList(img.encodeJpg(output, quality: 60));
-  }
-
-  Widget _buildLiveStatus(ThemeData theme) {
+  Widget _buildOnlineRecognitionStatus(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -382,7 +233,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.cloud_outlined,
             color: Colors.white,
             size: 20,
@@ -639,7 +490,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen>
           top: 16,
           left: 16,
           right: 16,
-          child: _buildLiveStatus(theme),
+          child: _buildOnlineRecognitionStatus(theme),
         ),
         if (!isOnline)
           Positioned(

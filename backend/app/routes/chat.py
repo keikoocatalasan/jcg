@@ -1,21 +1,24 @@
 import uuid
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.auth.jwt_verifier import verify_token
 from app.schemas.chatbot import ChatRequest, ChatResponse
+from app.services.chat_context_service import ChatContextService
 from app.services.chatbot_service import ChatbotService
 from app.services.safety_service import EMERGENCY_TOPICS, check_safety, contains_profanity
-from app.services.rate_limit_service import enforce_ai_rate_limit
+from app.services.rate_limit_service import enforce_chat_rate_limit
 
 router = APIRouter()
 chatbot_service = ChatbotService()
+chat_context_service = ChatContextService()
 
 
 @router.post("/ai/chat", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
-    _payload: dict = Depends(verify_token),
-    _rate_limit: None = Depends(enforce_ai_rate_limit),
+    http_request: Request,
+    payload: dict = Depends(verify_token),
+    _rate_limit: None = Depends(enforce_chat_rate_limit),
 ):
     safety = check_safety(request.message)
 
@@ -51,10 +54,22 @@ async def chat(
         )
 
     try:
-        if request.history:
-            result = await chatbot_service.get_response(request.message, request.context, request.history)
+        access_token = http_request.headers.get("authorization", "")
+        if access_token.lower().startswith("bearer "):
+            access_token = access_token[7:].strip()
         else:
-            result = await chatbot_service.get_response(request.message, request.context)
+            access_token = ""
+        trusted_context = await chat_context_service.get_context(
+            auth_user_id=str(payload.get("sub") or ""),
+            access_token=access_token,
+            message=request.message,
+            history=request.history,
+        )
+        result = await chatbot_service.get_response(
+            request.message,
+            trusted_context,
+            request.history,
+        )
     except httpx.TimeoutException as exc:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,

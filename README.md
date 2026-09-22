@@ -79,7 +79,6 @@ $env:JCG_BACKEND_PORT = "8001"
 $env:JCG_FASTAPI_BASE_URL = "http://10.0.2.2:8001"
 $env:JCG_APP_ENV = "development"
 $env:JCG_DEV_BYPASS_AUTH = "true"
-$env:JCG_LIVE_PREVIEW = "false" # enable only for bounded live hints
 # From the repository root, run the backend in one terminal:
 .\run_backend.ps1
 # In a second terminal, keep the same environment values and run:
@@ -89,10 +88,12 @@ $env:JCG_LIVE_PREVIEW = "false" # enable only for bounded live hints
 `JCG_DEV_BYPASS_AUTH` is compile-time, visible as `LOCAL QA`, and rejected in
 release/production builds. It must never be used for a production APK.
 
-The chatbot can inherit the existing server-side provider or use Groq
-independently with `CHAT_MODEL_PROVIDER=groq`, `CHAT_MODEL_API_KEY`,
-`CHAT_MODEL_NAME`, and `GROQ_BASE_URL`. Keep those values on the backend; do
-not put a Groq key in Flutter or source control.
+The chatbot can inherit the scanner's server-side provider or use OpenAI,
+NVIDIA, or Groq independently through `CHAT_MODEL_PROVIDER`. When choosing an
+independent provider, configure its matching `CHAT_MODEL_API_KEY` and a model
+name supported by that provider. Groq uses `GROQ_BASE_URL`; OpenAI and NVIDIA
+use their respective backend base URLs. Keep provider keys on the backend, not
+in Flutter or source control.
 
 For a production Android build, use the ignored `flutter_app/.env` file with
 the Render HTTPS API and `APP_ENV=production`, or start from

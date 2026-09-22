@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
@@ -73,6 +75,22 @@ class Settings(BaseSettings):
             return self.ai_model_name
         return self.chat_model_name.strip() or "openai/gpt-oss-20b"
 
+    @staticmethod
+    def _is_https_url(value: str) -> bool:
+        try:
+            parsed = urlsplit(value.strip())
+            _ = parsed.port
+            return (
+                parsed.scheme == "https"
+                and bool(parsed.hostname)
+                and parsed.username is None
+                and parsed.password is None
+                and not parsed.query
+                and not parsed.fragment
+            )
+        except ValueError:
+            return False
+
     def validate_runtime(self) -> None:
         scanner_provider = self.ai_model_provider.strip().lower()
         if scanner_provider not in {"deterministic", "openai", "nvidia"}:
@@ -97,9 +115,14 @@ class Settings(BaseSettings):
             raise ValueError(
                 "AI_MODEL_PROVIDER=deterministic is not allowed in production"
             )
+        if self.effective_chat_provider == "deterministic":
+            raise ValueError(
+                "CHAT_MODEL_PROVIDER=deterministic is not allowed in production"
+            )
         missing = [
             name for name, value in {
                 "SUPABASE_URL": self.supabase_url,
+                "SUPABASE_ANON_KEY": self.supabase_anon_key,
                 "SUPABASE_SERVICE_ROLE_KEY": self.supabase_service_role_key,
                 "SUPABASE_JWT_SECRET": self.supabase_jwt_secret,
                 "ALLOWED_ORIGINS": self.allowed_origins,
@@ -115,10 +138,41 @@ class Settings(BaseSettings):
             raise ValueError(
                 "CHAT_MODEL_API_KEY or AI_MODEL_API_KEY is required for the configured chat provider"
             )
-        if self.effective_chat_provider == "groq" and not self.groq_base_url.startswith("https://"):
-            raise ValueError("GROQ_BASE_URL must use HTTPS in production")
         if self.allowed_origins.strip() == "*":
             raise ValueError("ALLOWED_ORIGINS must not be '*' in production")
+        if not self._is_https_url(self.supabase_url):
+            raise ValueError("SUPABASE_URL must be a valid HTTPS URL in production")
+        if any(not self._is_https_origin(origin) for origin in self.allowed_origins_list):
+            raise ValueError("Every ALLOWED_ORIGINS entry must be an HTTPS origin in production")
+        secure_provider_urls = {
+            "openai": ("OPENAI_BASE_URL", self.openai_base_url),
+            "nvidia": ("NVIDIA_BASE_URL", self.nvidia_base_url),
+            "groq": ("GROQ_BASE_URL", self.groq_base_url),
+        }
+        used_providers = {scanner_provider, self.effective_chat_provider}
+        for provider in used_providers:
+            if provider not in secure_provider_urls:
+                continue
+            setting_name, value = secure_provider_urls[provider]
+            if not self._is_https_url(value):
+                raise ValueError(f"{setting_name} must be a valid HTTPS URL in production")
+
+    @staticmethod
+    def _is_https_origin(value: str) -> bool:
+        try:
+            parsed = urlsplit(value.strip())
+            _ = parsed.port
+            return (
+                parsed.scheme == "https"
+                and bool(parsed.hostname)
+                and parsed.username is None
+                and parsed.password is None
+                and parsed.path in {"", "/"}
+                and not parsed.query
+                and not parsed.fragment
+            )
+        except ValueError:
+            return False
 
 
 settings = Settings()
