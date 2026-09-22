@@ -7,11 +7,27 @@ import 'package:jcg_fitness/core/widgets/empty_state_widget.dart';
 import 'package:jcg_fitness/core/widgets/glass_container.dart';
 import 'package:jcg_fitness/features/admin/admin_provider.dart';
 
-class AdminUsersScreen extends ConsumerWidget {
+class AdminUsersScreen extends ConsumerStatefulWidget {
   const AdminUsersScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminUsersScreen> createState() => _AdminUsersScreenState();
+}
+
+class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
+  final _searchController = TextEditingController();
+  String _statusFilter = 'all';
+  String _roleFilter = 'all';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final usersAsync = ref.watch(adminUsersProvider);
     final rolesAsync = ref.watch(adminRolesProvider);
     final statusesAsync = ref.watch(adminAccountStatusesProvider);
@@ -30,20 +46,59 @@ class AdminUsersScreen extends ConsumerWidget {
                     subtitle: 'Registered users will appear here.',
                   );
                 }
+                final filteredUsers = users.where((user) {
+                  final query = _searchController.text.trim().toLowerCase();
+                  final matchesQuery = query.isEmpty ||
+                      (user.email ?? '').toLowerCase().contains(query) ||
+                      (user.nickname ?? '').toLowerCase().contains(query);
+                  final matchesStatus = _statusFilter == 'all' ||
+                      user.statusCode == _statusFilter;
+                  final matchesRole =
+                      _roleFilter == 'all' || user.roleCode == _roleFilter;
+                  return matchesQuery && matchesStatus && matchesRole;
+                }).toList();
+
                 return RefreshIndicator(
                   onRefresh: () async {
                     final refresh = ref.refresh(adminUsersProvider.future);
                     await refresh;
                   },
-                  child: ListView.separated(
+                  child: ListView(
                     padding: const EdgeInsets.all(12),
-                    itemCount: users.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, index) => _UserCard(
-                      entry: users[index],
-                      roles: roles,
-                      statuses: statuses,
-                    ),
+                    children: [
+                      _UserFilterPanel(
+                        controller: _searchController,
+                        roles: roles,
+                        statuses: statuses,
+                        roleFilter: _roleFilter,
+                        statusFilter: _statusFilter,
+                        resultCount: filteredUsers.length,
+                        onSearchChanged: (_) => setState(() {}),
+                        onRoleChanged: (value) =>
+                            setState(() => _roleFilter = value),
+                        onStatusChanged: (value) =>
+                            setState(() => _statusFilter = value),
+                      ),
+                      const SizedBox(height: 12),
+                      if (filteredUsers.isEmpty)
+                        const EmptyStateWidget(
+                          icon: Icons.filter_alt_off_outlined,
+                          title: 'No matching users',
+                          subtitle:
+                              'Try clearing a filter or changing your search.',
+                        )
+                      else
+                        ...filteredUsers.expand(
+                          (user) => [
+                            _UserCard(
+                              entry: user,
+                              roles: roles,
+                              statuses: statuses,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ),
+                    ],
                   ),
                 );
               },
@@ -66,6 +121,114 @@ class AdminUsersScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _UserFilterPanel extends StatelessWidget {
+  final TextEditingController controller;
+  final List<AdminRoleOption> roles;
+  final List<AdminAccountStatusOption> statuses;
+  final String roleFilter;
+  final String statusFilter;
+  final int resultCount;
+  final ValueChanged<String> onSearchChanged;
+  final ValueChanged<String> onRoleChanged;
+  final ValueChanged<String> onStatusChanged;
+
+  const _UserFilterPanel({
+    required this.controller,
+    required this.roles,
+    required this.statuses,
+    required this.roleFilter,
+    required this.statusFilter,
+    required this.resultCount,
+    required this.onSearchChanged,
+    required this.onRoleChanged,
+    required this.onStatusChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              onChanged: onSearchChanged,
+              decoration: InputDecoration(
+                labelText: 'Search users',
+                hintText: 'Name or email',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: controller.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          controller.clear();
+                          onSearchChanged('');
+                        },
+                        icon: const Icon(Icons.clear),
+                      ),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '$resultCount matching user${resultCount == 1 ? '' : 's'}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _filterChip('All roles', 'all', roleFilter, onRoleChanged),
+                ...roles.map((role) => _filterChip(
+                      role.name,
+                      role.code,
+                      roleFilter,
+                      onRoleChanged,
+                    )),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _filterChip(
+                    'All statuses', 'all', statusFilter, onStatusChanged),
+                ...statuses.map((status) => _filterChip(
+                      status.name,
+                      status.code,
+                      statusFilter,
+                      onStatusChanged,
+                    )),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip(
+    String label,
+    String value,
+    String selected,
+    ValueChanged<String> onSelected,
+  ) {
+    return FilterChip(
+      label: Text(label),
+      selected: value == selected,
+      onSelected: (_) => onSelected(value),
     );
   }
 }

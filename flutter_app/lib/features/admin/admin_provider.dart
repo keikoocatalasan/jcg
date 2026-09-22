@@ -183,6 +183,7 @@ class AdminUserEntry {
   final String authUserId;
   final String? email;
   final int roleId;
+  final String roleCode;
   final String roleName;
   final int statusId;
   final String statusCode;
@@ -195,6 +196,7 @@ class AdminUserEntry {
     required this.authUserId,
     required this.email,
     required this.roleId,
+    required this.roleCode,
     required this.roleName,
     required this.statusId,
     required this.statusCode,
@@ -212,6 +214,7 @@ final adminUsersProvider = FutureProvider<List<AdminUserEntry>>((ref) async {
         authUserId: AppConfig.localTestUserId,
         email: AppConfig.localTestUserEmail,
         roleId: 2,
+        roleCode: 'admin',
         roleName: 'Administrator',
         statusId: 1,
         statusCode: 'active',
@@ -238,6 +241,7 @@ final adminUsersProvider = FutureProvider<List<AdminUserEntry>>((ref) async {
             authUserId: row['auth_user_id'] as String,
             email: row['email'] as String?,
             roleId: (row['role_id'] as num).toInt(),
+            roleCode: row['role_code'] as String? ?? 'unknown',
             roleName: row['role_name'] as String? ?? 'Unknown role',
             statusId: (row['account_status_id'] as num).toInt(),
             statusCode: row['status_code'] as String? ?? 'unknown',
@@ -290,6 +294,7 @@ final adminUsersProvider = FutureProvider<List<AdminUserEntry>>((ref) async {
       authUserId: row['auth_user_id'] as String,
       email: null,
       roleId: roleId,
+      roleCode: role?.code ?? 'unknown',
       roleName: role?.name ?? 'Unknown role',
       statusId: statusId,
       statusCode: status?.code ?? 'unknown',
