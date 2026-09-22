@@ -33,7 +33,13 @@ $devAuthBypass = if ($env:JCG_DEV_BYPASS_AUTH) {
 } else {
     "false"
 }
+$localLiveAuth = if ($env:JCG_LOCAL_LIVE_AUTH) {
+    $env:JCG_LOCAL_LIVE_AUTH
+} else {
+    "false"
+}
 flutter run -d $deviceId --dart-define-from-file=.env `
     --dart-define=FASTAPI_BASE_URL=$fastApiBaseUrl `
     --dart-define=APP_ENV=$appEnvironment `
-    --dart-define=JCG_DEV_BYPASS_AUTH=$devAuthBypass
+    --dart-define=JCG_DEV_BYPASS_AUTH=$devAuthBypass `
+    --dart-define=JCG_LOCAL_LIVE_AUTH=$localLiveAuth

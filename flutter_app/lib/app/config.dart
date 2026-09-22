@@ -25,11 +25,20 @@ class AppConfig {
     'JCG_DEV_BYPASS_AUTH',
     defaultValue: false,
   );
+  /// Keeps a local emulator on the real Supabase login flow even when the
+  /// demo bypass flag is present in a shared launch command.
+  static const localLiveAuthRequested = bool.fromEnvironment(
+    'JCG_LOCAL_LIVE_AUTH',
+    defaultValue: false,
+  );
   static bool get isProduction =>
       environment.trim().toLowerCase() == 'production';
 
   static bool get isLocalTestMode =>
-      devAuthBypassRequested && !kReleaseMode && !isProduction;
+      devAuthBypassRequested &&
+      !localLiveAuthRequested &&
+      !kReleaseMode &&
+      !isProduction;
 
   static const localTestUserId = 'local-demo-admin';
   static const localTestUserEmail = 'demo.admin@local.jcg';

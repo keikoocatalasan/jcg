@@ -88,6 +88,12 @@ $env:JCG_DEV_BYPASS_AUTH = "true"
 `JCG_DEV_BYPASS_AUTH` is compile-time, visible as `LOCAL QA`, and rejected in
 release/production builds. It must never be used for a production APK.
 
+To test a real Supabase account on the emulator, keep the development
+environment but set `$env:JCG_LOCAL_LIVE_AUTH = "true"`. This disables the
+demo session while preserving the local backend URL. Do not enable the demo
+bypass and live-auth flags together unless you intentionally want the live
+login flow to win.
+
 The chatbot can inherit the scanner's server-side provider or use OpenAI,
 NVIDIA, or Groq independently through `CHAT_MODEL_PROVIDER`. When choosing an
 independent provider, configure its matching `CHAT_MODEL_API_KEY` and a model
